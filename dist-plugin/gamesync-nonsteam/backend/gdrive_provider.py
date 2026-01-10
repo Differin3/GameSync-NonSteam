@@ -9,6 +9,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 import io
+from base_provider import StorageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file']
 TOKEN_DIR = Path.home() / ".config" / "gamesync"
 TOKEN_FILE = TOKEN_DIR / "token.pickle"
 
-class GoogleDriveProvider:
+class GoogleDriveProvider(StorageProvider):
     def __init__(self, refresh_token: Optional[str] = None, client_id: Optional[str] = None, client_secret: Optional[str] = None):
         self.service = None
         self.creds = None
