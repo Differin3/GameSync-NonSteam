@@ -8,7 +8,7 @@ import {
   ButtonItem,
   Navigation,
 } from "@decky/ui";
-import { loadSettings, saveSettings, Settings } from "../utils/Settings";
+import { loadSettings, saveSettings, Settings, WEBDAV_PROVIDERS, WebDAVProviderType } from "../utils/Settings";
 
 export function Settings() {
   const [settings, setSettings] = useState<Settings>(loadSettings());
@@ -25,9 +25,39 @@ export function Settings() {
   const [debugLog, setDebugLog] = useState<string[]>([]);
 
   useEffect(() => {
+    // Загружаем настройки провайдера из backend при монтировании
+    const loadStorageConfig = async () => {
+      try {
+        const result: any = await call("load_storage_config", {});
+        if (result.success && result.config) {
+          const config = result.config;
+          setSettings(prev => ({
+            ...prev,
+            storageProvider: config.provider || 'gdrive',
+            clientId: config.client_id || prev.clientId || '',
+            clientSecret: config.client_secret || prev.clientSecret || '',
+            refreshToken: config.refresh_token || prev.refreshToken || '',
+            webdavProvider: (config.webdav_provider && ['custom', 'nextcloud', 'yandex', 'box', 'owncloud'].includes(config.webdav_provider)) 
+              ? (config.webdav_provider as WebDAVProviderType) 
+              : (prev.webdavProvider || 'custom'),
+            webdavUrl: config.url || prev.webdavUrl || '',
+            webdavUsername: config.username || prev.webdavUsername || '',
+            webdavPassword: config.password || prev.webdavPassword || '',
+            webdavOAuthToken: config.oauth_token || prev.webdavOAuthToken || ''
+          }));
+        }
+      } catch (error) {
+        console.error("Error loading storage config:", error);
+      }
+    };
+    loadStorageConfig();
+  }, []);
+
+  useEffect(() => {
     saveSettings(settings);
     // Логируем изменения для отладки
     console.log("Settings updated:", {
+      provider: settings.storageProvider,
       clientId: settings.clientId ? `${settings.clientId.length} chars` : "empty",
       clientSecret: settings.clientSecret ? `${settings.clientSecret.length} chars` : "empty",
       refreshToken: settings.refreshToken ? `${settings.refreshToken.length} chars` : "empty"
@@ -336,6 +366,31 @@ export function Settings() {
   };
 
   const testConnection = async () => {
+    if (settings.storageProvider === 'webdav') {
+      setTesting(true);
+      setTestResult(null);
+      try {
+      const result: any = await call("test_storage_connection", {
+        provider: 'webdav',
+        url: settings.webdavUrl,
+        username: settings.webdavUsername,
+        password: settings.webdavPassword,
+        oauth_token: settings.webdavOAuthToken
+      });
+        if (result.success) {
+          setTestResult(`✓ ${result.message || "Подключение успешно"}`);
+        } else {
+          setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
+        }
+      } catch (error: any) {
+        setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
+      } finally {
+        setTesting(false);
+      }
+      return;
+    }
+
+    // Google Drive
     if (!settings.refreshToken.trim()) {
       setTestResult("Введите refresh_token");
       return;
@@ -409,9 +464,71 @@ export function Settings() {
     });
   };
 
+  const saveStorageConfig = async () => {
+    try {
+      const result: any = await call("save_storage_config", {
+        provider: settings.storageProvider,
+        ...(settings.storageProvider === 'gdrive' ? {
+          client_id: settings.clientId,
+          client_secret: settings.clientSecret,
+          refresh_token: settings.refreshToken
+        } : {
+          url: settings.webdavUrl,
+          username: settings.webdavUsername,
+          password: settings.webdavPassword,
+          oauth_token: settings.webdavOAuthToken,
+          webdav_provider: settings.webdavProvider
+        })
+      });
+      if (result.success) {
+        setTestResult("✓ Настройки сохранены");
+      } else {
+        setTestResult(`✗ ${result.error || "Ошибка сохранения"}`);
+      }
+    } catch (error: any) {
+      setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
+    }
+  };
+
   return (
     <div>
+      {/* Storage Provider Selection */}
+      <PanelSection title="Выбор хранилища">
+        <PanelSectionRow>
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
+            Выберите провайдер для синхронизации сохранений
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={() => setSettings({ ...settings, storageProvider: 'gdrive' })}
+            disabled={settings.storageProvider === 'gdrive'}
+          >
+            {settings.storageProvider === 'gdrive' ? '✓ Google Drive' : 'Google Drive'}
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={() => setSettings({ ...settings, storageProvider: 'webdav' })}
+            disabled={settings.storageProvider === 'webdav'}
+          >
+            {settings.storageProvider === 'webdav' ? '✓ WebDAV' : 'WebDAV (проще!)'}
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={saveStorageConfig}
+          >
+            Сохранить настройки
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+
       {/* Google Drive Settings Section */}
+      {settings.storageProvider === 'gdrive' && (
       <PanelSection title="Google Drive Settings">
         <PanelSectionRow>
           <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
@@ -643,6 +760,158 @@ export function Settings() {
           </PanelSectionRow>
         )}
       </PanelSection>
+      )}
+
+      {/* WebDAV Settings Section */}
+      {settings.storageProvider === 'webdav' && (
+      <PanelSection title="WebDAV Settings">
+        <PanelSectionRow>
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
+            WebDAV - простой способ синхронизации без OAuth. Поддерживается Nextcloud, Яндекс Диск, Box и другие.
+          </div>
+        </PanelSectionRow>
+
+        <PanelSection title="Выберите провайдер">
+          {Object.entries(WEBDAV_PROVIDERS).map(([key, provider]) => (
+            <PanelSectionRow key={key}>
+              <ButtonItem
+                layout="below"
+                onClick={() => {
+                  const newUrl = key === 'custom' ? settings.webdavUrl : provider.url;
+                  setSettings({ 
+                    ...settings, 
+                    webdavProvider: key as WebDAVProviderType,
+                    webdavUrl: newUrl
+                  });
+                }}
+                disabled={settings.webdavProvider === key}
+              >
+                {settings.webdavProvider === key ? `✓ ${provider.name}` : provider.name}
+              </ButtonItem>
+            </PanelSectionRow>
+          ))}
+        </PanelSection>
+
+        <PanelSectionRow>
+          <TextField
+            label="WebDAV URL"
+            value={settings.webdavUrl || ""}
+            onChange={(e) =>
+              setSettings({ ...settings, webdavUrl: e.target.value })
+            }
+            description={WEBDAV_PROVIDERS[settings.webdavProvider || 'custom']?.description || "URL WebDAV сервера"}
+          />
+        </PanelSectionRow>
+
+        {settings.webdavProvider === 'yandex' && (
+          <>
+            <PanelSectionRow>
+              <div style={{ fontSize: "11px", color: "#888", padding: "8px", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }}>
+                <div style={{ fontWeight: "bold", marginBottom: "4px" }}>Яндекс Диск - два способа авторизации:</div>
+                <div><strong>1. Basic-аутентификация:</strong> Логин и пароль приложения (проще)</div>
+                <div><strong>2. OAuth-токен:</strong> Токен из oauth.yandex.ru (безопаснее)</div>
+                <div style={{ marginTop: "8px", fontSize: "10px" }}>
+                  Для Basic: создайте пароль приложения с типом "Файлы" в настройках Яндекс ID
+                </div>
+              </div>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <TextField
+                label="OAuth токен (опционально, если используете Basic - оставьте пустым)"
+                value={settings.webdavOAuthToken || ""}
+                onChange={(e) =>
+                  setSettings({ ...settings, webdavOAuthToken: e.target.value })
+                }
+                description="Получите на oauth.yandex.ru/authorize?response_type=token&client_id=YOUR_CLIENT_ID"
+              />
+            </PanelSectionRow>
+          </>
+        )}
+
+        {!settings.webdavOAuthToken && (
+          <>
+            <PanelSectionRow>
+              <TextField
+                label="Логин"
+                value={settings.webdavUsername || ""}
+                onChange={(e) =>
+                  setSettings({ ...settings, webdavUsername: e.target.value })
+                }
+                description={settings.webdavProvider === 'yandex' ? "Логин Яндекс ID или пароль приложения" : "Ваш логин для WebDAV"}
+              />
+            </PanelSectionRow>
+
+            <PanelSectionRow>
+              <TextField
+                label="Пароль"
+                value={settings.webdavPassword || ""}
+                onChange={(e) =>
+                  setSettings({ ...settings, webdavPassword: e.target.value })
+                }
+                description={settings.webdavProvider === 'yandex' ? "Пароль приложения (тип: Файлы)" : "Ваш пароль для WebDAV"}
+              />
+            </PanelSectionRow>
+          </>
+        )}
+
+        {settings.webdavProvider === 'custom' && (
+          <PanelSectionRow>
+            <div style={{ fontSize: "11px", color: "#888", padding: "8px", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }}>
+              <div style={{ fontWeight: "bold", marginBottom: "4px" }}>Примеры WebDAV хостингов:</div>
+              <div>• Nextcloud: https://nextcloud.com/remote.php/dav/files/USERNAME/</div>
+              <div>• Яндекс Диск: https://webdav.yandex.ru</div>
+              <div>• Box: https://dav.box.com/dav/</div>
+              <div>• ownCloud: https://your-server.com/remote.php/dav/files/USERNAME/</div>
+            </div>
+          </PanelSectionRow>
+        )}
+
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={async () => {
+            setTesting(true);
+            setTestResult(null);
+            try {
+              const result: any = await call("test_storage_connection", {
+                provider: 'webdav',
+                url: settings.webdavUrl,
+                username: settings.webdavUsername,
+                password: settings.webdavPassword,
+                oauth_token: settings.webdavOAuthToken
+              });
+              if (result.success) {
+                setTestResult(`✓ ${result.message || "Подключение успешно"}`);
+              } else {
+                setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
+              }
+            } catch (error: any) {
+              setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
+            } finally {
+              setTesting(false);
+            }
+          }} disabled={testing || !settings.webdavUrl || (!settings.webdavOAuthToken && (!settings.webdavUsername || !settings.webdavPassword))}>
+            {testing ? "Тестирование..." : "Тест подключения"}
+          </ButtonItem>
+        </PanelSectionRow>
+
+        {testResult && (
+          <PanelSectionRow>
+            <div
+              style={{
+                padding: "10px",
+                backgroundColor: testResult.startsWith("✓")
+                  ? "#0a4a0a"
+                  : "#4a0a0a",
+                color: "#fff",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              {testResult}
+            </div>
+          </PanelSectionRow>
+        )}
+      </PanelSection>
+      )}
 
       {/* Sync Settings Section */}
       <PanelSection title="Sync Settings">

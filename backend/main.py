@@ -88,25 +88,62 @@ class Plugin:
             if not archive_path:
                 return {"success": False, "error": "Не удалось создать архив"}
             
-            # Загружаем на Google Drive
+            # Загружаем провайдер хранилища
             try:
-                from config_manager import load_gdrive_config
+                from config_manager import load_storage_config
             except ImportError:
                 import sys
                 import pathlib
                 backend_path = pathlib.Path(__file__).parent
                 sys.path.insert(0, str(backend_path))
-                from config_manager import load_gdrive_config
+                from config_manager import load_storage_config
             
-            gdrive_config = load_gdrive_config()
-            if not gdrive_config.get('refresh_token') or not gdrive_config.get('client_id') or not gdrive_config.get('client_secret'):
-                return {"success": False, "error": "Не настроен Google Drive. Укажите Client ID, Client Secret и Refresh Token в настройках."}
+            storage_config = load_storage_config()
+            provider_type = storage_config.get('provider', 'gdrive')
             
-            provider = GoogleDriveProvider(
-                refresh_token=gdrive_config.get('refresh_token'),
-                client_id=gdrive_config.get('client_id'),
-                client_secret=gdrive_config.get('client_secret')
-            )
+            # Создаем провайдер в зависимости от типа
+            if provider_type == 'webdav':
+                try:
+                    from webdav_provider import WebDAVProvider
+                except ImportError:
+                    import sys
+                    import pathlib
+                    backend_path = pathlib.Path(__file__).parent
+                    sys.path.insert(0, str(backend_path))
+                    from webdav_provider import WebDAVProvider
+                
+                url = storage_config.get('url', '')
+                username = storage_config.get('username', '')
+                password = storage_config.get('password', '')
+                oauth_token = storage_config.get('oauth_token', '')
+                
+                if not url:
+                    return {"success": False, "error": "Не настроен WebDAV. Укажите URL в настройках."}
+                
+                if not oauth_token and (not username or not password):
+                    return {"success": False, "error": "Не настроен WebDAV. Укажите логин/пароль или OAuth токен в настройках."}
+                
+                provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
+            else:  # gdrive по умолчанию
+                try:
+                    from config_manager import load_gdrive_config
+                except ImportError:
+                    import sys
+                    import pathlib
+                    backend_path = pathlib.Path(__file__).parent
+                    sys.path.insert(0, str(backend_path))
+                    from config_manager import load_gdrive_config
+                
+                gdrive_config = load_gdrive_config()
+                if not gdrive_config.get('refresh_token') or not gdrive_config.get('client_id') or not gdrive_config.get('client_secret'):
+                    return {"success": False, "error": "Не настроен Google Drive. Укажите Client ID, Client Secret и Refresh Token в настройках."}
+                
+                provider = GoogleDriveProvider(
+                    refresh_token=gdrive_config.get('refresh_token'),
+                    client_id=gdrive_config.get('client_id'),
+                    client_secret=gdrive_config.get('client_secret')
+                )
+            
             file_id = provider.upload_file(archive_path, "GameSync")
             
             if not file_id:
@@ -452,21 +489,37 @@ class Plugin:
                     if not last_sync or sync_date > last_sync:
                         last_sync = sync_date
                 
-                # Пытаемся получить размер файла из Google Drive
+                # Пытаемся получить размер файла из хранилища
                 file_id = game_data.get('fileId')
                 if file_id:
                     try:
-                        from config_manager import load_gdrive_config
-                        gdrive_config = load_gdrive_config()
-                        if gdrive_config.get('refresh_token') and gdrive_config.get('client_id') and gdrive_config.get('client_secret'):
-                            provider = GoogleDriveProvider(
-                                refresh_token=gdrive_config.get('refresh_token'),
-                                client_id=gdrive_config.get('client_id'),
-                                client_secret=gdrive_config.get('client_secret')
-                            )
-                            file_info = provider.get_file_info(file_id)
-                            if file_info and file_info.get('size'):
-                                total_size += file_info['size']
+                        from config_manager import load_storage_config
+                        storage_config = load_storage_config()
+                        provider_type = storage_config.get('provider', 'gdrive')
+                        
+                        if provider_type == 'webdav':
+                            from webdav_provider import WebDAVProvider
+                            url = storage_config.get('url', '')
+                            username = storage_config.get('username', '')
+                            password = storage_config.get('password', '')
+                            oauth_token = storage_config.get('oauth_token', '')
+                            if url and (oauth_token or (username and password)):
+                                provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
+                                file_info = provider.get_file_info(file_id)
+                                if file_info and file_info.get('size'):
+                                    total_size += file_info['size']
+                        else:
+                            from config_manager import load_gdrive_config
+                            gdrive_config = load_gdrive_config()
+                            if gdrive_config.get('refresh_token') and gdrive_config.get('client_id') and gdrive_config.get('client_secret'):
+                                provider = GoogleDriveProvider(
+                                    refresh_token=gdrive_config.get('refresh_token'),
+                                    client_id=gdrive_config.get('client_id'),
+                                    client_secret=gdrive_config.get('client_secret')
+                                )
+                                file_info = provider.get_file_info(file_id)
+                                if file_info and file_info.get('size'):
+                                    total_size += file_info['size']
                     except:
                         pass
             
@@ -656,16 +709,88 @@ class Plugin:
     async def load_gdrive_config(self, *args, **kwargs) -> Dict[str, Any]:
         """Загрузка конфигурации Google Drive из backend"""
         try:
-            from config_manager import load_gdrive_config
-            config = load_gdrive_config()
-            return {
-                "success": True,
-                "client_id": config.get("client_id", ""),
-                "client_secret": config.get("client_secret", ""),
-                "refresh_token": config.get("refresh_token", "")
-            }
+            from config_manager import load_storage_config
+            storage_config = load_storage_config()
+            if storage_config.get('provider') == 'gdrive':
+                return {
+                    "success": True,
+                    "client_id": storage_config.get("client_id", ""),
+                    "client_secret": storage_config.get("client_secret", ""),
+                    "refresh_token": storage_config.get("refresh_token", "")
+                }
+            return {"success": True, "client_id": "", "client_secret": "", "refresh_token": ""}
         except Exception as e:
             logger.error(f"Error loading gdrive config: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def save_storage_config(self, provider: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Сохранение конфигурации хранилища"""
+        try:
+            from config_manager import save_storage_config
+            
+            if not provider:
+                provider = kwargs.get('provider', 'gdrive')
+            
+            if provider == 'webdav':
+                url = kwargs.get('url', '')
+                username = kwargs.get('username', '')
+                password = kwargs.get('password', '')
+                oauth_token = kwargs.get('oauth_token', '')
+                webdav_provider = kwargs.get('webdav_provider', 'custom')
+                save_storage_config(provider='webdav', webdav_provider=webdav_provider, url=url, username=username, password=password, oauth_token=oauth_token)
+            else:  # gdrive
+                client_id = kwargs.get('client_id', '')
+                client_secret = kwargs.get('client_secret', '')
+                refresh_token = kwargs.get('refresh_token', '')
+                save_storage_config(provider='gdrive', client_id=client_id, client_secret=client_secret, refresh_token=refresh_token)
+            
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Error saving storage config: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def load_storage_config(self, *args, **kwargs) -> Dict[str, Any]:
+        """Загрузка конфигурации хранилища"""
+        try:
+            from config_manager import load_storage_config
+            config = load_storage_config()
+            return {"success": True, "config": config}
+        except Exception as e:
+            logger.error(f"Error loading storage config: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def test_storage_connection(self, provider: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Тест подключения к хранилищу"""
+        try:
+            from config_manager import load_storage_config
+            
+            if not provider:
+                storage_config = load_storage_config()
+                provider = storage_config.get('provider', 'gdrive')
+            else:
+                storage_config = kwargs
+            
+            if provider == 'webdav':
+                from webdav_provider import WebDAVProvider
+                
+                url = storage_config.get('url', '') or kwargs.get('url', '')
+                username = storage_config.get('username', '') or kwargs.get('username', '')
+                password = storage_config.get('password', '') or kwargs.get('password', '')
+                oauth_token = storage_config.get('oauth_token', '') or kwargs.get('oauth_token', '')
+                
+                if not url:
+                    return {"success": False, "error": "Не указан URL"}
+                
+                if not oauth_token and (not username or not password):
+                    return {"success": False, "error": "Не указаны логин/пароль или OAuth токен"}
+                
+                provider_obj = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
+                result = provider_obj.test_connection()
+                return result
+            else:  # gdrive
+                return await self.test_gdrive_connection(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error testing storage connection: {e}")
             return {"success": False, "error": str(e)}
 
 class GoogleOAuthMonitor:

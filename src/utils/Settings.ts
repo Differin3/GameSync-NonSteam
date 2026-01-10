@@ -1,15 +1,40 @@
+export type WebDAVProviderType = 'custom' | 'nextcloud' | 'yandex' | 'box' | 'owncloud';
+
 export interface Settings {
+  storageProvider: 'gdrive' | 'webdav';
+  // Google Drive
   refreshToken: string;
   clientId: string;
   clientSecret: string;
+  // WebDAV
+  webdavProvider: WebDAVProviderType;
+  webdavUrl: string;
+  webdavUsername: string;
+  webdavPassword: string;
+  webdavOAuthToken: string; // Для Яндекс Диска через OAuth
+  // Общие
   autoSync: boolean;
   defaultSavePaths: string[];
 }
 
+export const WEBDAV_PROVIDERS: Record<WebDAVProviderType, { name: string; url: string; description: string }> = {
+  custom: { name: 'Другой', url: '', description: 'Введите URL вручную' },
+  nextcloud: { name: 'Nextcloud', url: 'https://nextcloud.com/remote.php/dav/files/USERNAME/', description: 'Бесплатный облачный хостинг' },
+  yandex: { name: 'Яндекс Диск', url: 'https://webdav.yandex.ru', description: '10GB бесплатно, Basic или OAuth' },
+  box: { name: 'Box', url: 'https://dav.box.com/dav/', description: 'Корпоративное хранилище' },
+  owncloud: { name: 'ownCloud', url: 'https://your-server.com/remote.php/dav/files/USERNAME/', description: 'Свой сервер ownCloud' }
+};
+
 export const DEFAULT_SETTINGS: Settings = {
+  storageProvider: 'gdrive',
   refreshToken: "",
   clientId: "",
   clientSecret: "",
+  webdavProvider: 'custom',
+  webdavUrl: "",
+  webdavUsername: "",
+  webdavPassword: "",
+  webdavOAuthToken: "",
   autoSync: false,
   defaultSavePaths: []
 };
