@@ -1,0 +1,19 @@
+{
+  "name": "Wine Cellar",
+  "author": "FlashyReese",
+  "flags": [
+    "debug"
+  ],
+  "api_version": 1,
+  "publish": {
+    "tags": [
+      "proton",
+      "proton-ge",
+      "luxtorpeda",
+      "boxtron",
+      "wine"
+    ],
+    "description": "A decky plugin to manage Steam Play compatibility tools",
+    "image": "https://raw.githubusercontent.com/FlashyReese/decky-wine-cellar/main/assets/decky-loader-store-cover.png"
+  }
+}

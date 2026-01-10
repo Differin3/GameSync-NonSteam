@@ -1,0 +1,515 @@
+#!/bin/bash
+# unifideck-launcher - UMU-based game launcher for Unifideck
+#
+# Usage: unifideck-launcher "store:game_id"
+#
+# This script reads from ~/.local/share/unifideck/games.map
+# Format of map file: store:game_id|/path/to/exe|/path/to/workdir
+#
+# For Windows .exe games, umu-launcher handles Proton execution with:
+# - Automatic prefix creation
+# - Protonfixes from umu-database
+# - Steam Runtime container
+
+set -e
+
+LOG_FILE="$HOME/.local/share/unifideck/launcher.log"
+MAP_FILE="$HOME/.local/share/unifideck/games.map"
+PREFIXES_DIR="$HOME/.local/share/unifideck/prefixes"
+
+# Get the plugin directory (parent of bin/)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
+
+# umu-run location (bundled zipapp)
+UMU_RUN="$PLUGIN_DIR/bin/umu/umu/umu-run"
+
+# Heroic-specific paths (preferred when available - proven working)
+HEROIC_UMU_RUN="$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/tools/runtimes/umu/umu_run.py"
+HEROIC_LEGENDARY_CONFIG="$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/legendaryConfig/legendary"
+
+mkdir -p "$(dirname "$LOG_FILE")" "$PREFIXES_DIR"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+# Cloud save sync script (Python - uses legendary/gogdl)
+CLOUD_SAVE_SCRIPT="$PLUGIN_DIR/bin/cloud_save_sync.py"
+
+# Sync cloud saves before/after game launch
+# Usage: sync_cloud_saves "epic|gog" "game_id" "download|upload" "prefix_path" ["save_path"]
+sync_cloud_saves() {
+    local store="$1"
+    local game_id="$2"
+    local direction="$3"
+    local prefix_path="${4:-}"
+    local save_path="${5:-}"
+    
+    if [ ! -f "$CLOUD_SAVE_SCRIPT" ]; then
+        log "[CloudSave] Sync script not found, skipping"
+        return 0
+    fi
+    
+    log "[CloudSave] Syncing $store/$game_id ($direction)..."
+    
+    if python3 "$CLOUD_SAVE_SCRIPT" "$store" "$game_id" "$direction" "$prefix_path" "$save_path" 2>>"$LOG_FILE"; then
+        log "[CloudSave] Sync completed successfully"
+        return 0
+    else
+        log "[CloudSave] Sync failed (non-critical, continuing)"
+        return 1
+    fi
+}
+
+# Reset environment to avoid conflicts
+# Clear LD_PRELOAD to prevent Steam's 32-bit overlay from interfering with 64-bit games
+unset LD_PRELOAD
+unset LD_LIBRARY_PATH
+unset STEAM_RUNTIME
+unset STEAM_COMPAT_CLIENT_INSTALL_PATH
+
+# 1. Get the lookup key (store:game_id)
+KEY="$1"
+shift || true
+
+if [ -z "$KEY" ]; then
+    log "ERROR: No game key provided"
+    exit 1
+fi
+
+log "=== Launching: $KEY ==="
+
+# 2. Look up in map file
+if [ ! -f "$MAP_FILE" ]; then
+    log "ERROR: Map file not found at $MAP_FILE"
+    if command -v zenity &>/dev/null; then
+        zenity --error --title="Unifideck" --text="No games configured.\n\nPlease run Sync Libraries from the Unifideck plugin first." --width=350 2>/dev/null &
+    fi
+    exit 1
+fi
+
+# Find line starting with KEY|
+GAME_ENTRY=$(grep "^$KEY|" "$MAP_FILE" | head -n 1)
+
+if [ -z "$GAME_ENTRY" ]; then
+    log "ERROR: Game not found in map for key: $KEY"
+    # Show user-friendly error using zenity if available
+    if command -v zenity &>/dev/null; then
+        zenity --error --title="Unifideck" --text="Game location not mapped.\n\nPlease run Force Sync from the Unifideck plugin and try again." --width=350 2>/dev/null &
+    fi
+    exit 1
+fi
+
+# 3. Parse entry
+# Format: key|exe|workdir
+IFS='|' read -r _ EXE_PATH WORK_DIR <<< "$GAME_ENTRY"
+
+if [ -z "$EXE_PATH" ]; then
+    log "ERROR: No executable path in map entry"
+    exit 1
+fi
+
+log "Executable: $EXE_PATH"
+log "Work Dir: $WORK_DIR"
+
+# 4. Check if executable exists
+if [ ! -f "$EXE_PATH" ]; then
+    log "ERROR: Executable not found: $EXE_PATH"
+    if command -v zenity &>/dev/null; then
+        zenity --error --title="Unifideck" --text="Game executable not found.\n\nThe game may have been uninstalled. Please reinstall." --width=350 2>/dev/null &
+    fi
+    exit 1
+fi
+
+# 5. Check if this is a Windows game (.exe)
+if [[ "$EXE_PATH" == *.exe ]] || [[ "$EXE_PATH" == *.EXE ]]; then
+    log "Windows game detected, using umu-launcher with Proton"
+    
+    # Parse store and game ID from key
+    STORE="${KEY%%:*}"      # 'epic', 'gog', or 'amazon'
+    GAME_ID="${KEY#*:}"     # Game ID after colon
+    
+    # Map store names to umu store codes
+    case "$STORE" in
+        epic)   UMU_STORE="egs" ;;
+        gog)    UMU_STORE="gog" ;;
+        amazon) UMU_STORE="amazon" ;;
+        *)      UMU_STORE="none" ;;
+    esac
+    
+    # Check for existing Heroic prefix (preferred - includes redistributables)
+    # Heroic stores prefixes at ~/Games/Heroic/Prefixes/default/<GameTitle>/
+    HEROIC_PREFIX_BASE="$HOME/Games/Heroic/Prefixes/default"
+    HEROIC_PREFIX=""
+    if [ -d "$HEROIC_PREFIX_BASE" ]; then
+        # Try to find a matching prefix by looking in Heroic's game config
+        HEROIC_GAME_CONFIG="$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/GamesConfig/$GAME_ID.json"
+        if [ -f "$HEROIC_GAME_CONFIG" ]; then
+            # Extract winePrefix from Heroic's config
+            HEROIC_PREFIX=$(python3 -c "import json; f=open('$HEROIC_GAME_CONFIG'); d=json.load(f); print(d.get('$GAME_ID', {}).get('winePrefix', ''))" 2>/dev/null)
+        fi
+    fi
+    
+    # Use External prefix if found and valid, otherwise use Unifideck prefix
+    if [ -n "$HEROIC_PREFIX" ] && [ -d "$HEROIC_PREFIX" ]; then
+        PREFIX_PATH="$HEROIC_PREFIX"
+        log "Using External (Shared) prefix: $PREFIX_PATH"
+    else
+        PREFIX_PATH="$PREFIXES_DIR/$GAME_ID"
+        mkdir -p "$PREFIX_PATH"
+        log "Using Unifideck prefix (Self-Managed): $PREFIX_PATH"
+    fi
+    
+    # Set umu environment variables
+    export WINEPREFIX="$PREFIX_PATH"
+    export GAMEID="$GAME_ID"
+    export STORE="$UMU_STORE"
+    
+    # Heroic/Legendary workaround for games requiring Epic Games Launcher
+    if [ "$STORE" == "epic" ] || [ "$STORE" == "egs" ]; then
+        export LEGENDARY_WRAPPER_EXE="C:\\windows\\command\\EpicGamesLauncher.exe"
+    fi
+    
+    # Try to use Steam's Proton (saves download time)
+    for PROTON_DIR in \
+        "$HOME/.steam/steam/steamapps/common/Proton - Experimental" \
+        "$HOME/.local/share/Steam/steamapps/common/Proton - Experimental" \
+        "$HOME/.steam/steam/steamapps/common/Proton 10.0" \
+        "$HOME/.steam/steam/steamapps/common/Proton 9.0 (Beta)" \
+        "$HOME/.steam/root/steamapps/common/Proton - Experimental"
+    do
+        if [ -d "$PROTON_DIR" ]; then
+            export PROTONPATH="$PROTON_DIR"
+            break
+        fi
+    done
+    
+    log "WINEPREFIX: $WINEPREFIX"
+    log "GAMEID: $GAMEID"
+    log "STORE: $STORE"
+    log "PROTONPATH: ${PROTONPATH:-<umu will download>}"
+    
+    # Check for umu-run
+    if [ ! -f "$UMU_RUN" ]; then
+        log "ERROR: umu-run not found at $UMU_RUN"
+        exit 1
+    fi
+    
+    # Change to work directory
+    if [ -d "$WORK_DIR" ]; then
+        cd "$WORK_DIR"
+        log "Changed to: $WORK_DIR"
+    fi
+    
+    # Launch with umu as wrapper via legendary (Heroic approach)
+    
+    # For Epic games, we now use legendary to launch (like Heroic does)
+    # This ensures proper Epic authentication and wrapper handling
+    if [ "$STORE" == "epic" ] || [ "$STORE" == "egs" ]; then
+        # QUICK FIX: Copy wrapper and apply registry (non-blocking, <1 second)
+        # Winetricks installation now happens in background during download
+        FIX_SCRIPT="$PLUGIN_DIR/bin/fix_epic_launcher_prefix.py"
+        if [ -f "$FIX_SCRIPT" ]; then
+             log "Applying quick Epic launcher fix..."
+             python3 "$FIX_SCRIPT" "$PREFIX_PATH" >> "$LOG_FILE" 2>&1 || true
+        fi
+        
+        log "Launching Epic game via legendary..."
+        
+        # PREFER Bundled Legendary binary (v0.20.38+) which has LEGENDARY_WRAPPER_EXE support
+        # We now download this during build, so checks for Heroic's binary are secondary/fallback
+        LEGENDARY_BIN="$PLUGIN_DIR/bin/legendary"
+        
+        if [ -f "$LEGENDARY_BIN" ]; then
+             log "Using Bundled legendary binary (should have WRAPPER_EXE support): $LEGENDARY_BIN"
+        else
+             # Fallback to finding Heroic's binary if bundled one is missing
+             HEROIC_LEGENDARY_BIN=$(find /var/lib/flatpak/app/com.heroicgameslauncher.hgl -name "legendary" -path "*/linux/*" 2>/dev/null | head -1)
+             if [ -f "$HEROIC_LEGENDARY_BIN" ]; then
+                LEGENDARY_BIN="$HEROIC_LEGENDARY_BIN"
+                log "Using External (Heroic) legendary binary: $LEGENDARY_BIN"
+             fi
+        fi
+
+        if [ ! -f "$LEGENDARY_BIN" ]; then
+            log "ERROR: legendary binary not found"
+            if command -v zenity &>/dev/null; then
+                zenity --error --title="Unifideck" --text="Legendary binary not found.\n\nPlease reinstall Unifideck plugin." --width=350 2>/dev/null &
+            fi
+            exit 1
+        fi
+
+        # Set additional environment variables (matching Heroic's exact config)
+        export STEAM_COMPAT_INSTALL_PATH="$WORK_DIR"
+        export GAMEID="umu-0"
+        export HEROIC_APP_NAME="$GAME_ID"
+        export HEROIC_APP_RUNNER="legendary"
+        export HEROIC_APP_SOURCE="epic"
+        export SteamGameId="heroic-$GAME_ID"
+        export STEAM_COMPAT_APP_ID="0"
+        export SteamAppId="0"
+
+        # Enable NVAPI for modern Proton
+        export PROTON_ENABLE_NVAPI="1"
+        export DXVK_NVAPI_ALLOW_OTHER_DRIVERS="1"
+
+
+        log "STEAM_COMPAT_INSTALL_PATH: $STEAM_COMPAT_INSTALL_PATH"
+        log "GAMEID: $GAMEID"
+        log "LEGENDARY_WRAPPER_EXE: $LEGENDARY_WRAPPER_EXE"
+
+        # Install/Update EOS overlay if not installed (required for games like FM24)
+        # Check if overlay_install.json exists in legendary config
+        EOS_INSTALL_MARKER="$HOME/.config/legendary/overlay_install.json"
+        if [ ! -f "$EOS_INSTALL_MARKER" ]; then
+            log "EOS Overlay not installed, installing..."
+            "$LEGENDARY_BIN" eos-overlay install -y 2>>"$LOG_FILE" || true
+        else
+            # Update to latest version (non-blocking, best effort)
+            "$LEGENDARY_BIN" eos-overlay update -y 2>>"$LOG_FILE" &
+        fi
+
+        # Enable EOS overlay for the /pfx subdirectory (like Heroic)
+        # Only if prefix is already initialized (has user.reg)
+        PFX_PATH="$PREFIX_PATH/pfx"
+        mkdir -p "$PFX_PATH"
+        if [ -f "$PFX_PATH/user.reg" ]; then
+            "$LEGENDARY_BIN" eos-overlay enable --prefix "$PFX_PATH" 2>>"$LOG_FILE" || true
+        else
+            log "Prefix not initialized yet, skipping EOS overlay enable"
+        fi
+
+        # === WINETRICKS: Install redistributables at first launch ===
+        # Check if winetricks was already run successfully
+        WINETRICKS_MARKER="$PREFIX_PATH/unifideck_winetricks_complete.marker"
+        WINETRICKS_SCRIPT="$PLUGIN_DIR/bin/winetricks_installer.py"
+
+        if [ ! -f "$WINETRICKS_MARKER" ] || ! grep -q "complete\|no redistributables" "$WINETRICKS_MARKER" 2>/dev/null; then
+            if [ -f "$WINETRICKS_SCRIPT" ]; then
+                log "[Winetricks] Running first-launch redistributables check..."
+                # Run in background so it doesn't block game launch
+                # The game may need these, but many games work without them
+                nohup python3 "$WINETRICKS_SCRIPT" "$GAME_ID" "$PREFIX_PATH" >> "$HOME/.local/share/unifideck/winetricks.log" 2>&1 &
+                log "[Winetricks] Started background installer (PID: $!)"
+            fi
+        else
+            log "[Winetricks] Redistributables already installed, skipping"
+        fi
+
+        # Get the umu-run path
+        # PREFER bundled umu-run - Heroic's flatpak uses Python 3.9 which causes
+        # SyntaxError on match statements in newer umu versions
+        if [ -f "$UMU_RUN" ]; then
+            UMU_WRAPPER="$UMU_RUN"
+            log "Using bundled umu-run: $UMU_WRAPPER"
+        elif [ -f "$HEROIC_UMU_RUN" ]; then
+            UMU_WRAPPER="$HEROIC_UMU_RUN"
+            log "Using External (Shared) umu-run: $UMU_WRAPPER"
+        elif command -v umu-run &>/dev/null; then
+            UMU_WRAPPER="umu-run"
+             log "Using system umu-run"
+        else
+             log "ERROR: umu-run not found"
+             exit 1
+        fi
+
+        # Determine Python path - need Python 3.10+ for modern umu-launcher (uses match statements)
+        # Check common system paths first, prefer newer versions
+        PYTHON_BIN=""
+        for py in /usr/bin/python3.13 /usr/bin/python3.12 /usr/bin/python3.11 /usr/bin/python3.10 /usr/bin/python3; do
+            if [ -x "$py" ]; then
+                PYTHON_BIN="$py"
+                break
+            fi
+        done
+        # Fallback to PATH resolution if no system python found
+        if [ -z "$PYTHON_BIN" ]; then
+            PYTHON_BIN="python3"
+        fi
+        log "Using Python: $PYTHON_BIN"
+
+        # Choose Legendary Config Path (Critical for Epic Auth)
+        # Check standard legendary config location first
+        if [ -f "$HOME/.config/legendary/user.json" ]; then
+            export LEGENDARY_CONFIG_PATH="$HOME/.config/legendary"
+            log "Using local LEGENDARY_CONFIG_PATH: $LEGENDARY_CONFIG_PATH"
+        # Fallback to Shared config if local doesn't exist
+        elif [ -f "$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/legendaryConfig/legendary/user.json" ]; then
+            export LEGENDARY_CONFIG_PATH="$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/legendaryConfig/legendary"
+            log "Using External LEGENDARY_CONFIG_PATH: $LEGENDARY_CONFIG_PATH"
+        else
+            log "WARNING: No authenticated Legendary config found! Game may fail to launch."
+        fi
+
+        # Construct the legendary launch command
+        CMD="$LEGENDARY_BIN launch $GAME_ID --no-wine --wrapper \"$PYTHON_BIN $UMU_WRAPPER\" --language en"
+        log "Executing: $CMD"
+
+        # === CLOUD SAVE: Download before launch ===
+        sync_cloud_saves "epic" "$GAME_ID" "download" "$PREFIX_PATH"
+
+        # Execute legendary (wait for exit, don't use exec)
+        "$LEGENDARY_BIN" launch "$GAME_ID" --no-wine --wrapper "$PYTHON_BIN $UMU_WRAPPER" --language en 2>>"$LOG_FILE"
+        GAME_EXIT_CODE=$?
+
+        # === CLOUD SAVE: Upload after exit ===
+        log "Epic game exited with code: $GAME_EXIT_CODE"
+        sync_cloud_saves "epic" "$GAME_ID" "upload" "$PREFIX_PATH"
+
+        exit $GAME_EXIT_CODE
+    elif [ "$STORE" == "amazon" ]; then
+        # Amazon games may need fuel.json parsing for additional launch parameters
+        log "Amazon game detected, checking for fuel.json..."
+
+        # Find fuel.json in game directory
+        FUEL_JSON="$WORK_DIR/fuel.json"
+        AMAZON_ARGS=""
+        if [ -f "$FUEL_JSON" ]; then
+            log "Found fuel.json at $FUEL_JSON"
+
+            # Parse launch args from fuel.json if present
+            AMAZON_ARGS=$(python3 -c "import json, re, sys
+try:
+    with open('$FUEL_JSON', 'r') as f:
+        content = f.read()
+        # Remove single-line comments (fuel.json may have them)
+        content = re.sub(r'//.*$', '', content, flags=re.MULTILINE)
+        data = json.loads(content)
+        main = data.get('Main', {})
+        args = main.get('Args', [])
+        if args:
+            print(' '.join(f'\"{arg}\"' for arg in args))
+except Exception as e:
+    print('', file=sys.stderr)
+" 2>> "$LOG_FILE" || true)
+            log "Obtained Amazon args: $AMAZON_ARGS"
+        else
+            log "No fuel.json found, launching without additional args"
+        fi
+
+        # Determine Python path - need Python 3.10+ for modern umu-launcher
+        PYTHON_BIN=""
+        for py in /usr/bin/python3.13 /usr/bin/python3.12 /usr/bin/python3.11 /usr/bin/python3.10 /usr/bin/python3; do
+            if [ -x "$py" ]; then
+                PYTHON_BIN="$py"
+                break
+            fi
+        done
+        if [ -z "$PYTHON_BIN" ]; then
+            PYTHON_BIN="python3"
+        fi
+        log "Using Python: $PYTHON_BIN"
+
+        # Get the umu-run path
+        if [ -f "$UMU_RUN" ]; then
+            UMU_WRAPPER="$UMU_RUN"
+            log "Using bundled umu-run: $UMU_WRAPPER"
+        elif command -v umu-run &>/dev/null; then
+            UMU_WRAPPER="umu-run"
+            log "Using system umu-run"
+        else
+            log "ERROR: umu-run not found"
+            exit 1
+        fi
+
+        # Build the command with any Amazon-specific args
+        if [ -n "$AMAZON_ARGS" ]; then
+            CMD_STR="$PYTHON_BIN $UMU_WRAPPER \"$EXE_PATH\" $AMAZON_ARGS $*"
+        else
+            CMD_STR="$PYTHON_BIN $UMU_WRAPPER \"$EXE_PATH\" $*"
+        fi
+        log "Executing: $CMD_STR"
+
+        # Execute umu-run for Amazon game
+        if [ -n "$AMAZON_ARGS" ]; then
+            eval "$PYTHON_BIN" "$UMU_WRAPPER" "\"$EXE_PATH\"" $AMAZON_ARGS "$@" 2>>"$LOG_FILE"
+        else
+            "$PYTHON_BIN" "$UMU_WRAPPER" "$EXE_PATH" "$@" 2>>"$LOG_FILE"
+        fi
+        GAME_EXIT_CODE=$?
+
+        log "Amazon game exited with code: $GAME_EXIT_CODE"
+        exit $GAME_EXIT_CODE
+    else
+        # GOG games: use direct umu-run (no legendary needed)
+        log "Launching GOG game via umu-run..."
+
+        # Determine Python path - need Python 3.10+ for modern umu-launcher
+        PYTHON_BIN=""
+        for py in /usr/bin/python3.13 /usr/bin/python3.12 /usr/bin/python3.11 /usr/bin/python3.10 /usr/bin/python3; do
+            if [ -x "$py" ]; then
+                PYTHON_BIN="$py"
+                break
+            fi
+        done
+        if [ -z "$PYTHON_BIN" ]; then
+            PYTHON_BIN="python3"
+        fi
+        log "Using Python: $PYTHON_BIN"
+
+        # Get the umu-run path
+        if [ -f "$UMU_RUN" ]; then
+            UMU_WRAPPER="$UMU_RUN"
+            log "Using bundled umu-run: $UMU_WRAPPER"
+        elif command -v umu-run &>/dev/null; then
+            UMU_WRAPPER="umu-run"
+            log "Using system umu-run"
+        else
+            log "ERROR: umu-run not found"
+            exit 1
+        fi
+
+        CMD_STR="$PYTHON_BIN $UMU_WRAPPER \"$EXE_PATH\" $*"
+        log "Executing: $CMD_STR"
+
+        # === CLOUD SAVE: Download before launch ===
+        sync_cloud_saves "gog" "$GAME_ID" "download" "$PREFIX_PATH" ""
+
+        # Execute umu-run (wait for exit, don't use exec)
+        "$PYTHON_BIN" "$UMU_WRAPPER" "$EXE_PATH" "$@" 2>>"$LOG_FILE"
+        GAME_EXIT_CODE=$?
+
+        # === CLOUD SAVE: Upload after exit ===
+        log "GOG game exited with code: $GAME_EXIT_CODE"
+        sync_cloud_saves "gog" "$GAME_ID" "upload" "$PREFIX_PATH" ""
+
+        exit $GAME_EXIT_CODE
+    fi
+    
+else
+    # Native Linux game
+    log "Native Linux game detected"
+    
+    # Change to work directory
+    if [ -d "$WORK_DIR" ]; then
+        cd "$WORK_DIR"
+        log "Changed to: $WORK_DIR"
+    fi
+    
+    # Ensure executable permissions
+    chmod +x "$EXE_PATH" 2>/dev/null || true
+    
+    # Try Steam Runtime for legacy library support (libssl.so.1.0.0, etc)
+    STEAM_RUNTIME_RUN="$HOME/.steam/steam/ubuntu12_32/steam-runtime/run.sh"
+    STEAM_RUNTIME_ALT="$HOME/.local/share/Steam/ubuntu12_32/steam-runtime/run.sh"
+    
+    if [ -f "$STEAM_RUNTIME_RUN" ]; then
+        log "Using Steam Runtime: $STEAM_RUNTIME_RUN"
+        log "Executing: $STEAM_RUNTIME_RUN $EXE_PATH $*"
+        exec "$STEAM_RUNTIME_RUN" "$EXE_PATH" "$@" 2>>"$LOG_FILE"
+    elif [ -f "$STEAM_RUNTIME_ALT" ]; then
+        log "Using Steam Runtime (alt): $STEAM_RUNTIME_ALT"
+        log "Executing: $STEAM_RUNTIME_ALT $EXE_PATH $*"
+        exec "$STEAM_RUNTIME_ALT" "$EXE_PATH" "$@" 2>>"$LOG_FILE"
+    else
+        # Fallback: direct execution (may fail for old games needing legacy libs)
+        log "No Steam Runtime found, executing directly"
+        log "Executing: $EXE_PATH $*"
+        exec "$EXE_PATH" "$@" 2>>"$LOG_FILE"
+    fi
+fi
+
+# If exec fails, log it
+log "ERROR: exec failed for $EXE_PATH (exit code: $?)"
+exit 1
