@@ -295,7 +295,7 @@ export function Settings() {
 
   const exchangeAuthCode = async () => {
     if (!manualAuthCode.trim()) {
-      setTestResult("✗ Введите authorization code");
+      setTestResult("✗ Введите authorization code или полный URL");
       return;
     }
 
@@ -306,34 +306,86 @@ export function Settings() {
 
     setExchangingCode(true);
     setTestResult(null);
-    addDebugLog("Извлечение authorization code...");
+    addDebugLog("Извлечение authorization code из введенных данных...");
 
     try {
       // Извлекаем code из URL, если пользователь вставил полный URL
       let authCode = manualAuthCode.trim();
+      let extractedFromUrl = false;
       
-      // Если это полный URL, извлекаем code
+      // Пробуем разные варианты извлечения
+      // 1. Проверяем query параметры (code=...)
       if (authCode.includes('code=')) {
         try {
-          const url = new URL(authCode);
-          const codeParam = url.searchParams.get('code');
-          if (codeParam) {
-            authCode = codeParam;
-            addDebugLog(`Извлечен code из URL: ${authCode.substring(0, 20)}...`);
+          // Пробуем как полный URL
+          if (authCode.startsWith('http://') || authCode.startsWith('https://')) {
+            const url = new URL(authCode);
+            const codeParam = url.searchParams.get('code');
+            if (codeParam) {
+              authCode = codeParam;
+              extractedFromUrl = true;
+              addDebugLog(`✓ Извлечен code из URL query: ${authCode.substring(0, 20)}...`);
+            }
+          } else {
+            // Извлекаем вручную из строки
+            const codeMatch = authCode.match(/[?&]code=([^&]+)/);
+            if (codeMatch && codeMatch[1]) {
+              authCode = decodeURIComponent(codeMatch[1]);
+              extractedFromUrl = true;
+              addDebugLog(`✓ Извлечен code из строки: ${authCode.substring(0, 20)}...`);
+            }
           }
         } catch (e) {
           // Если не валидный URL, пробуем извлечь вручную
-          const codeMatch = authCode.match(/code=([^&]+)/);
+          const codeMatch = authCode.match(/[?&]code=([^&]+)/);
           if (codeMatch && codeMatch[1]) {
-            authCode = codeMatch[1];
-            addDebugLog(`Извлечен code из строки: ${authCode.substring(0, 20)}...`);
+            authCode = decodeURIComponent(codeMatch[1]);
+            extractedFromUrl = true;
+            addDebugLog(`✓ Извлечен code из строки (fallback): ${authCode.substring(0, 20)}...`);
           }
+        }
+      }
+      
+      // 2. Проверяем fragment (#access_token=... или #code=...)
+      if (!extractedFromUrl && authCode.includes('#')) {
+        try {
+          const fragment = authCode.split('#')[1];
+          // Проверяем access_token (для Яндекс OAuth)
+          if (fragment.includes('access_token=')) {
+            const tokenMatch = fragment.match(/access_token=([^&]+)/);
+            if (tokenMatch && tokenMatch[1]) {
+              const accessToken = decodeURIComponent(tokenMatch[1]);
+              addDebugLog(`✓ Найден access_token в fragment (для Яндекс Диска): ${accessToken.substring(0, 20)}...`);
+              // Для Яндекс Диска можно использовать access_token напрямую как OAuth токен
+              const updatedSettings = {
+                ...settings,
+                webdavOAuthToken: accessToken
+              };
+              setSettings(updatedSettings);
+              setManualAuthCode("");
+              addDebugLog("✓ OAuth токен для Яндекс Диска сохранен!");
+              setTestResult("✓ OAuth токен для Яндекс Диска успешно извлечен и сохранен!");
+              setExchangingCode(false);
+              return;
+            }
+          }
+          // Проверяем code в fragment
+          if (fragment.includes('code=')) {
+            const codeMatch = fragment.match(/code=([^&]+)/);
+            if (codeMatch && codeMatch[1]) {
+              authCode = decodeURIComponent(codeMatch[1]);
+              extractedFromUrl = true;
+              addDebugLog(`✓ Извлечен code из fragment: ${authCode.substring(0, 20)}...`);
+            }
+          }
+        } catch (e) {
+          addDebugLog(`Ошибка при обработке fragment: ${e}`);
         }
       }
       
       if (!authCode || authCode.length < 10) {
         addDebugLog("✗ Не удалось извлечь authorization code");
-        setTestResult("✗ Не удалось извлечь authorization code из введенных данных");
+        setTestResult("✗ Не удалось извлечь authorization code из введенных данных. Убедитесь, что вставили полный URL из адресной строки браузера.");
         setExchangingCode(false);
         return;
       }
@@ -359,6 +411,7 @@ export function Settings() {
         setTestResult(`✗ ${result.error || "Ошибка обмена кода"}`);
       }
     } catch (error) {
+      addDebugLog(`✗ Исключение: ${error}`);
       setTestResult(`✗ Ошибка: ${error}`);
     } finally {
       setExchangingCode(false);
@@ -464,20 +517,21 @@ export function Settings() {
     });
   };
 
-  const saveStorageConfig = async () => {
+  const saveStorageConfig = async (customSettings?: Settings) => {
     try {
+      const settingsToSave = customSettings || settings;
       const result: any = await call("save_storage_config", {
-        provider: settings.storageProvider,
-        ...(settings.storageProvider === 'gdrive' ? {
-          client_id: settings.clientId,
-          client_secret: settings.clientSecret,
-          refresh_token: settings.refreshToken
+        provider: settingsToSave.storageProvider,
+        ...(settingsToSave.storageProvider === 'gdrive' ? {
+          client_id: settingsToSave.clientId,
+          client_secret: settingsToSave.clientSecret,
+          refresh_token: settingsToSave.refreshToken
         } : {
-          url: settings.webdavUrl,
-          username: settings.webdavUsername,
-          password: settings.webdavPassword,
-          oauth_token: settings.webdavOAuthToken,
-          webdav_provider: settings.webdavProvider
+          url: settingsToSave.webdavUrl,
+          username: settingsToSave.webdavUsername,
+          password: settingsToSave.webdavPassword,
+          oauth_token: settingsToSave.webdavOAuthToken,
+          webdav_provider: settingsToSave.webdavProvider
         })
       });
       if (result.success) {
@@ -502,7 +556,14 @@ export function Settings() {
         <PanelSectionRow>
           <ButtonItem
             layout="below"
-            onClick={() => setSettings({ ...settings, storageProvider: 'gdrive' })}
+            onClick={async () => {
+              const newSettings = { ...settings, storageProvider: 'gdrive' };
+              setSettings(newSettings);
+              // Автосохранение при переключении
+              setTimeout(async () => {
+                await saveStorageConfig();
+              }, 100);
+            }}
             disabled={settings.storageProvider === 'gdrive'}
           >
             {settings.storageProvider === 'gdrive' ? '✓ Google Drive' : 'Google Drive'}
@@ -511,7 +572,14 @@ export function Settings() {
         <PanelSectionRow>
           <ButtonItem
             layout="below"
-            onClick={() => setSettings({ ...settings, storageProvider: 'webdav' })}
+            onClick={async () => {
+              const newSettings = { ...settings, storageProvider: 'webdav' };
+              setSettings(newSettings);
+              // Автосохранение при переключении
+              setTimeout(async () => {
+                await saveStorageConfig();
+              }, 100);
+            }}
             disabled={settings.storageProvider === 'webdav'}
           >
             {settings.storageProvider === 'webdav' ? '✓ WebDAV' : 'WebDAV (проще!)'}
@@ -688,7 +756,12 @@ export function Settings() {
               <br />1. После авторизации Google перенаправит на localhost:8080/callback (может быть ошибка 404 - это нормально)
               <br />2. В адресной строке браузера будет URL: <code style={{ color: "#1a9fff" }}>http://localhost:8080/callback?code=4/0ASc3gC...</code>
               <br />3. Скопируйте весь URL из адресной строки
-              <br />4. Вставьте в поле ниже (можно вставить весь URL - код извлечется автоматически)
+              <br />4. Вставьте в поле ниже - код извлечется автоматически из любого формата URL
+              <br /><br />
+              <strong>Поддерживаемые форматы:</strong>
+              <br />• Полный URL: <code style={{ color: "#1a9fff" }}>http://localhost:8080/callback?code=...</code>
+              <br />• Только код: <code style={{ color: "#1a9fff" }}>4/0ASc3gC...</code>
+              <br />• URL с fragment: <code style={{ color: "#1a9fff" }}>...#code=...</code>
             </div>
           </PanelSectionRow>
 
@@ -696,8 +769,107 @@ export function Settings() {
             <TextField
               label="Authorization Code или полный URL"
               value={manualAuthCode}
-              onChange={(e) => setManualAuthCode(e.target.value)}
-              description="Вставьте код из URL после авторизации (можно вставить весь URL - код извлечется автоматически)"
+              onChange={async (e) => {
+                const value = e.target.value;
+                setManualAuthCode(value);
+                
+                // Автоматическое извлечение и обмен при обнаружении code в URL
+                if (value.trim() && (value.includes('code=') || value.includes('localhost:8080/callback'))) {
+                  // Небольшая задержка, чтобы пользователь успел вставить весь URL
+                  setTimeout(async () => {
+                    if (manualAuthCode === value && value.trim()) {
+                      addDebugLog("🔍 Обнаружен URL с кодом, начинаю автоматическое извлечение...");
+                      
+                      // Извлекаем code
+                      let authCode = value.trim();
+                      let extracted = false;
+                      
+                      // Извлечение из query параметров
+                      if (authCode.includes('code=')) {
+                        try {
+                          if (authCode.startsWith('http://') || authCode.startsWith('https://')) {
+                            const url = new URL(authCode);
+                            const codeParam = url.searchParams.get('code');
+                            if (codeParam) {
+                              authCode = codeParam;
+                              extracted = true;
+                              addDebugLog(`✓ Извлечен code из URL: ${authCode.substring(0, 20)}...`);
+                            }
+                          } else {
+                            const codeMatch = authCode.match(/[?&]code=([^&]+)/);
+                            if (codeMatch && codeMatch[1]) {
+                              authCode = decodeURIComponent(codeMatch[1]);
+                              extracted = true;
+                              addDebugLog(`✓ Извлечен code из строки: ${authCode.substring(0, 20)}...`);
+                            }
+                          }
+                        } catch (e) {
+                          const codeMatch = authCode.match(/[?&]code=([^&]+)/);
+                          if (codeMatch && codeMatch[1]) {
+                            authCode = decodeURIComponent(codeMatch[1]);
+                            extracted = true;
+                            addDebugLog(`✓ Извлечен code (fallback): ${authCode.substring(0, 20)}...`);
+                          }
+                        }
+                      }
+                      
+                      // Извлечение из fragment
+                      if (!extracted && authCode.includes('#')) {
+                        try {
+                          const fragment = authCode.split('#')[1];
+                          if (fragment.includes('code=')) {
+                            const codeMatch = fragment.match(/code=([^&]+)/);
+                            if (codeMatch && codeMatch[1]) {
+                              authCode = decodeURIComponent(codeMatch[1]);
+                              extracted = true;
+                              addDebugLog(`✓ Извлечен code из fragment: ${authCode.substring(0, 20)}...`);
+                            }
+                          }
+                        } catch (e) {
+                          // ignore
+                        }
+                      }
+                      
+                      // Если код извлечен и есть Client ID/Secret, автоматически обмениваем
+                      if (extracted && authCode.length >= 10 && settings.clientId?.trim() && settings.clientSecret?.trim()) {
+                        addDebugLog("🔄 Автоматический обмен кода на refresh_token...");
+                        setExchangingCode(true);
+                        
+                        try {
+                          const result: any = await call("exchange_code_for_token", {
+                            auth_code: authCode,
+                            client_id: settings.clientId.trim(),
+                            client_secret: settings.clientSecret.trim(),
+                          });
+
+                          if (result.success && result.refresh_token) {
+                            const updatedSettings = {
+                              ...settings,
+                              refreshToken: result.refresh_token
+                            };
+                            setSettings(updatedSettings);
+                            setManualAuthCode("");
+                            addDebugLog("✓ Refresh token успешно получен автоматически!");
+                            setTestResult("✓ Refresh token успешно получен автоматически из URL!");
+                          } else {
+                            addDebugLog(`✗ Ошибка автоматического обмена: ${result.error || "Ошибка обмена кода"}`);
+                            setTestResult(`✗ Ошибка автоматического обмена: ${result.error || "Ошибка обмена кода"}`);
+                          }
+                        } catch (error: any) {
+                          addDebugLog(`✗ Исключение при автоматическом обмене: ${error}`);
+                          setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
+                        } finally {
+                          setExchangingCode(false);
+                        }
+                      } else if (extracted && (!settings.clientId?.trim() || !settings.clientSecret?.trim())) {
+                        addDebugLog("⚠ Код извлечен, но не указаны Client ID или Client Secret");
+                        setTestResult("⚠ Код извлечен из URL. Укажите Client ID и Client Secret для автоматического обмена.");
+                      }
+                    }
+                  }, 1000); // Задержка 1 секунда после последнего ввода
+                }
+              }}
+              description="Вставьте код или полный URL - извлечение и обмен происходят автоматически"
             />
           </PanelSectionRow>
 
@@ -776,13 +948,18 @@ export function Settings() {
             <PanelSectionRow key={key}>
               <ButtonItem
                 layout="below"
-                onClick={() => {
+                onClick={async () => {
                   const newUrl = key === 'custom' ? settings.webdavUrl : provider.url;
-                  setSettings({ 
+                  const newSettings = { 
                     ...settings, 
                     webdavProvider: key as WebDAVProviderType,
                     webdavUrl: newUrl
-                  });
+                  };
+                  setSettings(newSettings);
+                  // Автосохранение при выборе провайдера
+                  setTimeout(async () => {
+                    await saveStorageConfig();
+                  }, 100);
                 }}
                 disabled={settings.webdavProvider === key}
               >
@@ -912,6 +1089,50 @@ export function Settings() {
         )}
       </PanelSection>
       )}
+
+      {/* Clear Data Section */}
+      <PanelSection title="Очистка данных">
+        <PanelSectionRow>
+          <div style={{ fontSize: "12px", color: "#ff6b6b", marginBottom: "8px" }}>
+            <strong>Внимание:</strong> Это удалит все настройки, кэш и конфигурацию плагина. Действие необратимо!
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={async () => {
+              if (confirm("Вы уверены? Это удалит все настройки, кэш и конфигурацию плагина.")) {
+                try {
+                  const result: any = await call("clear_all_data", {});
+                  if (result.success) {
+                    setTestResult(`✓ ${result.message || "Все данные очищены"}`);
+                    // Сбрасываем настройки на дефолтные
+                    setSettings({
+                      storageProvider: 'gdrive',
+                      refreshToken: "",
+                      clientId: "",
+                      clientSecret: "",
+                      webdavProvider: 'custom',
+                      webdavUrl: "",
+                      webdavUsername: "",
+                      webdavPassword: "",
+                      webdavOAuthToken: "",
+                      autoSync: false,
+                      defaultSavePaths: []
+                    });
+                  } else {
+                    setTestResult(`✗ ${result.error || "Ошибка очистки"}`);
+                  }
+                } catch (error: any) {
+                  setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
+                }
+              }
+            }}
+          >
+            Очистить все данные плагина
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
 
       {/* Sync Settings Section */}
       <PanelSection title="Sync Settings">

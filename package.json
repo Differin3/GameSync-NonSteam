@@ -1,6 +1,6 @@
 {
   "name": "gamesync-nonsteam",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Синхронизация сохранений игр PortProton с Google Drive",
   "type": "module",
   "scripts": {

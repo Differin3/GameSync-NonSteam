@@ -98,12 +98,13 @@ def get_synced_games() -> List[Dict]:
     synced_games = load_synced_games()
     return [{"gameName": name, **data} for name, data in synced_games.items()]
 
-def add_synced_game(game_name: str, file_id: Optional[str] = None):
+def add_synced_game(game_name: str, file_id: Optional[str] = None, file_size: Optional[int] = None):
     """Добавление игры в список синхронизированных"""
     synced_games = load_synced_games()
     synced_games[game_name] = {
         "lastSync": datetime.now().isoformat(),
-        "fileId": file_id
+        "fileId": file_id,
+        "fileSize": file_size  # Сохраняем размер файла локально
     }
     save_synced_games(synced_games)
 
