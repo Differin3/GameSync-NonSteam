@@ -103,47 +103,44 @@ def find_game_folders(base_path: Path, game_name: str) -> List[Path]:
     return game_folders
 
 def detect_save_paths(game_prefix_path: Path, game_name: str = "") -> List[str]:
-    """Автоопределение путей сохранений для игры"""
+    """Автоопределение путей сохранений для игры.
+    Сканирует Documents, Saved Games, My Games, AppData — ищет подпапки по названию игры и имени префикса.
+    Найденные папки добавляются без проверки расширений файлов (мягкий вариант по плану).
+    """
     save_paths = []
     drive_c = game_prefix_path / "drive_c"
     
     if not drive_c.exists():
         return save_paths
     
-    # Если используется DEFAULT префикс и указано название игры, ищем папки игры
-    is_default_prefix = game_prefix_path.name.upper() == "DEFAULT"
+    prefix_name = game_prefix_path.name
     
-    # Проверяем стандартные пути
     for standard_path in STANDARD_SAVE_PATHS:
         full_path = drive_c / standard_path
         if not full_path.exists() or not full_path.is_dir():
             continue
         
-        # Если это DEFAULT префикс и есть название игры, ищем папки игры
-        if is_default_prefix and game_name:
-            game_folders = find_game_folders(full_path, game_name)
-            for game_folder in game_folders:
-                # Проверяем наличие файлов сохранений в папке игры
-                found_save = False
-                try:
-                    for item in game_folder.rglob("*"):
-                        if item.is_file() and item.suffix.lower() in SAVE_EXTENSIONS:
-                            found_save = True
-                            break
-                except (PermissionError, OSError):
-                    continue
-                
-                if found_save:
-                    save_paths.append(str(game_folder))
-        else:
-            # Обычная проверка - ищем файлы сохранений в папке
+        # Для любого префикса: ищем подпапки по названию игры и по имени префикса (без проверки расширений)
+        found_folders: List[Path] = []
+        if game_name:
+            found_folders.extend(find_game_folders(full_path, game_name))
+        if prefix_name and prefix_name.upper() != "DEFAULT":
+            folders_by_prefix = find_game_folders(full_path, prefix_name)
+            for f in folders_by_prefix:
+                if f not in found_folders:
+                    found_folders.append(f)
+        
+        for folder in found_folders:
+            save_paths.append(str(folder))
+        
+        # Fallback: если подпапок по имени не нашли, но в самой базовой папке есть файлы сохранений — добавляем её
+        if not found_folders:
             found_save = False
             try:
                 for item in full_path.iterdir():
                     if item.is_file() and item.suffix.lower() in SAVE_EXTENSIONS:
                         found_save = True
                         break
-                    # Проверяем только первый уровень подпапок
                     if item.is_dir():
                         for subitem in item.iterdir():
                             if subitem.is_file() and subitem.suffix.lower() in SAVE_EXTENSIONS:
@@ -153,12 +150,9 @@ def detect_save_paths(game_prefix_path: Path, game_name: str = "") -> List[str]:
                             break
             except (PermissionError, OSError) as e:
                 logger.debug(f"Cannot access {full_path}: {e}")
-                continue
-            
             if found_save:
                 save_paths.append(str(full_path))
     
-    # Убираем дубликаты
     return list(set(save_paths))
 
 def find_prefix_for_game(game_name: str, desktop_file_path: str, prefixes_path: Path) -> Optional[Path]:
