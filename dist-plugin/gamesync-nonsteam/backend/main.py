@@ -147,7 +147,18 @@ class Plugin:
             file_id = provider.upload_file(archive_path, "GameSync")
             
             if not file_id:
-                return {"success": False, "error": "Не удалось загрузить на Google Drive"}
+                provider_name = "хранилище" if provider_type == 'webdav' else "Google Drive"
+                return {"success": False, "error": f"Не удалось загрузить файл в {provider_name}"}
+            
+            # Получаем размер загруженного файла для статистики
+            file_size = None
+            try:
+                file_info = provider.get_file_info(file_id)
+                if file_info and file_info.get('size'):
+                    file_size = file_info.get('size')
+                    logger.info(f"File size for {game_name}: {file_size} bytes")
+            except Exception as e:
+                logger.warning(f"Failed to get file info: {e}")
             
             # Удаляем временный архив
             try:
@@ -155,10 +166,10 @@ class Plugin:
             except:
                 pass
             
-            # Сохраняем информацию о синхронизации
+            # Сохраняем информацию о синхронизации с размером файла
             try:
                 from config_manager import add_synced_game
-                add_synced_game(game_name, file_id)
+                add_synced_game(game_name, file_id, file_size)
             except Exception as e:
                 logger.warning(f"Failed to save sync info: {e}")
             
@@ -463,14 +474,12 @@ class Plugin:
         try:
             try:
                 from config_manager import get_synced_games, load_synced_games
-                from gdrive_provider import GoogleDriveProvider
             except ImportError:
                 import sys
                 import pathlib
                 backend_path = pathlib.Path(__file__).parent
                 sys.path.insert(0, str(backend_path))
                 from config_manager import get_synced_games, load_synced_games
-                from gdrive_provider import GoogleDriveProvider
             
             synced_games = load_synced_games()
             total_syncs = len(synced_games)
@@ -489,39 +498,10 @@ class Plugin:
                     if not last_sync or sync_date > last_sync:
                         last_sync = sync_date
                 
-                # Пытаемся получить размер файла из хранилища
-                file_id = game_data.get('fileId')
-                if file_id:
-                    try:
-                        from config_manager import load_storage_config
-                        storage_config = load_storage_config()
-                        provider_type = storage_config.get('provider', 'gdrive')
-                        
-                        if provider_type == 'webdav':
-                            from webdav_provider import WebDAVProvider
-                            url = storage_config.get('url', '')
-                            username = storage_config.get('username', '')
-                            password = storage_config.get('password', '')
-                            oauth_token = storage_config.get('oauth_token', '')
-                            if url and (oauth_token or (username and password)):
-                                provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
-                                file_info = provider.get_file_info(file_id)
-                                if file_info and file_info.get('size'):
-                                    total_size += file_info['size']
-                        else:
-                            from config_manager import load_gdrive_config
-                            gdrive_config = load_gdrive_config()
-                            if gdrive_config.get('refresh_token') and gdrive_config.get('client_id') and gdrive_config.get('client_secret'):
-                                provider = GoogleDriveProvider(
-                                    refresh_token=gdrive_config.get('refresh_token'),
-                                    client_id=gdrive_config.get('client_id'),
-                                    client_secret=gdrive_config.get('client_secret')
-                                )
-                                file_info = provider.get_file_info(file_id)
-                                if file_info and file_info.get('size'):
-                                    total_size += file_info['size']
-                    except:
-                        pass
+                # Используем локально сохраненный размер файла
+                file_size = game_data.get('fileSize', 0)
+                if file_size and isinstance(file_size, (int, float)):
+                    total_size += int(file_size)
             
             # Преобразуем в список для фронтенда
             syncs_by_date_list = [
@@ -759,24 +739,122 @@ class Plugin:
             logger.error(f"Error loading storage config: {e}")
             return {"success": False, "error": str(e)}
     
+    async def clear_all_data(self, *args, **kwargs) -> Dict[str, Any]:
+        """Полная очистка всех данных плагина (конфигурация, кэш, токены)"""
+        try:
+            import shutil
+            from config_manager import CONFIG_DIR
+            from cache_manager import cache_manager
+            from gdrive_provider import TOKEN_FILE
+            
+            deleted_files = []
+            deleted_dirs = []
+            
+            # Очистка кэша
+            try:
+                cache_manager.clear_all()
+                logger.info("Cache cleared")
+            except Exception as e:
+                logger.warning(f"Error clearing cache: {e}")
+            
+            # Удаление token.pickle (токены Google)
+            if TOKEN_FILE.exists():
+                try:
+                    TOKEN_FILE.unlink()
+                    deleted_files.append(TOKEN_FILE.name)
+                    logger.info(f"Deleted token file: {TOKEN_FILE.name}")
+                except Exception as e:
+                    logger.warning(f"Error deleting token file: {e}")
+            
+            # Удаление всех конфигурационных файлов и директории
+            if CONFIG_DIR.exists():
+                try:
+                    # Сначала собираем список файлов для отчета
+                    for item in CONFIG_DIR.rglob('*'):
+                        if item.is_file():
+                            deleted_files.append(str(item.relative_to(CONFIG_DIR)))
+                    
+                    # Полностью удаляем директорию со всем содержимым
+                    shutil.rmtree(CONFIG_DIR)
+                    deleted_dirs.append(str(CONFIG_DIR))
+                    logger.info(f"Deleted config directory: {CONFIG_DIR}")
+                except Exception as e:
+                    logger.error(f"Error clearing config directory: {e}")
+                    # Если не удалось удалить директорию, пробуем удалить файлы по одному
+                    try:
+                        for file in CONFIG_DIR.iterdir():
+                            if file.is_file():
+                                file.unlink()
+                                logger.info(f"Deleted config file: {file.name}")
+                            elif file.is_dir():
+                                shutil.rmtree(file)
+                                logger.info(f"Deleted config subdirectory: {file.name}")
+                    except Exception as e2:
+                        logger.error(f"Error clearing config files individually: {e2}")
+            
+            total_deleted = len(deleted_files) + len(deleted_dirs)
+            return {
+                "success": True,
+                "message": f"Очищено {total_deleted} элементов ({len(deleted_files)} файлов, {len(deleted_dirs)} директорий)",
+                "deleted_files": deleted_files,
+                "deleted_dirs": deleted_dirs
+            }
+        except Exception as e:
+            logger.error(f"Error clearing all data: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+    
     async def test_storage_connection(self, provider: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Тест подключения к хранилищу"""
         try:
             from config_manager import load_storage_config
             
+            logger.info(f"[test_storage_connection] Called with provider={provider}, args={len(args)}, kwargs keys: {list(kwargs.keys())}")
+            
+            # ВАЖНО: Проверяем наличие WebDAV параметров ПЕРВЫМ ДЕЛОМ - до загрузки конфига
+            # Если есть WebDAV параметры, это точно WebDAV, независимо от provider в конфиге
+            has_webdav_params = bool(kwargs.get('url') or kwargs.get('username') or kwargs.get('password') or kwargs.get('oauth_token'))
+            if has_webdav_params:
+                logger.info(f"[test_storage_connection] WebDAV parameters detected in kwargs, forcing provider to webdav")
+                provider = 'webdav'
+            
+            # Проверяем все возможные источники provider только если WebDAV параметров нет
+            if not provider:
+                # Сначала из kwargs
+                provider = kwargs.get('provider')
+                logger.info(f"[test_storage_connection] Provider from kwargs: {provider}")
+            
+            # Если provider все еще не указан, проверяем args
+            if not provider and args:
+                if isinstance(args[0], dict) and 'provider' in args[0]:
+                    provider = args[0]['provider']
+                    logger.info(f"[test_storage_connection] Provider from args[0]: {provider}")
+            
+            # Если provider все еще не указан, загружаем из конфига
             if not provider:
                 storage_config = load_storage_config()
                 provider = storage_config.get('provider', 'gdrive')
-            else:
-                storage_config = kwargs
+                logger.info(f"[test_storage_connection] Provider from config: {provider}")
             
+            logger.info(f"[test_storage_connection] Final provider: {provider}")
+            
+            # Если provider webdav, используем параметры из kwargs или из конфига
             if provider == 'webdav':
                 from webdav_provider import WebDAVProvider
                 
-                url = storage_config.get('url', '') or kwargs.get('url', '')
-                username = storage_config.get('username', '') or kwargs.get('username', '')
-                password = storage_config.get('password', '') or kwargs.get('password', '')
-                oauth_token = storage_config.get('oauth_token', '') or kwargs.get('oauth_token', '')
+                # Сначала берем из kwargs (если переданы явно), потом из конфига
+                if kwargs.get('url') or kwargs.get('username') or kwargs.get('password') or kwargs.get('oauth_token'):
+                    # Параметры переданы явно
+                    url = kwargs.get('url', '')
+                    username = kwargs.get('username', '')
+                    password = kwargs.get('password', '')
+                    oauth_token = kwargs.get('oauth_token', '')
+                else:
+                    # Загружаем из конфига
+                    storage_config = load_storage_config()
+                    url = storage_config.get('url', '')
+                    username = storage_config.get('username', '')
+                    password = storage_config.get('password', '')
+                    oauth_token = storage_config.get('oauth_token', '')
                 
                 if not url:
                     return {"success": False, "error": "Не указан URL"}
@@ -788,6 +866,23 @@ class Plugin:
                 result = provider_obj.test_connection()
                 return result
             else:  # gdrive
+                # Убеждаемся, что это действительно Google Drive, а не WebDAV с неправильным provider
+                if has_webdav_params:
+                    logger.warning(f"[test_storage_connection] WebDAV parameters detected but provider is {provider}, forcing webdav")
+                    provider = 'webdav'
+                    # Повторяем логику WebDAV
+                    from webdav_provider import WebDAVProvider
+                    url = kwargs.get('url', '')
+                    username = kwargs.get('username', '')
+                    password = kwargs.get('password', '')
+                    oauth_token = kwargs.get('oauth_token', '')
+                    if not url:
+                        return {"success": False, "error": "Не указан URL"}
+                    if not oauth_token and (not username or not password):
+                        return {"success": False, "error": "Не указаны логин/пароль или OAuth токен"}
+                    provider_obj = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
+                    result = provider_obj.test_connection()
+                    return result
                 return await self.test_gdrive_connection(*args, **kwargs)
         except Exception as e:
             logger.error(f"Error testing storage connection: {e}")
