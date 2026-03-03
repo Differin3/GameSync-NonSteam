@@ -162,25 +162,11 @@ def detect_save_paths(game_prefix_path: Path, game_name: str = "") -> List[str]:
             first_folder = found_folders[0]
             return [str(first_folder)]
         
-        # Fallback: если подпапок по имени не нашли, но в самой базовой папке есть файлы сохранений —
-        # считаем, что ИМЕННО этот базовый путь и есть папка сохранений для игры.
-        found_save = False
-        try:
-            for item in full_path.iterdir():
-                if item.is_file() and item.suffix.lower() in SAVE_EXTENSIONS:
-                    found_save = True
-                    break
-                if item.is_dir():
-                    for subitem in item.iterdir():
-                        if subitem.is_file() and subitem.suffix.lower() in SAVE_EXTENSIONS:
-                            found_save = True
-                            break
-                    if found_save:
-                        break
-        except (PermissionError, OSError) as e:
-            logger.debug(f"Cannot access {full_path}: {e}")
-        if found_save:
-            return [str(full_path)]
+        # Раньше здесь был fallback, который добавлял саму базовую папку
+        # (например, весь Documents), если внутри находились файлы сохранений.
+        # Это приводило к неточным путям вида ".../Documents".
+        # Теперь такой fallback отключен: если папка игры по имени не найдена,
+        # просто продолжаем поиск дальше.
     
     # Ничего не нашли
     return []
