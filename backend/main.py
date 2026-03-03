@@ -74,14 +74,12 @@ class Plugin:
                 return {"success": False, "error": "Не указаны game_name или save_paths"}
             try:
                 from sync_engine import create_backup
-                from gdrive_provider import GoogleDriveProvider
             except ImportError:
                 import sys
                 import pathlib
                 backend_path = pathlib.Path(__file__).parent
                 sys.path.insert(0, str(backend_path))
                 from sync_engine import create_backup
-                from gdrive_provider import GoogleDriveProvider
             
             # Создаем бэкап
             archive_path = create_backup(game_name, save_paths)
@@ -99,56 +97,34 @@ class Plugin:
                 from config_manager import load_storage_config
             
             storage_config = load_storage_config()
-            provider_type = storage_config.get('provider', 'gdrive')
             
-            # Создаем провайдер в зависимости от типа
-            if provider_type == 'webdav':
-                try:
-                    from webdav_provider import WebDAVProvider
-                except ImportError:
-                    import sys
-                    import pathlib
-                    backend_path = pathlib.Path(__file__).parent
-                    sys.path.insert(0, str(backend_path))
-                    from webdav_provider import WebDAVProvider
-                
-                url = storage_config.get('url', '')
-                username = storage_config.get('username', '')
-                password = storage_config.get('password', '')
-                oauth_token = storage_config.get('oauth_token', '')
-                
-                if not url:
-                    return {"success": False, "error": "Не настроен WebDAV. Укажите URL в настройках."}
-                
-                if not oauth_token and (not username or not password):
-                    return {"success": False, "error": "Не настроен WebDAV. Укажите логин/пароль или OAuth токен в настройках."}
-                
-                provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
-            else:  # gdrive по умолчанию
-                try:
-                    from config_manager import load_gdrive_config
-                except ImportError:
-                    import sys
-                    import pathlib
-                    backend_path = pathlib.Path(__file__).parent
-                    sys.path.insert(0, str(backend_path))
-                    from config_manager import load_gdrive_config
-                
-                gdrive_config = load_gdrive_config()
-                if not gdrive_config.get('refresh_token') or not gdrive_config.get('client_id') or not gdrive_config.get('client_secret'):
-                    return {"success": False, "error": "Не настроен Google Drive. Укажите Client ID, Client Secret и Refresh Token в настройках."}
-                
-                provider = GoogleDriveProvider(
-                    refresh_token=gdrive_config.get('refresh_token'),
-                    client_id=gdrive_config.get('client_id'),
-                    client_secret=gdrive_config.get('client_secret')
-                )
+            # Единственный поддерживаемый провайдер сейчас — WebDAV
+            try:
+                from webdav_provider import WebDAVProvider
+            except ImportError:
+                import sys
+                import pathlib
+                backend_path = pathlib.Path(__file__).parent
+                sys.path.insert(0, str(backend_path))
+                from webdav_provider import WebDAVProvider
+            
+            url = storage_config.get('url', '')
+            username = storage_config.get('username', '')
+            password = storage_config.get('password', '')
+            oauth_token = storage_config.get('oauth_token', '')
+            
+            if not url:
+                return {"success": False, "error": "Не настроен WebDAV. Укажите URL в настройках."}
+            
+            if not oauth_token and (not username or not password):
+                return {"success": False, "error": "Не настроен WebDAV. Укажите логин/пароль или OAuth токен в настройках."}
+            
+            provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
             
             file_id = provider.upload_file(archive_path, "GameSync")
             
             if not file_id:
-                provider_name = "хранилище" if provider_type == 'webdav' else "Google Drive"
-                return {"success": False, "error": f"Не удалось загрузить файл в {provider_name}"}
+                return {"success": False, "error": "Не удалось загрузить файл в WebDAV хранилище"}
             
             # Получаем размер загруженного файла для статистики
             file_size = None
@@ -258,36 +234,7 @@ class Plugin:
             logger.error(f"Error loading credentials from file: {e}")
             return {"success": False, "error": str(e)}
     
-    async def test_gdrive_connection(self, refresh_token: str = None, client_id: str = None, client_secret: str = None, *args, **kwargs) -> Dict[str, Any]:
-        """Тест подключения к Google Drive"""
-        try:
-            if refresh_token is None:
-                refresh_token = kwargs.get('refresh_token')
-            if client_id is None:
-                client_id = kwargs.get('client_id')
-            if client_secret is None:
-                client_secret = kwargs.get('client_secret')
-            
-            if not refresh_token:
-                return {"success": False, "error": "Не указан refresh_token"}
-            if not client_id:
-                return {"success": False, "error": "Не указан client_id"}
-            if not client_secret:
-                return {"success": False, "error": "Не указан client_secret"}
-            try:
-                from gdrive_provider import GoogleDriveProvider
-            except ImportError:
-                import sys
-                import pathlib
-                backend_path = pathlib.Path(__file__).parent
-                sys.path.insert(0, str(backend_path))
-                from gdrive_provider import GoogleDriveProvider
-            
-            provider = GoogleDriveProvider(refresh_token=refresh_token, client_id=client_id, client_secret=client_secret)
-            return provider.test_connection()
-        except Exception as e:
-            logger.error(f"Error testing connection: {e}")
-            return {"success": False, "error": str(e)}
+    # Google Drive больше не поддерживается – тест подключения не реализован
     
     async def validate_save_path(self, path: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Валидация пути сохранений"""
@@ -370,45 +317,8 @@ class Plugin:
             
             if not game_name or not save_paths:
                 return {"success": False, "error": "Не указаны game_name или save_paths", "conflicts": []}
-            try:
-                from gdrive_provider import GoogleDriveProvider
-            except ImportError:
-                import sys
-                import pathlib
-                backend_path = pathlib.Path(__file__).parent
-                sys.path.insert(0, str(backend_path))
-                from gdrive_provider import GoogleDriveProvider
-            
-            conflicts = []
-            try:
-                from config_manager import load_gdrive_config
-            except ImportError:
-                import sys
-                import pathlib
-                backend_path = pathlib.Path(__file__).parent
-                sys.path.insert(0, str(backend_path))
-                from config_manager import load_gdrive_config
-            
-            gdrive_config = load_gdrive_config()
-            provider = GoogleDriveProvider(
-                refresh_token=gdrive_config.get('refresh_token'),
-                client_id=gdrive_config.get('client_id'),
-                client_secret=gdrive_config.get('client_secret')
-            )
-            
-            # Ищем архивы на Google Drive
-            for save_path in save_paths:
-                path_obj = Path(save_path)
-                if path_obj.is_file():
-                    file_id = provider.find_file(path_obj.name, "GameSync")
-                    if file_id:
-                        conflicts.append({
-                            "path": save_path,
-                            "file_id": file_id,
-                            "type": "file"
-                        })
-            
-            return {"success": True, "conflicts": conflicts}
+            # Пока конфликтов не ищем, так как Google Drive убран.
+            return {"success": True, "conflicts": []}
         except Exception as e:
             logger.error(f"Error checking conflicts: {e}")
             return {"success": False, "error": str(e), "conflicts": []}
@@ -523,206 +433,20 @@ class Plugin:
             logger.error(f"Error getting sync stats: {e}")
             return {"success": False, "error": str(e), "stats": None}
     
-    async def start_google_oauth(self, *args, **kwargs) -> Dict[str, Any]:
-        """Запуск Google OAuth flow с автоматическим захватом refresh_token"""
-        try:
-            # Детальное логирование всех входящих данных
-            logger.info(f"[OAuth] start_google_oauth called")
-            logger.info(f"[OAuth] args count: {len(args)}, args types: {[type(a).__name__ for a in args]}")
-            logger.info(f"[OAuth] kwargs count: {len(kwargs)}, kwargs keys: {list(kwargs.keys())}")
-            
-            # Логируем каждый ключ отдельно для отладки
-            for key, value in kwargs.items():
-                val_type = type(value).__name__
-                val_len = len(str(value)) if value else 0
-                logger.info(f"[OAuth] kwargs['{key}']: type={val_type}, is_none={value is None}, length={val_len}")
-            
-            # Проверяем, не переданы ли параметры как один объект в kwargs
-            # Decky может обернуть все параметры в один объект
-            if len(kwargs) == 1:
-                first_value = list(kwargs.values())[0]
-                if isinstance(first_value, dict):
-                    nested_dict = first_value
-                    logger.info(f"[OAuth] Found nested dict in kwargs: {list(nested_dict.keys())}")
-                    kwargs = nested_dict
-                elif isinstance(first_value, (list, tuple)) and len(first_value) > 0 and isinstance(first_value[0], dict):
-                    # Может быть список словарей
-                    logger.info(f"[OAuth] Found list/tuple of dicts in kwargs")
-                    if len(first_value) > 0:
-                        kwargs = first_value[0]
-            
-            # Также проверяем args - может быть список или кортеж словарей
-            if args and len(args) > 0:
-                if isinstance(args[0], dict):
-                    logger.info(f"[OAuth] Found dict in args[0]: {list(args[0].keys())}")
-                    kwargs.update(args[0])
-                elif isinstance(args[0], (list, tuple)) and len(args[0]) > 0:
-                    if isinstance(args[0][0], dict):
-                        logger.info(f"[OAuth] Found dict in args[0][0]: {list(args[0][0].keys())}")
-                        kwargs.update(args[0][0])
-            
-            # Извлекаем параметры из kwargs
-            client_id = None
-            client_secret = None
-            
-            # Пробуем все возможные варианты ключей (с учетом разных стилей именования)
-            possible_id_keys = ['client_id', 'clientId', 'client-id', 'clientid', 'CLIENT_ID', 'CLIENTID']
-            possible_secret_keys = ['client_secret', 'clientSecret', 'client-secret', 'clientsecret', 'CLIENT_SECRET', 'CLIENTSECRET']
-            
-            for key in possible_id_keys:
-                if key in kwargs:
-                    client_id = kwargs[key]
-                    logger.info(f"[OAuth] Found client_id in kwargs['{key}']: type={type(client_id).__name__}, length={len(str(client_id)) if client_id else 0}")
-                    break
-            
-            for key in possible_secret_keys:
-                if key in kwargs:
-                    client_secret = kwargs[key]
-                    logger.info(f"[OAuth] Found client_secret in kwargs['{key}']: type={type(client_secret).__name__}, length={len(str(client_secret)) if client_secret else 0}")
-                    break
-            
-            # Если не нашли, пробуем перебрать все ключи (на случай нестандартных имен)
-            if not client_id:
-                for key, value in kwargs.items():
-                    if 'client' in key.lower() and 'id' in key.lower() and not client_id:
-                        client_id = value
-                        logger.info(f"[OAuth] Found client_id by pattern matching in '{key}': length={len(str(client_id)) if client_id else 0}")
-                        break
-            
-            if not client_secret:
-                for key, value in kwargs.items():
-                    if 'client' in key.lower() and 'secret' in key.lower() and not client_secret:
-                        client_secret = value
-                        logger.info(f"[OAuth] Found client_secret by pattern matching in '{key}': length={len(str(client_secret)) if client_secret else 0}")
-                        break
-            
-            # Проверяем, что значения не пустые строки
-            if client_id:
-                client_id = str(client_id).strip()
-            if client_secret:
-                client_secret = str(client_secret).strip()
-            
-            logger.info(f"[OAuth] After processing: client_id length={len(client_id) if client_id else 0}, client_secret length={len(client_secret) if client_secret else 0}")
-            logger.info(f"[OAuth] client_id is None: {client_id is None}, empty: {not client_id if client_id else True}")
-            logger.info(f"[OAuth] client_secret is None: {client_secret is None}, empty: {not client_secret if client_secret else True}")
-            
-            if not client_id or not client_secret:
-                error_msg = f"Не указаны client_id или client_secret. client_id: {bool(client_id)}, client_secret: {bool(client_secret)}. kwargs keys: {list(kwargs.keys())}"
-                logger.error(f"[OAuth] {error_msg}")
-                return {"success": False, "error": error_msg}
-            
-            monitor = GoogleOAuthMonitor()
-            return await monitor.start_google_oauth(client_id, client_secret)
-        except Exception as e:
-            logger.error(f"Error starting Google OAuth: {e}")
-            return {"success": False, "error": str(e)}
-    
-    async def exchange_code_for_token(self, auth_code: str = None, client_id: str = None, client_secret: str = None, *args, **kwargs) -> Dict[str, Any]:
-        """Обмен authorization code на refresh_token"""
-        try:
-            if auth_code is None:
-                auth_code = kwargs.get('auth_code')
-            if client_id is None:
-                client_id = kwargs.get('client_id')
-            if client_secret is None:
-                client_secret = kwargs.get('client_secret')
-            
-            if not auth_code or not client_id or not client_secret:
-                return {"success": False, "error": "Не указаны все необходимые параметры"}
-            
-            return await GoogleOAuthMonitor.exchange_code_for_token(auth_code, client_id, client_secret)
-        except Exception as e:
-            logger.error(f"Error exchanging code: {e}")
-            return {"success": False, "error": str(e)}
-    
-    async def generate_oauth_url(self, client_id: str = None, client_secret: str = None, *args, **kwargs) -> Dict[str, Any]:
-        """Генерация OAuth URL для ручного использования"""
-        try:
-            # Извлекаем параметры так же, как в start_google_oauth
-            if client_id is None or not client_id:
-                client_id = kwargs.get('client_id') or kwargs.get('clientId') or (args[0] if args and len(args) > 0 else None)
-            if client_secret is None or not client_secret:
-                client_secret = kwargs.get('client_secret') or kwargs.get('clientSecret') or (args[1] if args and len(args) > 1 else None)
-            
-            if client_id:
-                client_id = str(client_id).strip()
-            if client_secret:
-                client_secret = str(client_secret).strip()
-            
-            if not client_id or not client_secret:
-                return {"success": False, "error": "Не указаны client_id или client_secret"}
-            
-            import secrets
-            from urllib.parse import urlencode
-            
-            state = secrets.token_urlsafe(32)
-            redirect_uri = "http://localhost:8080/callback"  # Должен точно совпадать с Google Cloud Console
-            
-            # Формируем OAuth URL с правильным URL-кодированием
-            params = {
-                'client_id': client_id,
-                'redirect_uri': redirect_uri,
-                'response_type': 'code',
-                'scope': 'https://www.googleapis.com/auth/drive.file',
-                'access_type': 'offline',
-                'prompt': 'consent',
-                'state': state
-            }
-            auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-            
-            logger.info(f"[OAuth] Generated OAuth URL, redirect_uri={redirect_uri}")
-            
-            return {
-                'success': True,
-                'url': auth_url,
-                'instructions': [
-                    '1. Откройте URL в браузере',
-                    '2. Войдите в Google и разрешите доступ',
-                    '3. После авторизации скопируйте код из URL (параметр code=...)',
-                    '4. Вставьте код в поле ниже и нажмите "Обменять код"'
-                ]
-            }
-        except Exception as e:
-            logger.error(f"Error generating OAuth URL: {e}")
-            return {"success": False, "error": str(e)}
-    
-    async def load_gdrive_config(self, *args, **kwargs) -> Dict[str, Any]:
-        """Загрузка конфигурации Google Drive из backend"""
-        try:
-            from config_manager import load_storage_config
-            storage_config = load_storage_config()
-            if storage_config.get('provider') == 'gdrive':
-                return {
-                    "success": True,
-                    "client_id": storage_config.get("client_id", ""),
-                    "client_secret": storage_config.get("client_secret", ""),
-                    "refresh_token": storage_config.get("refresh_token", "")
-                }
-            return {"success": True, "client_id": "", "client_secret": "", "refresh_token": ""}
-        except Exception as e:
-            logger.error(f"Error loading gdrive config: {e}")
-            return {"success": False, "error": str(e)}
+    # Google OAuth и отдельная конфигурация для Google Drive больше не используются
     
     async def save_storage_config(self, provider: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Сохранение конфигурации хранилища"""
         try:
             from config_manager import save_storage_config
             
-            if not provider:
-                provider = kwargs.get('provider', 'gdrive')
-            
-            if provider == 'webdav':
-                url = kwargs.get('url', '')
-                username = kwargs.get('username', '')
-                password = kwargs.get('password', '')
-                oauth_token = kwargs.get('oauth_token', '')
-                webdav_provider = kwargs.get('webdav_provider', 'custom')
-                save_storage_config(provider='webdav', webdav_provider=webdav_provider, url=url, username=username, password=password, oauth_token=oauth_token)
-            else:  # gdrive
-                client_id = kwargs.get('client_id', '')
-                client_secret = kwargs.get('client_secret', '')
-                refresh_token = kwargs.get('refresh_token', '')
-                save_storage_config(provider='gdrive', client_id=client_id, client_secret=client_secret, refresh_token=refresh_token)
+            # Сейчас поддерживается только WebDAV, игнорируем другие значения provider
+            url = kwargs.get('url', '')
+            username = kwargs.get('username', '')
+            password = kwargs.get('password', '')
+            oauth_token = kwargs.get('oauth_token', '')
+            webdav_provider = kwargs.get('webdav_provider', 'custom')
+            save_storage_config(provider='webdav', webdav_provider=webdav_provider, url=url, username=username, password=password, oauth_token=oauth_token)
             
             return {"success": True}
         except Exception as e:
@@ -745,7 +469,6 @@ class Plugin:
             import shutil
             from config_manager import CONFIG_DIR
             from cache_manager import cache_manager
-            from gdrive_provider import TOKEN_FILE
             
             deleted_files = []
             deleted_dirs = []
@@ -756,15 +479,6 @@ class Plugin:
                 logger.info("Cache cleared")
             except Exception as e:
                 logger.warning(f"Error clearing cache: {e}")
-            
-            # Удаление token.pickle (токены Google)
-            if TOKEN_FILE.exists():
-                try:
-                    TOKEN_FILE.unlink()
-                    deleted_files.append(TOKEN_FILE.name)
-                    logger.info(f"Deleted token file: {TOKEN_FILE.name}")
-                except Exception as e:
-                    logger.warning(f"Error deleting token file: {e}")
             
             # Удаление всех конфигурационных файлов и директории
             if CONFIG_DIR.exists():
@@ -817,283 +531,33 @@ class Plugin:
                 logger.info(f"[test_storage_connection] WebDAV parameters detected in kwargs, forcing provider to webdav")
                 provider = 'webdav'
             
-            # Проверяем все возможные источники provider только если WebDAV параметров нет
-            if not provider:
-                # Сначала из kwargs
-                provider = kwargs.get('provider')
-                logger.info(f"[test_storage_connection] Provider from kwargs: {provider}")
+            # Сейчас поддерживаем только WebDAV, определяем параметры и тестируем подключение
+            from webdav_provider import WebDAVProvider
             
-            # Если provider все еще не указан, проверяем args
-            if not provider and args:
-                if isinstance(args[0], dict) and 'provider' in args[0]:
-                    provider = args[0]['provider']
-                    logger.info(f"[test_storage_connection] Provider from args[0]: {provider}")
-            
-            # Если provider все еще не указан, загружаем из конфига
-            if not provider:
+            if kwargs.get('url') or kwargs.get('username') or kwargs.get('password') or kwargs.get('oauth_token'):
+                url = (kwargs.get('url') or '').strip()
+                username = kwargs.get('username', '')
+                password = kwargs.get('password', '')
+                oauth_token = kwargs.get('oauth_token', '')
+            else:
                 storage_config = load_storage_config()
-                provider = storage_config.get('provider', 'gdrive')
-                logger.info(f"[test_storage_connection] Provider from config: {provider}")
+                url = (storage_config.get('url', '') or '').strip()
+                username = storage_config.get('username', '')
+                password = storage_config.get('password', '')
+                oauth_token = storage_config.get('oauth_token', '')
             
-            logger.info(f"[test_storage_connection] Final provider: {provider}")
+            logger.info(f"[test_storage_connection] Using URL='{url}' username='{username}' oauth_token_len={len(oauth_token or '')}")
             
-            # Если provider webdav, используем параметры из kwargs или из конфига
-            if provider == 'webdav':
-                from webdav_provider import WebDAVProvider
-                
-                # Сначала берем из kwargs (если переданы явно), потом из конфига
-                if kwargs.get('url') or kwargs.get('username') or kwargs.get('password') or kwargs.get('oauth_token'):
-                    # Параметры переданы явно
-                    url = kwargs.get('url', '')
-                    username = kwargs.get('username', '')
-                    password = kwargs.get('password', '')
-                    oauth_token = kwargs.get('oauth_token', '')
-                else:
-                    # Загружаем из конфига
-                    storage_config = load_storage_config()
-                    url = storage_config.get('url', '')
-                    username = storage_config.get('username', '')
-                    password = storage_config.get('password', '')
-                    oauth_token = storage_config.get('oauth_token', '')
-                
-                if not url:
-                    return {"success": False, "error": "Не указан URL"}
-                
-                if not oauth_token and (not username or not password):
-                    return {"success": False, "error": "Не указаны логин/пароль или OAuth токен"}
-                
-                provider_obj = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
-                result = provider_obj.test_connection()
-                return result
-            else:  # gdrive
-                # Убеждаемся, что это действительно Google Drive, а не WebDAV с неправильным provider
-                if has_webdav_params:
-                    logger.warning(f"[test_storage_connection] WebDAV parameters detected but provider is {provider}, forcing webdav")
-                    provider = 'webdav'
-                    # Повторяем логику WebDAV
-                    from webdav_provider import WebDAVProvider
-                    url = kwargs.get('url', '')
-                    username = kwargs.get('username', '')
-                    password = kwargs.get('password', '')
-                    oauth_token = kwargs.get('oauth_token', '')
-                    if not url:
-                        return {"success": False, "error": "Не указан URL"}
-                    if not oauth_token and (not username or not password):
-                        return {"success": False, "error": "Не указаны логин/пароль или OAuth токен"}
-                    provider_obj = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
-                    result = provider_obj.test_connection()
-                    return result
-                return await self.test_gdrive_connection(*args, **kwargs)
+            if not url:
+                return {"success": False, "error": "Не указан URL (проверьте, что поле WebDAV URL заполнено и без пробелов)"}
+            
+            if not oauth_token and (not username or not password):
+                return {"success": False, "error": "Не указаны логин/пароль или OAuth токен"}
+            
+            provider_obj = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
+            result = provider_obj.test_connection()
+            return result
         except Exception as e:
             logger.error(f"Error testing storage connection: {e}")
             return {"success": False, "error": str(e)}
 
-class GoogleOAuthMonitor:
-    """Мониторинг браузера Steam Deck через CDP для автоматического захвата OAuth кода"""
-    
-    def __init__(self, cef_port=8080):
-        self.cef_url = f'http://127.0.0.1:{cef_port}/json'
-        self.monitored_urls = set()
-    
-    async def monitor_for_google_code(self, timeout=300, poll_interval=0.5) -> Optional[str]:
-        """Мониторинг CEF страниц для OAuth redirect URL и извлечение authorization code"""
-        import time
-        import re
-        
-        start_time = time.time()
-        logger.info("[GoogleOAuth] Starting OAuth code monitoring...")
-        
-        while time.time() - start_time < timeout:
-            try:
-                # Получаем текущие CEF страницы
-                with urllib.request.urlopen(self.cef_url, timeout=2) as response:
-                    pages = json.loads(response.read().decode())
-                
-                for page in pages:
-                    url = page.get('url', '')
-                    
-                    # Пропускаем уже проверенные URL
-                    if url in self.monitored_urls:
-                        continue
-                    
-                    self.monitored_urls.add(url)
-                    
-                    # Проверяем паттерны OAuth для Google (включая localhost callback)
-                    oauth_patterns = ['accounts.google.com', 'oauth2', 'code=', 'authorization', 'localhost:8080/callback']
-                    if any(p in url.lower() for p in oauth_patterns):
-                        logger.info(f"[GoogleOAuth] OAuth-related page detected: {url[:100]}...")
-                        
-                        # Извлекаем code из URL (может быть в query или fragment)
-                        parsed = urlparse(url)
-                        params = parse_qs(parsed.query)
-                        
-                        # Проверяем query параметры
-                        if 'code' in params:
-                            code = params['code'][0]
-                            logger.info(f"[GoogleOAuth] ✓ Found Google authorization code in URL query")
-                            return code
-                        
-                        # Проверяем фрагмент URL (после #)
-                        if '#' in url:
-                            fragment = url.split('#')[1]
-                            fragment_params = parse_qs(fragment)
-                            if 'code' in fragment_params:
-                                code = fragment_params['code'][0]
-                                logger.info(f"[GoogleOAuth] ✓ Found Google authorization code in URL fragment")
-                                return code
-                        
-                        # Также проверяем весь URL на наличие code= (на случай если парсинг не сработал)
-                        if 'code=' in url:
-                            try:
-                                # Извлекаем code из URL напрямую
-                                code_match = None
-                                if 'code=' in url:
-                                    code_part = url.split('code=')[1]
-                                    if '&' in code_part:
-                                        code_match = code_part.split('&')[0]
-                                    else:
-                                        code_match = code_part.split('#')[0] if '#' in code_part else code_part
-                                
-                                if code_match and len(code_match) > 10:  # Минимальная длина кода
-                                    logger.info(f"[GoogleOAuth] ✓ Found Google authorization code by direct extraction")
-                                    return code_match
-                            except Exception as e:
-                                logger.debug(f"[GoogleOAuth] Error extracting code from URL: {e}")
-                
-            except Exception as e:
-                logger.debug(f"[GoogleOAuth] Polling error (normal): {e}")
-            
-            await asyncio.sleep(poll_interval)
-        
-        logger.warning("[GoogleOAuth] OAuth monitoring timeout - no code found")
-        return None
-
-    async def start_google_oauth(self, client_id: str, client_secret: str) -> Dict[str, Any]:
-        """Запуск Google OAuth flow с автоматическим захватом кода"""
-        try:
-            import secrets
-            import urllib.request
-            
-            # Проверяем доступность CDP перед запуском
-            cef_url = 'http://127.0.0.1:8080/json'
-            cdp_available = False
-            try:
-                with urllib.request.urlopen(cef_url, timeout=2) as response:
-                    pages = json.loads(response.read().decode())
-                    cdp_available = True
-                    logger.info(f"[GoogleOAuth] CDP доступен, найдено {len(pages)} страниц")
-            except Exception as e:
-                logger.warning(f"[GoogleOAuth] CDP недоступен: {e}. Будет использован fallback метод.")
-            
-            # Генерируем state для безопасности
-            state = secrets.token_urlsafe(32)
-            
-            # Redirect URI - используем localhost (нужно добавить в Google Cloud Console)
-            # ВАЖНО: Добавьте этот URI в Google Cloud Console → Credentials → OAuth 2.0 Client ID → Authorized redirect URIs
-            redirect_uri = "http://localhost:8080/callback"
-            
-            # Альтернативные варианты, если localhost не работает:
-            # redirect_uri = "http://127.0.0.1:8080/callback"
-            # redirect_uri = "urn:ietf:wg:oauth:2.0:oob"  # Для desktop приложений
-            
-            # Формируем OAuth URL с правильным URL-кодированием
-            from urllib.parse import urlencode
-            params = {
-                'client_id': client_id,
-                'redirect_uri': redirect_uri,  # Должен точно совпадать с Google Cloud Console
-                'response_type': 'code',
-                'scope': 'https://www.googleapis.com/auth/drive.file',
-                'access_type': 'offline',
-                'prompt': 'consent',
-                'state': state
-            }
-            auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-            
-            logger.info(f"[GoogleOAuth] Generated OAuth URL, redirect_uri={redirect_uri}")
-            logger.info(f"[GoogleOAuth] CDP available: {cdp_available}")
-            
-            # Запускаем фоновый мониторинг только если CDP доступен
-            if cdp_available:
-                try:
-                    loop = asyncio.get_event_loop()
-                    loop.create_task(self._monitor_and_complete_oauth(client_id, client_secret, state))
-                except RuntimeError:
-                    asyncio.ensure_future(self._monitor_and_complete_oauth(client_id, client_secret, state))
-            else:
-                logger.info("[GoogleOAuth] CDP недоступен, автоматический захват кода не будет работать. Используйте ручной метод.")
-            
-            return {
-                'success': True,
-                'url': auth_url,
-                'message': 'Откройте браузер для авторизации - код будет захвачен автоматически' if cdp_available else 'CDP недоступен. Используйте ручной метод получения refresh_token.',
-                'cdp_available': cdp_available
-            }
-        except Exception as e:
-            logger.error(f"[GoogleOAuth] Error starting auth: {e}", exc_info=True)
-            return {'success': False, 'error': f'Ошибка запуска авторизации: {str(e)}'}
-    
-    async def _monitor_and_complete_oauth(self, client_id: str, client_secret: str, expected_state: str):
-        """Фоновая задача для мониторинга и завершения OAuth"""
-        try:
-            code = await self.monitor_for_google_code(timeout=300)
-            
-            if code:
-                logger.info(f"[GoogleOAuth] Auto-captured authorization code, exchanging for tokens...")
-                result = await GoogleOAuthMonitor.exchange_code_for_token(code, client_id, client_secret)
-                if result.get('success'):
-                    logger.info("[GoogleOAuth] ✓ Authentication completed automatically!")
-                    # Сохраняем refresh_token в настройки backend
-                    if 'refresh_token' in result:
-                        try:
-                            from config_manager import save_gdrive_config
-                            save_gdrive_config(client_id, client_secret, result['refresh_token'])
-                            logger.info(f"[GoogleOAuth] Saved refresh_token to config (length: {len(result['refresh_token'])})")
-                        except Exception as e:
-                            logger.error(f"[GoogleOAuth] Error saving config: {e}")
-                else:
-                    logger.error(f"[GoogleOAuth] Auto-auth failed: {result.get('error')}")
-            else:
-                logger.error("[GoogleOAuth] CDP monitoring timeout - user may have closed popup or not completed login")
-        except Exception as e:
-            logger.error(f"[GoogleOAuth] Error in background auth monitor: {e}", exc_info=True)
-
-    @staticmethod
-    async def exchange_code_for_token(auth_code: str, client_id: str, client_secret: str) -> Dict[str, Any]:
-        """Обмен authorization code на refresh_token"""
-        try:
-            import urllib.request
-            import urllib.parse
-            
-            token_url = "https://oauth2.googleapis.com/token"
-            redirect_uri = "http://localhost:8080/callback"  # Должен совпадать с тем, что в Google Cloud Console
-            
-            data = urllib.parse.urlencode({
-                'code': auth_code,
-                'client_id': client_id,
-                'client_secret': client_secret,
-                'redirect_uri': redirect_uri,  # Важно: должен точно совпадать с redirect_uri из authorize URL
-                'grant_type': 'authorization_code'
-            }).encode('utf-8')
-            
-            logger.info(f"[GoogleOAuth] Exchanging code, redirect_uri={redirect_uri}")
-            
-            req = urllib.request.Request(token_url, data=data, headers={'Content-Type': 'application/x-www-form-urlencoded'})
-            
-            with urllib.request.urlopen(req, timeout=10) as response:
-                if response.status == 200:
-                    token_data = json.loads(response.read().decode('utf-8'))
-                    refresh_token = token_data.get('refresh_token')
-                    if refresh_token:
-                        return {
-                            'success': True,
-                            'refresh_token': refresh_token,
-                            'access_token': token_data.get('access_token')
-                        }
-                    else:
-                        return {'success': False, 'error': 'refresh_token not found in response'}
-                else:
-                    error_text = response.read().decode('utf-8')
-                    return {'success': False, 'error': f'Token exchange failed: {error_text}'}
-        except Exception as e:
-            logger.error(f"[GoogleOAuth] Error exchanging code: {e}")
-            return {'success': False, 'error': str(e)}

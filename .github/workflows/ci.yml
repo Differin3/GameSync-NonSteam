@@ -1,0 +1,63 @@
+name: CI - Build and Package GameSync NonSteam
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Package Decky plugin (zip)
+        run: |
+          set -e
+          PLUGIN_DIR="gamesync-nonsteam"
+
+          rm -rf "$PLUGIN_DIR"
+          mkdir -p "$PLUGIN_DIR/dist"
+
+          # Frontend bundle
+          cp dist/index.js "$PLUGIN_DIR/dist/index.js"
+          if [ -d "dist/assets" ]; then
+            cp -r dist/assets "$PLUGIN_DIR/assets"
+          fi
+
+          # Backend and metadata
+          cp -r backend "$PLUGIN_DIR/backend"
+          cp main.py plugin.json package.json requirements.txt LICENSE "$PLUGIN_DIR"/
+          if [ -f "install_plugin.sh" ]; then
+            cp install_plugin.sh "$PLUGIN_DIR"/
+          fi
+
+          zip -r "${PLUGIN_DIR}.zip" "$PLUGIN_DIR"
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gamesync-nonsteam-${{ github.sha }}
+          path: gamesync-nonsteam.zip
+

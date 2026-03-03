@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <ul class="topnav">
+        <li><div class="activeButton" onclick="openAddGamesMenu()" style="width:auto;">Add Games</div></li>
+        <li><div onclick="onOpenMultisync(this)">Sync Multiple Games</div></li>
+        <li><div onclick="onSetCloudClicked(this)">Select Cloud</div></li>
+        <li><div onclick="onSyncSettingsClicked(this)">Settings</div></li>
+        <div class="search-container">
+              <input type="text" placeholder="Search.." name="search" onchange="onChangeSearch(this)" onkeypress="onChangeSearch(this)" onpaste = "onChangeSearch(this)" oninput = "onChangeSearch(this)">
+          </div>  
+    </ul>
+
+      <div class="padding"></div>
+
+<div id="confirmation-modal" class="bisync-modal" style="z-index: 2;">
+  <div id="confirmation-title" class="bisync-title"><p>This is your prompt</p></div>
+  <hr>
+  <div id="confirmation-subtitle" class="bisync-subtitle"><p>This is your subtitle.</p></div>
+  <div class="bisync-modal-content">
+    <div id="confirmation-line-cont" class="bisync-line-cont"></div>
+    <button id="confirmation-modal-confirm" class="signupbtn contentbutton">Confirm</button>
+    <button id="confirmation-modal-cancel" class="cancelbtn contentbutton">Cancel</button>
+  </div>
+</div>
+
+<hr>
+<div class="settings-title">Actively Tracked Games</div>
+<hr>
+
+<div id="accordion-cont">
+{{range .Games}}
+{{if not .Def.Hidden}}
+<button class="accordion" id="{{.Def.DisplayName}}-accordion">{{.Def.DisplayName}}</button>
+<div class="panel" id="{{.Def.DisplayName}}-panel">
+    <div>
+        {{if .SaveFilesFound}}
+        <div>Total File Size: <a id="{{.Def.DisplayName}}-total-size">{{.TotalSize}}</a>MB</div>
+        <button id="{{.Def.DisplayName}}-syncbtn" class="btn success" onclick="onSyncButtonClicked(this, '{{.Name}}')">Sync Game</button>
+        {{else}}
+        <div class="nosavefoundcont"><p>No Save Files found for {{.Def.DisplayName}}</p></div>
+        <button id="{{.Def.DisplayName}}-syncbtn" class="btn success" onclick="onSyncButtonClicked(this, '{{.Name}}')">Sync Game</button>
+        {{end}}
+
+        <button id="{{.Def.DisplayName}}-editbtn" class="btnaddl neutralbtn" onclick="onEditButtonClicked(this, '{{.Name}}')">Edit</button>
+        <button id="{{.Def.DisplayName}}-removebtn" class="removebtn" onclick="onRemoveButtonClicked(this, '{{.Name}}')">Remove</button>
+      </div>
+
+      {{if .SaveFilesFound}}
+      <table id="savefiles">
+        <tr>
+          <th>Filename</th>
+          <th>Modified</th>
+          <th>Size</th>
+        </tr>
+        <tr>
+        {{range .SaveFiles}}
+            <td>{{.Filename}}</td>
+            <td class="table-right-align">{{.ModifiedBy}}</td>
+            <td class="table-right-align">{{.Size}}</td>
+          </tr>
+        {{end}}
+      </table>
+      <div class="table-padding"></div>
+      {{end}}
+      
+
+</div>
+{{end}} <!-- if not .Def.Hidden -->
+{{end}} <!-- range .Games -->
+
+<hr>
+<div class="settings-title">Archived Game Definitions</div>
+<hr>
+
+{{range .Records}}
+<div class="import-game" id="{{.Name}}-import-game" onclick="onGameImportClicked('{{.Name}}')">Import {{.Name}}</div>
+{{end}}
+</div>
+
+
+<div id="id01" class="modal">
+    <span onclick="onAddGameClosed()" class="close" title="Close Modal">&times;</span>
+    <div class="modal-content">
+      <div class="container">
+        <h1>Add a game</h1>
+        <div>
+            <b>Game Name</b>
+            <input required id="gamename" type="text" value="New Game">
+        </div>
+        <hr>
+        {{range .Platforms}}
+        <label><b>{{.}}</b></label>
+        <div class="{{.}}-container" id="{{.}}-container">
+        <input class="{{.}}-path" id="{{.}}-path" type="text" placeholder="Gamepath" name="path">
+        <button class="selectbtn" onclick="onSelectClicked(this, '{{.}}')">Select</button>
+  
+        <input class="{{.}}-include" id="{{.}}-include" type="text" placeholder="Include">
+        <hr>
+        </div>
+        <div>
+            <button class="addpathbtn" onclick="onAddPathClicked('{{.}}')">Add {{.}} Path</button>
+        </div>
+        <hr>
+        {{end}}
+        <div>
+          <div><b>Custom rclone flags</b></div>
+          <input class="flags" id="flags" type="text" placeholder="rclone flags">
+        </div>
+        <div class="clearfix">
+          <button onclick="onAddGameClosed()" class="cancelbtn contentbutton">Cancel</button>
+          <button onclick="submitGamedef()" class="signupbtn contentbutton">Save</button>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div id="bisync-confirm" class="bisync-modal">
+  <span id="close-sync-window" class="close" onclick="onSyncGameModalClosed(this)" title="Close">&times;</span>
+  <div class="bisync-title"><p>Sync Summary</p></div>
+  <div id="bisync-subtitle" class="bisync-subtitle"><p>Your data is not sync'd yet, please read the summary and conduct the sync if everything looks good.</p></div>
+  <div id="sync-game-modal-loader" class="loader-cont"><span class="loader"></span></div>
+  <div class="bisync-modal-content">
+    <div id="bisync-line-cont" class="bisync-line-cont"></div>
+    <button id="sync-modal-confirm" class="signupbtn contentbutton" disabled onclick="onSyncGameConfirm(this)">Confirm</button>
+    <button id="sync-modal-cancel" class="cancelbtn contentbutton" disabled onclick="onSyncGameModalClosed(this)">Cancel</button>
+  </div>
+</div>
+
+<div id="settings-modal" class="settings-modal">
+  <span class="close" onclick="onSettingsModalClosed(this)" title="Close Modal">&times;</span>
+  <div class="settings-modal-content">
+    <div class="settings-title">Settings</div>
+    <hr>
+    <div class="settings-switch-cont">
+      <label class="switch switch-float">
+        <input id="settings-dry-run" type="checkbox" onclick="onDryRunToggle(this)">
+        <span class="slider round"></span>
+      </label>
+      <div class="setting-text">
+        <p>Perform a Dry Run prior to sync.</p>
+      </div>
+    </div>
+    <div class="clearfix">
+    </div>
+    <div class="settings-switch-cont">
+      <label class="switch switch-float">
+        <input id="settings-use-sync" type="checkbox" onclick="onUseBiSyncToggle(this)">
+        <span class="slider round"></span>
+      </label>
+      <div class="setting-text">
+        <p>Use a Bi-Directional Sync instead of a standard Sync.</p>
+      </div>
+    </div>
+    <div class="clearfix">
+    </div>
+    <div class="settings-switch-cont">
+      <label class="switch switch-float">
+        <input id="settings-should-not-prompt-large" type="checkbox" onclick="onDoNotPromptLargeSyncsToggle(this)">
+        <span class="slider round"></span>
+      </label>
+      <div class="setting-text">
+        <p>Do not show a warning prior to large syncs.</p>
+      </div>
+    </div>
+    <div class="clearfix">
+    </div>
+    <button class="contentbutton noticebutton" onclick="onNoticeClicked()">License Notices</button>
+    <div id="notice-modal" class="settings-modal">
+      <span class="close" onclick="onNoticeClosed()" title="Close Modal">&times;</span>
+      <div class="settings-modal-content">
+        <div class="noticebox">{{.Notice}}</div>
+      </div>
+    </div>
+    <hr>
+    <div class="current-version-div">
+      Current Version: {{.Version}}
+    </div>
+    <hr>
+    <div class="danger-zone">DANGER ZONE (Developer Options)</div>
+    <button class="contentbutton clearsettingsbutton" onclick="onClearUserSettings()">Reset Game Definitions</button>
+    <button class="contentbutton clearsettingsbutton" onclick="onDeleteAllDrivesClicked()">Reset RClone Config</button>  
+  </div>
+</div>
+
+<div id="multisync-modal" class="multisync-modal">
+  <span class="close" onclick="onCloseMultisync(this)" title="Close Modal">&times;</span>
+  <!-- <div class="settings-modal-content"> -->
+
+    <div class="multisync-title">Sync Multiple Games</div>
+    <div id="multisync-subtitle" class="multisync-subtitle"></div>
+    <button id="multisync-modal-confirm" class="multisyncbtn" onclick="onSyncSelectedClicked()">Sync Selected</button>
+    <button id="multisync-modal-selectall" class="multisyncbtn multisync-selectallbtn" onclick="onMultisyncSelectAllClicked()">Select All</button>
+    <button id="multisync-modal-selectall" class="multisyncbtn multisync-selectallbtn" onclick="onMultisyncUnselectAllClicked()">Unselect All</button>
+    <div class="search-container">
+      <input id="multisync-input" type="text" placeholder="Search.." name="search" onchange="onChangeSearchMultisync(this)" onkeypress="onChangeSearchMultisync(this)" onpaste = "onChangeSearchMultisync(this)" oninput = "onChangeSearchMultisync(this)">
+    </div>
+    <hr>
+    {{range .Games}}
+    <label id="{{.Def.DisplayName}}-cont" class="multisync-container">
+      <div>
+        <div id="{{.Def.DisplayName}}-multisync-game-modal-loader" class="multisync-loader-cont"><span class="multisync-loader"></span></div>  
+        <span class="multisync-checkmark"></span>
+          <div class="multisync-check-success-cont">
+          <li id="{{.Def.DisplayName}}-multisync-success" class="multisync-li multisync-check-success"></li>
+          </div>
+          <div class="multisync-check-failure-cont">
+          <li id="{{.Def.DisplayName}}-multisync-failure" class="multisync-li multisync-check-failure"></li>
+        </div>
+        {{.Def.DisplayName}}
+      </div>
+      <input class="multisync-check" id="{{.Def.DisplayName}}-multisync-check" type="checkbox" checked="checked">
+      <span class="multisync-checkmark"></span>
+    </label>
+    {{end}}
+    <div class="bisync-modal-content">
+    <div id="multisync-line-cont" class="bisync-line-cont"></div>
+    </div>
+  <!-- </div> -->
+</div>
+
+</body>
+</html> 
