@@ -9,8 +9,15 @@ logger = logging.getLogger(__name__)
 # Ключи: нормализованные имена игр (lowercase, без лишних символов).
 # Значения: список путей ОТНОСИТЕЛЬНО папки drive_c.
 LOCAL_GAME_SAVE_DEFINITIONS: Dict[str, List[str]] = {
-    # Expeditions 33 (по твоему примеру с Sandfall)
+    # Expedition 33 (по твоему примеру с Sandfall)
+    # Учитываем варианты написания: с/без s и с/без пробела.
+    "expedition 33": [
+        "users/deck/AppData/Local/Sandfall/Saved/SaveGames",
+    ],
     "expeditions 33": [
+        "users/deck/AppData/Local/Sandfall/Saved/SaveGames",
+    ],
+    "expedition33": [
         "users/deck/AppData/Local/Sandfall/Saved/SaveGames",
     ],
     "expeditions33": [
@@ -51,6 +58,12 @@ def _convert_windows_path_to_portproton_rel(path: str) -> Optional[str]:
     for token in ("%APPDATA%", "%AppData%", "%appdata%"):
         if token in p:
             p = p.replace(token, "users/deck/AppData/Roaming")
+            break
+
+    # %USERPROFILE%\Documents\My Games -> users/deck/Documents/My Games
+    for token in ("%USERPROFILE%", "%HOMEPATH%", "%UserProfile%", "%HomePath%"):
+        if token in p and "/Documents/My Games" in p:
+            p = p.replace(token + "/Documents/My Games", "users/deck/Documents/My Games")
             break
 
     # %USERPROFILE%\Documents -> users/deck/Documents
@@ -132,11 +145,13 @@ def get_known_save_paths_for_game(game_name: str) -> List[str]:
     normalized = _normalize_name(game_name)
 
     # 1. Локальная база
+    # Сначала пытаемся полное совпадение нормализованного имени
     if normalized in LOCAL_GAME_SAVE_DEFINITIONS:
         return LOCAL_GAME_SAVE_DEFINITIONS[normalized]
 
+    # Потом допускаем частичное совпадение (для случаев без пробелов и т.п.)
     for key, paths in LOCAL_GAME_SAVE_DEFINITIONS.items():
-        if key in normalized:
+        if key in normalized or normalized in key:
             logger.debug(f"Matched game '{game_name}' to local definition '{key}'")
             return paths
 

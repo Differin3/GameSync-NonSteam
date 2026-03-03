@@ -4,7 +4,10 @@
 
 ## 🇷🇺 Русский
 
-Плагин для Decky Loader, синхронизирующий сохранения игр PortProton с облачным хранилищем по WebDAV (например, Яндекс Диск, Nextcloud и др.).
+Плагин для Decky Loader, синхронизирующий сохранения игр PortProton с облачным хранилищем:
+
+- через **WebDAV** (Яндекс Диск, Nextcloud, Box, ownCloud и др.)
+- или через **S3‑совместимые object storage** (Yandex Object Storage, VK Cloud, Cloud.ru, Backblaze B2, Wasabi, AWS S3, DigitalOcean Spaces и др.)
 
 ### Установка
 
@@ -43,11 +46,20 @@ bash install_dependencies.sh
 
 ### Настройка
 
-1. Откройте настройки плагина в Decky Loader
-2. В разделе WebDAV выберите провайдера (например, Яндекс Диск или Nextcloud)
-3. Укажите WebDAV URL, логин/пароль или OAuth‑токен провайдера
-4. Нажмите «Тест подключения», убедитесь что соединение успешно
-5. Настройте пути сохранений для игр
+1. Откройте настройки плагина в Decky Loader.
+2. В блоке **Тип хранилища** выберите:
+   - **WebDAV**, если используете Яндекс Диск / Nextcloud / Box / ownCloud и т.п.
+   - **S3 (Object Storage)**, если используете Yandex Object Storage, VK Cloud, Cloud.ru, Backblaze B2, Wasabi, AWS S3, DigitalOcean Spaces и др.
+3. Для **WebDAV**:
+   - выберите провайдера (например, Яндекс Диск или Nextcloud);
+   - укажите WebDAV URL, логин/пароль или OAuth‑токен провайдера;
+   - нажмите «Тест подключения» и убедитесь, что соединение успешно.
+4. Для **S3**:
+   - выберите S3‑провайдера (например, Yandex Object Storage, VK Cloud, Backblaze B2);
+   - укажите **Bucket**, при необходимости поправьте Endpoint и Region;
+   - введите Access Key и Secret Key;
+   - нажмите «Тест подключения S3» и убедитесь, что соединение успешно.
+5. Настройте пути сохранений для игр (авто‑поиск + ручные пути при необходимости).
 
 ### Использование
 
@@ -67,7 +79,10 @@ bash install_dependencies.sh
 
 ## 🇬🇧 English
 
-Plugin for Decky Loader that synchronizes PortProton game saves with cloud storage via WebDAV (e.g. Yandex Disk, Nextcloud, etc.).
+Plugin for Decky Loader that synchronizes PortProton game saves with cloud storage:
+
+- via **WebDAV** (Yandex Disk, Nextcloud, Box, ownCloud, etc.)
+- or via **S3‑compatible object storage** (Yandex Object Storage, VK Cloud, Cloud.ru, Backblaze B2, Wasabi, AWS S3, DigitalOcean Spaces, etc.).
 
 ### Installation
 
@@ -106,11 +121,20 @@ bash install_dependencies.sh
 
 ### Configuration
 
-1. Open plugin settings in Decky Loader
-2. In the WebDAV section choose a provider (e.g. Yandex Disk or Nextcloud)
-3. Enter WebDAV URL, username/password or provider OAuth token
-4. Click “Test connection” and ensure it succeeds
-5. Configure save paths for games
+1. Open plugin settings in Decky Loader.
+2. In the **Storage type** block choose:
+   - **WebDAV** if you use Yandex Disk / Nextcloud / Box / ownCloud, etc.
+   - **S3 (Object Storage)** if you use Yandex Object Storage, VK Cloud, Cloud.ru, Backblaze B2, Wasabi, AWS S3, DigitalOcean Spaces, etc.
+3. For **WebDAV**:
+   - choose a provider (e.g. Yandex Disk or Nextcloud);
+   - enter WebDAV URL, username/password or provider OAuth token;
+   - click “Test connection” and ensure it succeeds.
+4. For **S3**:
+   - choose an S3 provider (e.g. Yandex Object Storage, VK Cloud, Backblaze B2);
+   - enter **Bucket**, adjust Endpoint and Region if needed;
+   - enter Access Key and Secret Key;
+   - click “Test S3 connection” and ensure it succeeds.
+5. Configure save paths for games (auto‑detected or custom paths).
 
 ### Usage
 

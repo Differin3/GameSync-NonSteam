@@ -523,28 +523,49 @@ class Plugin:
             from config_manager import load_storage_config
             
             logger.info(f"[test_storage_connection] Called with provider={provider}, args={len(args)}, kwargs keys: {list(kwargs.keys())}")
+            logger.info(f"[test_storage_connection] arg types: {[type(a).__name__ for a in args]}")
+
+            # Decky часто передаёт параметры не как kwargs, а как один dict в args[0]
+            if args and isinstance(args[0], dict):
+                logger.info(f"[test_storage_connection] Detected dict in args[0] with keys: {list(args[0].keys())}")
+                merged = dict(kwargs)
+                merged.update(args[0])
+                kwargs = merged
             
-            # ВАЖНО: Проверяем наличие WebDAV параметров ПЕРВЫМ ДЕЛОМ - до загрузки конфига
-            # Если есть WebDAV параметры, это точно WebDAV, независимо от provider в конфиге
-            has_webdav_params = bool(kwargs.get('url') or kwargs.get('username') or kwargs.get('password') or kwargs.get('oauth_token'))
+            # Загружаем значения из конфига (используем их как базовые)
+            storage_config = load_storage_config()
+            url = (storage_config.get('url') or '')
+            username = storage_config.get('username', '')
+            password = storage_config.get('password', '')
+            oauth_token = storage_config.get('oauth_token', '')
+
+            # Перекрываем значениями из kwargs ТОЛЬКО если они непустые
+            incoming_url = kwargs.get('url')
+            if isinstance(incoming_url, dict):
+                incoming_url = incoming_url.get('url') or incoming_url.get('path')
+            if incoming_url not in (None, ''):
+                url = str(incoming_url)
+
+            if kwargs.get('username'):
+                username = kwargs.get('username')
+            if kwargs.get('password'):
+                password = kwargs.get('password')
+            if kwargs.get('oauth_token'):
+                oauth_token = kwargs.get('oauth_token')
+            
+            # Небольшая нормализация URL
+            if url is None:
+                url = ''
+            url = str(url).strip()
+
+            # ВАЖНО: Проверяем наличие WebDAV параметров
+            has_webdav_params = bool(url or username or password or oauth_token)
             if has_webdav_params:
-                logger.info(f"[test_storage_connection] WebDAV parameters detected in kwargs, forcing provider to webdav")
+                logger.info(f"[test_storage_connection] WebDAV parameters detected, forcing provider to webdav")
                 provider = 'webdav'
             
             # Сейчас поддерживаем только WebDAV, определяем параметры и тестируем подключение
             from webdav_provider import WebDAVProvider
-            
-            if kwargs.get('url') or kwargs.get('username') or kwargs.get('password') or kwargs.get('oauth_token'):
-                url = (kwargs.get('url') or '').strip()
-                username = kwargs.get('username', '')
-                password = kwargs.get('password', '')
-                oauth_token = kwargs.get('oauth_token', '')
-            else:
-                storage_config = load_storage_config()
-                url = (storage_config.get('url', '') or '').strip()
-                username = storage_config.get('username', '')
-                password = storage_config.get('password', '')
-                oauth_token = storage_config.get('oauth_token', '')
             
             logger.info(f"[test_storage_connection] Using URL='{url}' username='{username}' oauth_token_len={len(oauth_token or '')}")
             
