@@ -97,29 +97,64 @@ class Plugin:
                 from config_manager import load_storage_config
             
             storage_config = load_storage_config()
-            
-            # Единственный поддерживаемый провайдер сейчас — WebDAV
-            try:
-                from webdav_provider import WebDAVProvider
-            except ImportError:
-                import sys
-                import pathlib
-                backend_path = pathlib.Path(__file__).parent
-                sys.path.insert(0, str(backend_path))
-                from webdav_provider import WebDAVProvider
-            
-            url = storage_config.get('url', '')
-            username = storage_config.get('username', '')
-            password = storage_config.get('password', '')
-            oauth_token = storage_config.get('oauth_token', '')
-            
-            if not url:
-                return {"success": False, "error": "Не настроен WebDAV. Укажите URL в настройках."}
-            
-            if not oauth_token and (not username or not password):
-                return {"success": False, "error": "Не настроен WebDAV. Укажите логин/пароль или OAuth токен в настройках."}
-            
-            provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
+            provider_type = storage_config.get("provider", "webdav")
+
+            provider = None
+
+            if provider_type == "s3":
+                try:
+                    from s3_provider import S3Provider
+                except ImportError:
+                    import sys
+                    import pathlib
+                    backend_path = pathlib.Path(__file__).parent
+                    sys.path.insert(0, str(backend_path))
+                    from s3_provider import S3Provider
+
+                endpoint = storage_config.get("endpoint", "")
+                region = storage_config.get("region", "us-east-1")
+                bucket = storage_config.get("bucket", "")
+                access_key = storage_config.get("access_key", "")
+                secret_key = storage_config.get("secret_key", "")
+                path_style = bool(storage_config.get("path_style", False))
+                signature_version = storage_config.get("signature_version", "s3v4")
+
+                if not bucket:
+                    return {"success": False, "error": "Не настроен S3. Укажите bucket в настройках."}
+                if not access_key or not secret_key:
+                    return {"success": False, "error": "Не настроен S3. Укажите Access Key и Secret Key в настройках."}
+
+                provider = S3Provider(
+                    endpoint=endpoint,
+                    region=region,
+                    bucket=bucket,
+                    access_key=access_key,
+                    secret_key=secret_key,
+                    path_style=path_style,
+                    signature_version=signature_version,
+                )
+            else:
+                try:
+                    from webdav_provider import WebDAVProvider
+                except ImportError:
+                    import sys
+                    import pathlib
+                    backend_path = pathlib.Path(__file__).parent
+                    sys.path.insert(0, str(backend_path))
+                    from webdav_provider import WebDAVProvider
+                
+                url = storage_config.get('url', '')
+                username = storage_config.get('username', '')
+                password = storage_config.get('password', '')
+                oauth_token = storage_config.get('oauth_token', '')
+                
+                if not url:
+                    return {"success": False, "error": "Не настроен WebDAV. Укажите URL в настройках."}
+                
+                if not oauth_token and (not username or not password):
+                    return {"success": False, "error": "Не настроен WebDAV. Укажите логин/пароль или OAuth токен в настройках."}
+                
+                provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
             
             file_id = provider.upload_file(archive_path, "GameSync")
             
@@ -440,13 +475,44 @@ class Plugin:
         try:
             from config_manager import save_storage_config
             
-            # Сейчас поддерживается только WebDAV, игнорируем другие значения provider
-            url = kwargs.get('url', '')
-            username = kwargs.get('username', '')
-            password = kwargs.get('password', '')
-            oauth_token = kwargs.get('oauth_token', '')
-            webdav_provider = kwargs.get('webdav_provider', 'custom')
-            save_storage_config(provider='webdav', webdav_provider=webdav_provider, url=url, username=username, password=password, oauth_token=oauth_token)
+            if provider is None:
+                provider = kwargs.get("provider", "webdav")
+
+            if provider == "s3":
+                s3_provider = kwargs.get("s3_provider", "custom")
+                endpoint = kwargs.get("endpoint", "")
+                region = kwargs.get("region", "us-east-1")
+                bucket = kwargs.get("bucket", "")
+                access_key = kwargs.get("access_key", "")
+                secret_key = kwargs.get("secret_key", "")
+                path_style = bool(kwargs.get("path_style", False))
+                signature_version = kwargs.get("signature_version", "s3v4")
+
+                save_storage_config(
+                    provider="s3",
+                    s3_provider=s3_provider,
+                    endpoint=endpoint,
+                    region=region,
+                    bucket=bucket,
+                    access_key=access_key,
+                    secret_key=secret_key,
+                    path_style=path_style,
+                    signature_version=signature_version,
+                )
+            else:
+                url = kwargs.get('url', '')
+                username = kwargs.get('username', '')
+                password = kwargs.get('password', '')
+                oauth_token = kwargs.get('oauth_token', '')
+                webdav_provider = kwargs.get('webdav_provider', 'custom')
+                save_storage_config(
+                    provider='webdav',
+                    webdav_provider=webdav_provider,
+                    url=url,
+                    username=username,
+                    password=password,
+                    oauth_token=oauth_token,
+                )
             
             return {"success": True}
         except Exception as e:
@@ -558,13 +624,56 @@ class Plugin:
                 url = ''
             url = str(url).strip()
 
-            # ВАЖНО: Проверяем наличие WebDAV параметров
-            has_webdav_params = bool(url or username or password or oauth_token)
-            if has_webdav_params:
-                logger.info(f"[test_storage_connection] WebDAV parameters detected, forcing provider to webdav")
-                provider = 'webdav'
-            
-            # Сейчас поддерживаем только WebDAV, определяем параметры и тестируем подключение
+            # Выбираем провайдера: если явно передан, используем его, иначе читаем из конфига
+            storage_provider = storage_config.get("provider", "webdav")
+            if provider:
+                storage_provider = provider
+
+            if storage_provider == "s3":
+                # Для S3 читаем параметры из конфига + kwargs
+                s3_bucket = storage_config.get("bucket", "")
+                s3_endpoint = storage_config.get("endpoint", "")
+                s3_region = storage_config.get("region", "us-east-1")
+                s3_access_key = storage_config.get("access_key", "")
+                s3_secret_key = storage_config.get("secret_key", "")
+                s3_path_style = bool(storage_config.get("path_style", False))
+                s3_signature_version = storage_config.get("signature_version", "s3v4")
+
+                # Перекрытие из kwargs (если пришли не пустые значения)
+                if kwargs.get("bucket"):
+                    s3_bucket = kwargs.get("bucket")
+                if kwargs.get("endpoint"):
+                    s3_endpoint = kwargs.get("endpoint")
+                if kwargs.get("region"):
+                    s3_region = kwargs.get("region")
+                if kwargs.get("access_key"):
+                    s3_access_key = kwargs.get("access_key")
+                if kwargs.get("secret_key"):
+                    s3_secret_key = kwargs.get("secret_key")
+                if "path_style" in kwargs:
+                    s3_path_style = bool(kwargs.get("path_style"))
+                if kwargs.get("signature_version"):
+                    s3_signature_version = kwargs.get("signature_version")
+
+                if not s3_bucket:
+                    return {"success": False, "error": "Не указан bucket для S3"}
+                if not s3_access_key or not s3_secret_key:
+                    return {"success": False, "error": "Не указаны Access Key / Secret Key для S3"}
+
+                from s3_provider import S3Provider
+
+                provider_obj = S3Provider(
+                    endpoint=s3_endpoint,
+                    region=s3_region,
+                    bucket=s3_bucket,
+                    access_key=s3_access_key,
+                    secret_key=s3_secret_key,
+                    path_style=s3_path_style,
+                    signature_version=s3_signature_version,
+                )
+                return provider_obj.test_connection()
+
+            # WebDAV по умолчанию
             from webdav_provider import WebDAVProvider
             
             logger.info(f"[test_storage_connection] Using URL='{url}' username='{username}' oauth_token_len={len(oauth_token or '')}")

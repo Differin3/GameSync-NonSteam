@@ -112,7 +112,7 @@ def save_storage_config(provider: str, **kwargs):
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     config = {
         "provider": provider,
-        **kwargs
+        **kwargs,
     }
     try:
         with open(STORAGE_CONFIG_FILE, 'w', encoding='utf-8') as f:
