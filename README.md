@@ -4,7 +4,7 @@
 
 ## 🇷🇺 Русский
 
-Плагин для Decky Loader, синхронизирующий сохранения игр PortProton с Google Drive.
+Плагин для Decky Loader, синхронизирующий сохранения игр PortProton с облачным хранилищем по WebDAV (например, Яндекс Диск, Nextcloud и др.).
 
 ### Установка
 
@@ -44,21 +44,10 @@ bash install_dependencies.sh
 ### Настройка
 
 1. Откройте настройки плагина в Decky Loader
-2. Введите Google Drive Client ID и Client Secret
-3. Нажмите "Авторизоваться автоматически" для получения refresh_token
-4. Настройте пути сохранений для игр
-
-### Получение OAuth учетных данных
-
-1. Откройте [Google Cloud Console](https://console.cloud.google.com/)
-2. Создайте новый проект (или выберите существующий)
-3. APIs & Services → Enable APIs → включите "Google Drive API"
-4. APIs & Services → Credentials → Create Credentials → OAuth client ID
-5. Тип приложения: "Web application"
-6. Authorized redirect URIs: `http://localhost:8080/callback`
-7. Сохраните и скопируйте Client ID и Client Secret
-8. OAuth consent screen → Publishing status: "Testing"
-9. OAuth consent screen → Test users → ADD USERS → добавьте ваш email
+2. В разделе WebDAV выберите провайдера (например, Яндекс Диск или Nextcloud)
+3. Укажите WebDAV URL, логин/пароль или OAuth‑токен провайдера
+4. Нажмите «Тест подключения», убедитесь что соединение успешно
+5. Настройте пути сохранений для игр
 
 ### Использование
 
@@ -78,7 +67,7 @@ bash install_dependencies.sh
 
 ## 🇬🇧 English
 
-Plugin for Decky Loader that synchronizes PortProton game saves with Google Drive.
+Plugin for Decky Loader that synchronizes PortProton game saves with cloud storage via WebDAV (e.g. Yandex Disk, Nextcloud, etc.).
 
 ### Installation
 
@@ -118,21 +107,10 @@ bash install_dependencies.sh
 ### Configuration
 
 1. Open plugin settings in Decky Loader
-2. Enter Google Drive Client ID and Client Secret
-3. Click "Authorize automatically" to get refresh_token
-4. Configure save paths for games
-
-### Getting OAuth Credentials
-
-1. Open [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or select existing)
-3. APIs & Services → Enable APIs → enable "Google Drive API"
-4. APIs & Services → Credentials → Create Credentials → OAuth client ID
-5. Application type: "Web application"
-6. Authorized redirect URIs: `http://localhost:8080/callback`
-7. Save and copy Client ID and Client Secret
-8. OAuth consent screen → Publishing status: "Testing"
-9. OAuth consent screen → Test users → ADD USERS → add your email
+2. In the WebDAV section choose a provider (e.g. Yandex Disk or Nextcloud)
+3. Enter WebDAV URL, username/password or provider OAuth token
+4. Click “Test connection” and ensure it succeeds
+5. Configure save paths for games
 
 ### Usage
 

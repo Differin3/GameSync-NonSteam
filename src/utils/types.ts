@@ -16,8 +16,7 @@ export interface SyncStatus {
 
 // Конфигурация облака
 export interface CloudConfig {
-  provider: "gdrive";
-  refreshToken?: string;
+  provider: "webdav";
   autoSync: boolean;
 }
 

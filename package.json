@@ -1,7 +1,7 @@
 {
   "name": "gamesync-nonsteam",
-  "version": "0.1.1",
-  "description": "Синхронизация сохранений игр PortProton с Google Drive",
+  "version": "0.2.0",
+  "description": "Синхронизация сохранений игр PortProton через WebDAV (Яндекс Диск, Nextcloud и др.)",
   "type": "module",
   "scripts": {
     "build": "rollup -c",

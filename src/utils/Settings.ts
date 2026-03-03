@@ -1,11 +1,7 @@
 export type WebDAVProviderType = 'custom' | 'nextcloud' | 'yandex' | 'box' | 'owncloud';
 
 export interface Settings {
-  storageProvider: 'gdrive' | 'webdav';
-  // Google Drive
-  refreshToken: string;
-  clientId: string;
-  clientSecret: string;
+  storageProvider: 'webdav';
   // WebDAV
   webdavProvider: WebDAVProviderType;
   webdavUrl: string;
@@ -26,10 +22,7 @@ export const WEBDAV_PROVIDERS: Record<WebDAVProviderType, { name: string; url: s
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  storageProvider: 'gdrive',
-  refreshToken: "",
-  clientId: "",
-  clientSecret: "",
+  storageProvider: 'webdav',
   webdavProvider: 'custom',
   webdavUrl: "",
   webdavUsername: "",

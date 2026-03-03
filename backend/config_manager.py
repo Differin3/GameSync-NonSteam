@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 CONFIG_DIR = Path.home() / ".config" / "gamesync"
 CONFIG_FILE = CONFIG_DIR / "games.json"
 SYNCED_GAMES_FILE = CONFIG_DIR / "synced_games.json"
-GDRIVE_CONFIG_FILE = CONFIG_DIR / "gdrive_config.json"
 STORAGE_CONFIG_FILE = CONFIG_DIR / "storage_config.json"
 
 def load_game_configs() -> Dict[str, Dict]:
@@ -108,41 +107,6 @@ def add_synced_game(game_name: str, file_id: Optional[str] = None, file_size: Op
     }
     save_synced_games(synced_games)
 
-def save_gdrive_config(client_id: str, client_secret: str, refresh_token: str):
-    """Сохранение конфигурации Google Drive"""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    config = {
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "refresh_token": refresh_token
-    }
-    try:
-        with open(GDRIVE_CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-        logger.info(f"Saved Google Drive config to {GDRIVE_CONFIG_FILE}")
-    except Exception as e:
-        logger.error(f"Error saving Google Drive config: {e}")
-        raise
-
-def load_gdrive_config() -> Dict[str, str]:
-    """Загрузка конфигурации Google Drive (для обратной совместимости)"""
-    storage_config = load_storage_config()
-    if storage_config.get('provider') == 'gdrive':
-        return {
-            'client_id': storage_config.get('client_id', ''),
-            'client_secret': storage_config.get('client_secret', ''),
-            'refresh_token': storage_config.get('refresh_token', '')
-        }
-    # Старый формат
-    if not GDRIVE_CONFIG_FILE.exists():
-        return {}
-    try:
-        with open(GDRIVE_CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading Google Drive config: {e}")
-        return {}
-
 def save_storage_config(provider: str, **kwargs):
     """Сохранение конфигурации хранилища"""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -161,25 +125,11 @@ def save_storage_config(provider: str, **kwargs):
 def load_storage_config() -> Dict[str, Any]:
     """Загрузка конфигурации хранилища"""
     if not STORAGE_CONFIG_FILE.exists():
-        # Обратная совместимость: загружаем старый gdrive_config
-        gdrive_config = {}
-        if GDRIVE_CONFIG_FILE.exists():
-            try:
-                with open(GDRIVE_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    gdrive_config = json.load(f)
-            except:
-                pass
-        if gdrive_config:
-            return {
-                "provider": "gdrive",
-                "client_id": gdrive_config.get("client_id", ""),
-                "client_secret": gdrive_config.get("client_secret", ""),
-                "refresh_token": gdrive_config.get("refresh_token", "")
-            }
-        return {"provider": "gdrive"}
+        # Конфигурация по умолчанию: WebDAV без настроек
+        return {"provider": "webdav"}
     try:
         with open(STORAGE_CONFIG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Error loading storage config: {e}")
-        return {"provider": "gdrive"}
+        return {"provider": "webdav"}

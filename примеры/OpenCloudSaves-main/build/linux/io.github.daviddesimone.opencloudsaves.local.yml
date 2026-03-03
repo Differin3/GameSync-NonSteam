@@ -1,0 +1,43 @@
+app-id: io.github.daviddesimone.opencloudsaves
+runtime: org.gnome.Platform
+runtime-version: '43'
+sdk: org.gnome.Sdk
+sdk-extensions:
+    - org.freedesktop.Sdk.Extension.golang
+command: bootstrap-opencloudsave.sh
+finish-args:
+  - '--share=ipc'
+  - '--socket=fallback-x11'
+  - '--filesystem=host'
+  - '--socket=wayland'
+  - '--device=dri'
+  - '--share=network'
+build-options:
+  env:
+    - GOBIN=/app/bin
+    - GOROOT=/usr/lib/sdk/golang
+modules:
+  - name: opencloudsave
+    buildsystem: simple    
+    build-commands:
+      - $GOROOT/bin/go build -trimpath -o opencloudsave
+      - install -D opencloudsave /app/bin/opencloudsave
+      - install -D ./build/linux/bootstrap-opencloudsave.sh /app/bin/bootstrap-opencloudsave.sh
+      - mkdir -p /app/share/applications/
+      - install -D ./build/linux/icon/io.github.daviddesimone.opencloudsaves.512.png /app/share/icons/hicolor/512x512/apps/io.github.daviddesimone.opencloudsaves.png
+      - install -D ./build/linux/OpenCloudSaves.desktop /app/share/applications/io.github.daviddesimone.opencloudsaves.desktop
+      - install -Dm644 ./build/linux/io.github.daviddesimone.opencloudsaves.appdata.xml /app/share/appdata/io.github.daviddesimone.opencloudsaves.metainfo.xml
+    sources:
+      - type: git
+        path: ../..
+        branch: main
+  - name: rclone
+    buildsystem: simple
+    build-commands:
+      - $GOROOT/bin/go build
+      - install -D rclone /app/bin/rclone
+    sources:
+      - type: git
+        url: https://github.com/DavidDeSimone/rclone
+        tag: v1.0.2
+        commit: 8d620b4c48a7e493290167397af779cb65d069c7
