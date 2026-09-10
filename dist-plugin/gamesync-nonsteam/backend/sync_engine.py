@@ -1,12 +1,20 @@
 import os
+import re
 import tarfile
 import tempfile
 import logging
 from pathlib import Path
-from typing import List, Optional, Set
-from datetime import datetime
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_name(name: str) -> str:
+    """Приводит имя игры к безопасному для файловой системы виду."""
+    safe = re.sub(r"[^\w.\- ]", "_", name, flags=re.UNICODE).strip()
+    safe = re.sub(r"\s+", "_", safe)
+    return safe or "game"
+
 
 def create_backup(game_name: str, save_paths: List[str], output_dir: Optional[str] = None, incremental: bool = False, last_backup_time: Optional[float] = None) -> Optional[str]:
     """Создание архива сохранений игры"""
@@ -22,9 +30,9 @@ def create_backup(game_name: str, save_paths: List[str], output_dir: Optional[st
     
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # Имя архива с временной меткой
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    archive_name = f"{game_name}_{timestamp}.tar.gz"
+    # Стабильное имя архива: повторная синхронизация перезаписывает облачную
+    # копию, а не создаёт новую с меткой времени (иначе хранилище растёт бесконечно).
+    archive_name = f"{_sanitize_name(game_name)}.tar.gz"
     archive_path = output_path / archive_name
     
     try:

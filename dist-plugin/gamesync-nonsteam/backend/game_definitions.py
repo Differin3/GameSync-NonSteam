@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Dict, List, Optional
+from difflib import SequenceMatcher
+from typing import Dict, List, Optional
 
 from gamedef_loader import load_raw_gamedef_map
 
@@ -33,7 +34,7 @@ def _normalize_name(name: str) -> str:
 
 
 def _convert_windows_path_to_portproton_rel(path: str) -> Optional[str]:
-    """
+    r"""
     Грубая конвертация Windows-пути из gamedef_map.json
     в относительный путь внутри drive_c префикса PortProton.
 
@@ -97,37 +98,59 @@ def _convert_windows_path_to_portproton_rel(path: str) -> Optional[str]:
     return p
 
 
+def _title_score(a: str, b: str) -> float:
+    """Оценка схожести нормализованных названий (0..1)."""
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    if a in b or b in a:
+        return 0.9
+    a_words = set(a.split())
+    b_words = set(b.split())
+    if a_words and b_words and (a_words <= b_words or b_words <= a_words):
+        return 0.85
+    return SequenceMatcher(None, a, b).ratio()
+
+
 def _find_in_openclouds(game_name: str) -> List[str]:
-    """Поиск путей в большой базе OpenCloudSaves."""
+    """Поиск путей в большой базе OpenCloudSaves (агрегирует близкие совпадения)."""
     raw = load_raw_gamedef_map()
     if not raw:
         return []
 
     normalized = _normalize_name(game_name)
-
-    best_entry: Optional[Dict[str, Any]] = None
-
-    for key, entry in raw.items():
-        key_norm = _normalize_name(key)
-        display_norm = _normalize_name(entry.get("display_name", key))
-
-        if normalized == key_norm or normalized == display_norm:
-            best_entry = entry
-            break
-        if key_norm in normalized or display_norm in normalized:
-            best_entry = entry
-
-    if not best_entry:
+    if not normalized:
         return []
 
-    win_paths = best_entry.get("win_path") or []
-    rel_paths: List[str] = []
+    matches: List[tuple] = []
+    for key, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        names = [key, entry.get("display_name", "")]
+        best = max(
+            (_title_score(normalized, _normalize_name(n)) for n in names if n),
+            default=0.0,
+        )
+        if best >= 0.85:
+            matches.append((best, entry))
 
-    for p in win_paths:
-        win_path = p.get("path")
-        rel = _convert_windows_path_to_portproton_rel(win_path)
-        if rel:
-            rel_paths.append(rel)
+    if not matches:
+        return []
+
+    matches.sort(key=lambda item: item[0], reverse=True)
+    top_score = matches[0][0]
+
+    rel_paths: List[str] = []
+    for score, entry in matches:
+        # берём только записи, близкие к лучшему совпадению
+        if score < top_score - 0.05:
+            break
+        for p in entry.get("win_path") or []:
+            win_path = p.get("path") if isinstance(p, dict) else p
+            rel = _convert_windows_path_to_portproton_rel(win_path)
+            if rel and rel not in rel_paths:
+                rel_paths.append(rel)
 
     return rel_paths
 
@@ -138,29 +161,42 @@ def get_known_save_paths_for_game(game_name: str) -> List[str]:
     Приоритет:
     1) Локальная мини-база (ручные пути).
     2) Конвертированные данные из OpenCloudSaves gamedef_map.json.
+
+    Собирает все подходящие записи (у игры может быть несколько папок сохранений).
     """
     if not game_name:
         return []
 
     normalized = _normalize_name(game_name)
+    result: List[str] = []
 
     # 1. Локальная база
-    # Сначала пытаемся полное совпадение нормализованного имени
     if normalized in LOCAL_GAME_SAVE_DEFINITIONS:
-        return LOCAL_GAME_SAVE_DEFINITIONS[normalized]
-
-    # Потом допускаем частичное совпадение (для случаев без пробелов и т.п.)
-    for key, paths in LOCAL_GAME_SAVE_DEFINITIONS.items():
-        if key in normalized or normalized in key:
-            logger.debug(f"Matched game '{game_name}' to local definition '{key}'")
-            return paths
+        result.extend(LOCAL_GAME_SAVE_DEFINITIONS[normalized])
+    else:
+        for key, paths in LOCAL_GAME_SAVE_DEFINITIONS.items():
+            if _title_score(normalized, key) >= 0.85:
+                logger.debug(f"Matched game '{game_name}' to local definition '{key}'")
+                result.extend(paths)
 
     # 2. База OpenCloudSaves
     oc_paths = _find_in_openclouds(game_name)
     if oc_paths:
-        logger.debug(f"Matched game '{game_name}' to OpenCloudSaves definition, paths={oc_paths}")
-        return oc_paths
+        logger.debug(f"Matched game '{game_name}' to OpenCloudSaves, paths={oc_paths}")
+        result.extend(oc_paths)
 
-    return []
+    # 3. База Ludusavi (скачивается и кэшируется автоматически)
+    try:
+        from ludusavi import get_known_save_paths_for_game as ludusavi_paths
+        lu_paths = ludusavi_paths(game_name)
+    except Exception as e:
+        logger.debug(f"Ludusavi lookup failed for '{game_name}': {e}")
+        lu_paths = []
+    if lu_paths:
+        logger.debug(f"Matched game '{game_name}' to Ludusavi, paths={lu_paths}")
+        result.extend(lu_paths)
+
+    # Убираем дубликаты, сохраняя порядок
+    return list(dict.fromkeys(result))
 
 
