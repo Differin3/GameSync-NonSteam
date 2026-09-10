@@ -1,61 +1,70 @@
 import { useState, useEffect } from "react";
 import { call } from "@decky/api";
+import { PanelSection, PanelSectionRow, TextField, ToggleField, ButtonItem, Dropdown } from "@decky/ui";
 import {
-  PanelSection,
-  PanelSectionRow,
-  TextField,
-  ToggleField,
-  ButtonItem,
-} from "@decky/ui";
-import { loadSettings, saveSettings, Settings, WEBDAV_PROVIDERS, WebDAVProviderType, S3_PROVIDERS, S3ProviderType } from "../utils/Settings";
+  loadSettings,
+  saveSettings,
+  Settings,
+  WEBDAV_PROVIDERS,
+  WebDAVProviderType,
+  S3_PROVIDERS,
+  S3ProviderType,
+} from "../utils/Settings";
+import { Hint, StatusMessage } from "./ui";
+import type { Tone } from "./ui";
+import { colors, actionRow, card } from "../utils/theme";
 
 export function Settings() {
   const [settings, setSettings] = useState<Settings>(loadSettings());
   const [testing, setTesting] = useState<boolean>(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ tone: Tone; text: string } | null>(null);
   const [newPath, setNewPath] = useState<string>("");
   const [validating, setValidating] = useState<boolean>(false);
   const [pathValidationResult, setPathValidationResult] = useState<string | null>(null);
 
+  const update = (patch: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...patch }));
+
   useEffect(() => {
-    // Загружаем настройки провайдера из backend при монтировании
     const loadStorageConfig = async () => {
       try {
         const result: any = await call("load_storage_config", {});
         if (result.success && result.config) {
           const config = result.config;
-          setSettings(prev => ({
+          setSettings((prev) => ({
             ...prev,
-            storageProvider: ['s3', 'webdav', 'ftp', 'sftp'].includes(config.provider) ? config.provider : 'webdav',
-            webdavProvider: (config.webdav_provider && ['custom', 'nextcloud', 'yandex', 'box', 'owncloud'].includes(config.webdav_provider)) 
-              ? (config.webdav_provider as WebDAVProviderType) 
-              : (prev.webdavProvider || 'custom'),
-            webdavUrl: config.url || prev.webdavUrl || '',
-            webdavUsername: config.username || prev.webdavUsername || '',
-            webdavPassword: config.password || prev.webdavPassword || '',
-            webdavOAuthToken: config.oauth_token || prev.webdavOAuthToken || '',
-            s3Provider: (config.s3_provider && ['custom','yandex','vk','cloudru','aws','backblaze','wasabi','digitalocean'].includes(config.s3_provider))
-              ? (config.s3_provider as S3ProviderType)
-              : (prev.s3Provider || 'custom'),
-            s3Endpoint: config.endpoint || prev.s3Endpoint || '',
-            s3Region: config.region || prev.s3Region || 'us-east-1',
-            s3Bucket: config.bucket || prev.s3Bucket || '',
-            s3AccessKey: config.access_key || prev.s3AccessKey || '',
-            s3SecretKey: config.secret_key || prev.s3SecretKey || '',
-            s3PathStyle: typeof config.path_style === 'boolean' ? config.path_style : (prev.s3PathStyle ?? false),
-            s3SignatureVersion: config.signature_version || prev.s3SignatureVersion || 's3v4',
-            ftpHost: config.provider === 'ftp' ? (config.host || '') : (prev.ftpHost || ''),
-            ftpPort: config.provider === 'ftp' ? String(config.port ?? prev.ftpPort ?? '21') : (prev.ftpPort || '21'),
-            ftpUsername: config.provider === 'ftp' ? (config.username || '') : (prev.ftpUsername || ''),
-            ftpPassword: config.provider === 'ftp' ? (config.password || '') : (prev.ftpPassword || ''),
-            ftpUseTls: config.provider === 'ftp' ? !!config.use_tls : (prev.ftpUseTls ?? false),
-            ftpPassive: config.provider === 'ftp' ? (config.passive ?? true) : (prev.ftpPassive ?? true),
-            sftpHost: config.provider === 'sftp' ? (config.host || '') : (prev.sftpHost || ''),
-            sftpPort: config.provider === 'sftp' ? String(config.port ?? prev.sftpPort ?? '22') : (prev.sftpPort || '22'),
-            sftpUsername: config.provider === 'sftp' ? (config.username || '') : (prev.sftpUsername || ''),
-            sftpPassword: config.provider === 'sftp' ? (config.password || '') : (prev.sftpPassword || ''),
-            sftpKeyPath: config.provider === 'sftp' ? (config.key_path || '') : (prev.sftpKeyPath || ''),
-            sftpKeyPassphrase: config.provider === 'sftp' ? (config.key_passphrase || '') : (prev.sftpKeyPassphrase || '')
+            storageProvider: ["s3", "webdav", "ftp", "sftp"].includes(config.provider) ? config.provider : "webdav",
+            webdavProvider:
+              config.webdav_provider && ["custom", "nextcloud", "yandex", "box", "owncloud"].includes(config.webdav_provider)
+                ? (config.webdav_provider as WebDAVProviderType)
+                : prev.webdavProvider || "custom",
+            webdavUrl: config.url || prev.webdavUrl || "",
+            webdavUsername: config.username || prev.webdavUsername || "",
+            webdavPassword: config.password || prev.webdavPassword || "",
+            webdavOAuthToken: config.oauth_token || prev.webdavOAuthToken || "",
+            s3Provider:
+              config.s3_provider &&
+              ["custom", "yandex", "vk", "cloudru", "aws", "backblaze", "wasabi", "digitalocean"].includes(config.s3_provider)
+                ? (config.s3_provider as S3ProviderType)
+                : prev.s3Provider || "custom",
+            s3Endpoint: config.endpoint || prev.s3Endpoint || "",
+            s3Region: config.region || prev.s3Region || "us-east-1",
+            s3Bucket: config.bucket || prev.s3Bucket || "",
+            s3AccessKey: config.access_key || prev.s3AccessKey || "",
+            s3SecretKey: config.secret_key || prev.s3SecretKey || "",
+            s3PathStyle: typeof config.path_style === "boolean" ? config.path_style : prev.s3PathStyle ?? false,
+            s3SignatureVersion: config.signature_version || prev.s3SignatureVersion || "s3v4",
+            ftpHost: config.provider === "ftp" ? config.host || "" : prev.ftpHost || "",
+            ftpPort: config.provider === "ftp" ? String(config.port ?? prev.ftpPort ?? "21") : prev.ftpPort || "21",
+            ftpUsername: config.provider === "ftp" ? config.username || "" : prev.ftpUsername || "",
+            ftpPassword: config.provider === "ftp" ? config.password || "" : prev.ftpPassword || "",
+            ftpUseTls: config.provider === "ftp" ? !!config.use_tls : prev.ftpUseTls ?? false,
+            ftpPassive: config.provider === "ftp" ? config.passive ?? true : prev.ftpPassive ?? true,
+            sftpHost: config.provider === "sftp" ? config.host || "" : prev.sftpHost || "",
+            sftpPort: config.provider === "sftp" ? String(config.port ?? prev.sftpPort ?? "22") : prev.sftpPort || "22",
+            sftpUsername: config.provider === "sftp" ? config.username || "" : prev.sftpUsername || "",
+            sftpPassword: config.provider === "sftp" ? config.password || "" : prev.sftpPassword || "",
+            sftpKeyPath: config.provider === "sftp" ? config.key_path || "" : prev.sftpKeyPath || "",
+            sftpKeyPassphrase: config.provider === "sftp" ? config.key_passphrase || "" : prev.sftpKeyPassphrase || "",
           }));
         }
       } catch (error) {
@@ -69,29 +78,98 @@ export function Settings() {
     saveSettings(settings);
   }, [settings]);
 
+  const buildPayload = (s: Settings): any => {
+    const provider = s.storageProvider;
+    if (provider === "webdav") {
+      return {
+        provider,
+        url: s.webdavUrl,
+        username: s.webdavUsername,
+        password: s.webdavPassword,
+        oauth_token: s.webdavOAuthToken,
+        webdav_provider: s.webdavProvider,
+      };
+    }
+    if (provider === "s3") {
+      return {
+        provider,
+        s3_provider: s.s3Provider,
+        endpoint: s.s3Endpoint,
+        region: s.s3Region,
+        bucket: s.s3Bucket,
+        access_key: s.s3AccessKey,
+        secret_key: s.s3SecretKey,
+        path_style: s.s3PathStyle,
+        signature_version: s.s3SignatureVersion,
+      };
+    }
+    if (provider === "ftp") {
+      return {
+        provider,
+        host: s.ftpHost,
+        port: s.ftpPort,
+        username: s.ftpUsername,
+        password: s.ftpPassword,
+        use_tls: s.ftpUseTls,
+        passive: s.ftpPassive,
+      };
+    }
+    return {
+      provider,
+      host: s.sftpHost,
+      port: s.sftpPort,
+      username: s.sftpUsername,
+      password: s.sftpPassword,
+      key_path: s.sftpKeyPath,
+      key_passphrase: s.sftpKeyPassphrase,
+    };
+  };
+
+  const saveStorageConfig = async (customSettings?: Settings) => {
+    try {
+      const result: any = await call("save_storage_config", buildPayload(customSettings || settings));
+      setTestResult(
+        result.success
+          ? { tone: "success", text: "Настройки сохранены" }
+          : { tone: "error", text: result.error || "Ошибка сохранения" }
+      );
+    } catch (error: any) {
+      setTestResult({ tone: "error", text: error?.message || String(error) });
+    }
+  };
+
+  const testConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result: any = await call("test_storage_connection", buildPayload(settings));
+      setTestResult(
+        result.success
+          ? { tone: "success", text: result.message || "Подключение успешно" }
+          : { tone: "error", text: result.error || result.message || "Ошибка подключения" }
+      );
+    } catch (error: any) {
+      setTestResult({ tone: "error", text: error?.message || String(error) });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const addDefaultPath = async () => {
     if (!newPath.trim()) {
       setPathValidationResult("Введите путь");
       return;
     }
-
     setValidating(true);
     setPathValidationResult(null);
-
     try {
       const result: any = await call("validate_save_path", { path: newPath.trim() });
-
       if (result.success && result.path) {
-        const normalizedPath = result.path;
-        if (!settings.defaultSavePaths.includes(normalizedPath)) {
-          setSettings({
-            ...settings,
-            defaultSavePaths: [...settings.defaultSavePaths, normalizedPath],
-          });
-          setNewPath("");
-          setPathValidationResult(null);
-        } else {
+        if (settings.defaultSavePaths.includes(result.path)) {
           setPathValidationResult("Этот путь уже добавлен");
+        } else {
+          update({ defaultSavePaths: [...settings.defaultSavePaths, result.path] });
+          setNewPath("");
         }
       } else {
         setPathValidationResult(`✗ ${result.error || "Ошибка валидации"}`);
@@ -104,716 +182,225 @@ export function Settings() {
   };
 
   const removeDefaultPath = (index: number) => {
-    setSettings({
-      ...settings,
-      defaultSavePaths: settings.defaultSavePaths.filter((_, i) => i !== index),
-    });
+    update({ defaultSavePaths: settings.defaultSavePaths.filter((_, i) => i !== index) });
   };
 
-  const saveStorageConfig = async (customSettings?: Settings) => {
-    try {
-      const settingsToSave = customSettings || settings;
-      const provider = settingsToSave.storageProvider;
-      let payload: any = { provider };
-
-      if (provider === 'webdav') {
-        payload = {
-          ...payload,
-          url: settingsToSave.webdavUrl,
-          username: settingsToSave.webdavUsername,
-          password: settingsToSave.webdavPassword,
-          oauth_token: settingsToSave.webdavOAuthToken,
-          webdav_provider: settingsToSave.webdavProvider
-        };
-      } else if (provider === 's3') {
-        payload = {
-          ...payload,
-          s3_provider: settingsToSave.s3Provider,
-          endpoint: settingsToSave.s3Endpoint,
-          region: settingsToSave.s3Region,
-          bucket: settingsToSave.s3Bucket,
-          access_key: settingsToSave.s3AccessKey,
-          secret_key: settingsToSave.s3SecretKey,
-          path_style: settingsToSave.s3PathStyle,
-          signature_version: settingsToSave.s3SignatureVersion
-        };
-      } else if (provider === 'ftp') {
-        payload = {
-          ...payload,
-          host: settingsToSave.ftpHost,
-          port: settingsToSave.ftpPort,
-          username: settingsToSave.ftpUsername,
-          password: settingsToSave.ftpPassword,
-          use_tls: settingsToSave.ftpUseTls,
-          passive: settingsToSave.ftpPassive
-        };
-      } else if (provider === 'sftp') {
-        payload = {
-          ...payload,
-          host: settingsToSave.sftpHost,
-          port: settingsToSave.sftpPort,
-          username: settingsToSave.sftpUsername,
-          password: settingsToSave.sftpPassword,
-          key_path: settingsToSave.sftpKeyPath,
-          key_passphrase: settingsToSave.sftpKeyPassphrase
-        };
-      }
-
-      const result: any = await call("save_storage_config", payload);
-      if (result.success) {
-        setTestResult("✓ Настройки сохранены");
-      } else {
-        setTestResult(`✗ ${result.error || "Ошибка сохранения"}`);
-      }
-    } catch (error: any) {
-      setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
-    }
-  };
+  const storageOptions = [
+    { data: "webdav", label: "WebDAV" },
+    { data: "s3", label: "S3 (Object Storage)" },
+    { data: "ftp", label: "FTP / FTPS" },
+    { data: "sftp", label: "SFTP" },
+  ];
 
   return (
     <div>
-      {/* Storage type selection */}
-      <PanelSection title="Тип хранилища">
+      <PanelSection title="Хранилище">
         <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={async () => {
-              const newSettings: Settings = { ...settings, storageProvider: 'webdav' };
-              setSettings(newSettings);
-              setTimeout(async () => {
-                await saveStorageConfig(newSettings);
-              }, 100);
+          <Dropdown
+            menuLabel="Тип хранилища"
+            rgOptions={storageOptions}
+            selectedOption={settings.storageProvider}
+            onChange={(opt) => {
+              const next: Settings = { ...settings, storageProvider: opt.data };
+              setSettings(next);
+              setTimeout(() => saveStorageConfig(next), 100);
             }}
-            disabled={settings.storageProvider === 'webdav'}
-          >
-            {settings.storageProvider === 'webdav' ? '✓ WebDAV' : 'WebDAV'}
-          </ButtonItem>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={async () => {
-              const newSettings: Settings = { ...settings, storageProvider: 's3' };
-              setSettings(newSettings);
-              setTimeout(async () => {
-                await saveStorageConfig(newSettings);
-              }, 100);
-            }}
-            disabled={settings.storageProvider === 's3'}
-          >
-            {settings.storageProvider === 's3' ? '✓ S3 (Object Storage)' : 'S3 (Object Storage)'}
-          </ButtonItem>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={async () => {
-              const newSettings: Settings = { ...settings, storageProvider: 'ftp' };
-              setSettings(newSettings);
-              setTimeout(async () => {
-                await saveStorageConfig(newSettings);
-              }, 100);
-            }}
-            disabled={settings.storageProvider === 'ftp'}
-          >
-            {settings.storageProvider === 'ftp' ? '✓ FTP / FTPS' : 'FTP / FTPS'}
-          </ButtonItem>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={async () => {
-              const newSettings: Settings = { ...settings, storageProvider: 'sftp' };
-              setSettings(newSettings);
-              setTimeout(async () => {
-                await saveStorageConfig(newSettings);
-              }, 100);
-            }}
-            disabled={settings.storageProvider === 'sftp'}
-          >
-            {settings.storageProvider === 'sftp' ? '✓ SFTP' : 'SFTP'}
-          </ButtonItem>
+          />
         </PanelSectionRow>
       </PanelSection>
 
-      {/* WebDAV Settings Section */}
-      {settings.storageProvider === 'webdav' && (
-      <PanelSection title="WebDAV Settings">
-        <PanelSectionRow>
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
-            WebDAV - простой способ синхронизации без OAuth. Поддерживается Nextcloud, Яндекс Диск, Box и другие.
-          </div>
-        </PanelSectionRow>
-
-        <PanelSection title="Выберите провайдер">
-          {Object.entries(WEBDAV_PROVIDERS).map(([key, provider]) => (
-            <PanelSectionRow key={key}>
-              <ButtonItem
-                layout="below"
-                onClick={async () => {
-                  const newUrl = key === 'custom' ? settings.webdavUrl : provider.url;
-                  const newSettings = { 
-                    ...settings, 
-                    webdavProvider: key as WebDAVProviderType,
-                    webdavUrl: newUrl
-                  };
-                  setSettings(newSettings);
-                  // Автосохранение при выборе провайдера
-                  setTimeout(async () => {
-                    await saveStorageConfig();
-                  }, 100);
-                }}
-                disabled={settings.webdavProvider === key}
-              >
-                {settings.webdavProvider === key ? `✓ ${provider.name}` : provider.name}
-              </ButtonItem>
-            </PanelSectionRow>
-          ))}
-        </PanelSection>
-
-        <PanelSectionRow>
-          <TextField
-            label="WebDAV URL"
-            value={settings.webdavUrl || ""}
-            onChange={(e) =>
-              setSettings({ ...settings, webdavUrl: e.target.value })
-            }
-            description={WEBDAV_PROVIDERS[settings.webdavProvider || 'custom']?.description || "URL WebDAV сервера"}
-          />
-        </PanelSectionRow>
-
-        {settings.webdavProvider === 'yandex' && (
-          <>
-            <PanelSectionRow>
-              <div style={{ fontSize: "11px", color: "#888", padding: "8px", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }}>
-                <div style={{ fontWeight: "bold", marginBottom: "4px" }}>Яндекс Диск - два способа авторизации:</div>
-                <div><strong>1. Basic-аутентификация:</strong> Логин и пароль приложения (проще)</div>
-                <div><strong>2. OAuth-токен:</strong> Токен из oauth.yandex.ru (безопаснее)</div>
-                <div style={{ marginTop: "8px", fontSize: "10px" }}>
-                  Для Basic: создайте пароль приложения с типом «Файлы» в настройках Яндекс ID
-                </div>
-              </div>
-            </PanelSectionRow>
+      {settings.storageProvider === "webdav" && (
+        <PanelSection title="WebDAV">
+          <PanelSectionRow>
+            <Dropdown
+              menuLabel="Провайдер"
+              rgOptions={Object.entries(WEBDAV_PROVIDERS).map(([key, provider]) => ({ data: key, label: provider.name }))}
+              selectedOption={settings.webdavProvider}
+              onChange={(opt) => {
+                const key = opt.data as WebDAVProviderType;
+                const next: Settings = {
+                  ...settings,
+                  webdavProvider: key,
+                  webdavUrl: key === "custom" ? settings.webdavUrl : WEBDAV_PROVIDERS[key].url,
+                };
+                setSettings(next);
+                setTimeout(() => saveStorageConfig(next), 100);
+              }}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField
+              label="URL"
+              value={settings.webdavUrl || ""}
+              onChange={(e) => update({ webdavUrl: e.target.value })}
+              description={WEBDAV_PROVIDERS[settings.webdavProvider || "custom"]?.description || "URL WebDAV сервера"}
+            />
+          </PanelSectionRow>
+          {settings.webdavProvider === "yandex" && (
             <PanelSectionRow>
               <TextField
-                label="OAuth токен (опционально, если используете Basic - оставьте пустым)"
+                label="OAuth токен (опционально)"
                 value={settings.webdavOAuthToken || ""}
-                onChange={(e) =>
-                  setSettings({ ...settings, webdavOAuthToken: e.target.value })
-                }
-                description="Получите на oauth.yandex.ru/authorize?response_type=token&client_id=YOUR_CLIENT_ID"
+                onChange={(e) => update({ webdavOAuthToken: e.target.value })}
+                description="Оставьте пустым, чтобы использовать логин и пароль приложения"
               />
             </PanelSectionRow>
-          </>
-        )}
-
-        {!settings.webdavOAuthToken && (
-          <>
-            <PanelSectionRow>
-              <TextField
-                label="Логин"
-                value={settings.webdavUsername || ""}
-                onChange={(e) =>
-                  setSettings({ ...settings, webdavUsername: e.target.value })
-                }
-                description={settings.webdavProvider === 'yandex' ? "Логин Яндекс ID или пароль приложения" : "Ваш логин для WebDAV"}
-              />
-            </PanelSectionRow>
-
-            <PanelSectionRow>
-              <TextField
-                label="Пароль"
-                value={settings.webdavPassword || ""}
-                onChange={(e) =>
-                  setSettings({ ...settings, webdavPassword: e.target.value })
-                }
-                description={settings.webdavProvider === 'yandex' ? "Пароль приложения (тип: Файлы)" : "Ваш пароль для WebDAV"}
-              />
-            </PanelSectionRow>
-          </>
-        )}
-
-        {settings.webdavProvider === 'custom' && (
+          )}
+          {!settings.webdavOAuthToken && (
+            <>
+              <PanelSectionRow>
+                <TextField
+                  label="Логин"
+                  value={settings.webdavUsername || ""}
+                  onChange={(e) => update({ webdavUsername: e.target.value })}
+                />
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <TextField
+                  label="Пароль"
+                  value={settings.webdavPassword || ""}
+                  onChange={(e) => update({ webdavPassword: e.target.value })}
+                  bIsPassword
+                />
+              </PanelSectionRow>
+            </>
+          )}
           <PanelSectionRow>
-            <div style={{ fontSize: "11px", color: "#888", padding: "8px", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: "4px" }}>
-              <div style={{ fontWeight: "bold", marginBottom: "4px" }}>Примеры WebDAV хостингов:</div>
-              <div>• Nextcloud: https://nextcloud.com/remote.php/dav/files/USERNAME/</div>
-              <div>• Яндекс Диск: https://webdav.yandex.ru</div>
-              <div>• Box: https://dav.box.com/dav/</div>
-              <div>• ownCloud: https://your-server.com/remote.php/dav/files/USERNAME/</div>
-            </div>
+            <Hint>Nextcloud, Яндекс Диск, Box, ownCloud и другие WebDAV‑серверы.</Hint>
           </PanelSectionRow>
-        )}
-
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={async () => {
-            setTesting(true);
-            setTestResult(null);
-            try {
-              const result: any = await call("test_storage_connection", {
-                provider: 'webdav',
-                url: settings.webdavUrl,
-                username: settings.webdavUsername,
-                password: settings.webdavPassword,
-                oauth_token: settings.webdavOAuthToken
-              });
-              if (result.success) {
-                setTestResult(`✓ ${result.message || "Подключение успешно"}`);
-              } else {
-                setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
-              }
-            } catch (error: any) {
-              setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
-            } finally {
-              setTesting(false);
-            }
-          }} disabled={testing || !settings.webdavUrl || (!settings.webdavOAuthToken && (!settings.webdavUsername || !settings.webdavPassword))}>
-            {testing ? "Тестирование..." : "Тест подключения"}
-          </ButtonItem>
-        </PanelSectionRow>
-
-        {testResult && (
-          <PanelSectionRow>
-            <div
-              style={{
-                padding: "10px",
-                backgroundColor: testResult.startsWith("✓")
-                  ? "#0a4a0a"
-                  : "#4a0a0a",
-                color: "#fff",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {testResult}
-            </div>
-          </PanelSectionRow>
-        )}
-      </PanelSection>
-      )}
-
-      {/* S3 Settings Section */}
-      {settings.storageProvider === 's3' && (
-      <PanelSection title="S3 Settings">
-        <PanelSectionRow>
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
-            S3 / Object Storage — альтернативное облачное хранилище (Yandex Object Storage, VK Cloud, Backblaze B2 и др.).
-          </div>
-        </PanelSectionRow>
-
-        <PanelSection title="Провайдер S3">
-          {Object.entries(S3_PROVIDERS).map(([key, provider]) => (
-            <PanelSectionRow key={key}>
-              <ButtonItem
-                layout="below"
-                onClick={async () => {
-                  const preset = provider;
-                  const newSettings: Settings = {
-                    ...settings,
-                    storageProvider: 's3',
-                    s3Provider: key as S3ProviderType,
-                    s3Endpoint: preset.endpoint || settings.s3Endpoint,
-                    s3Region: preset.region || settings.s3Region,
-                    s3PathStyle: preset.pathStyle
-                  };
-                  setSettings(newSettings);
-                  setTimeout(async () => {
-                    await saveStorageConfig(newSettings);
-                  }, 100);
-                }}
-                disabled={settings.s3Provider === key}
-              >
-                {settings.s3Provider === key ? `✓ ${provider.name}` : provider.name}
-              </ButtonItem>
-            </PanelSectionRow>
-          ))}
         </PanelSection>
+      )}
 
+      {settings.storageProvider === "s3" && (
+        <PanelSection title="S3 / Object Storage">
+          <PanelSectionRow>
+            <Dropdown
+              menuLabel="Провайдер S3"
+              rgOptions={Object.entries(S3_PROVIDERS).map(([key, provider]) => ({ data: key, label: provider.name }))}
+              selectedOption={settings.s3Provider}
+              onChange={(opt) => {
+                const key = opt.data as S3ProviderType;
+                const preset = S3_PROVIDERS[key];
+                const next: Settings = {
+                  ...settings,
+                  s3Provider: key,
+                  s3Endpoint: preset.endpoint || settings.s3Endpoint,
+                  s3Region: preset.region || settings.s3Region,
+                  s3PathStyle: preset.pathStyle,
+                };
+                setSettings(next);
+                setTimeout(() => saveStorageConfig(next), 100);
+              }}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Bucket" value={settings.s3Bucket || ""} onChange={(e) => update({ s3Bucket: e.target.value })} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Endpoint" value={settings.s3Endpoint || ""} onChange={(e) => update({ s3Endpoint: e.target.value })} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Region" value={settings.s3Region || ""} onChange={(e) => update({ s3Region: e.target.value })} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Access Key" value={settings.s3AccessKey || ""} onChange={(e) => update({ s3AccessKey: e.target.value })} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField
+              label="Secret Key"
+              value={settings.s3SecretKey || ""}
+              onChange={(e) => update({ s3SecretKey: e.target.value })}
+              bIsPassword
+            />
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
+      {settings.storageProvider === "ftp" && (
+        <PanelSection title="FTP / FTPS">
+          <PanelSectionRow>
+            <TextField label="Хост" value={settings.ftpHost || ""} onChange={(e) => update({ ftpHost: e.target.value })} description="ftp.example.com" />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Порт" value={settings.ftpPort || ""} onChange={(e) => update({ ftpPort: e.target.value })} description="по умолчанию 21" />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Логин" value={settings.ftpUsername || ""} onChange={(e) => update({ ftpUsername: e.target.value })} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Пароль" value={settings.ftpPassword || ""} onChange={(e) => update({ ftpPassword: e.target.value })} bIsPassword />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <ToggleField label="Использовать TLS (FTPS)" checked={settings.ftpUseTls} onChange={(v) => update({ ftpUseTls: v })} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <ToggleField label="Пассивный режим (PASV)" checked={settings.ftpPassive} onChange={(v) => update({ ftpPassive: v })} />
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
+      {settings.storageProvider === "sftp" && (
+        <PanelSection title="SFTP">
+          <PanelSectionRow>
+            <TextField label="Хост" value={settings.sftpHost || ""} onChange={(e) => update({ sftpHost: e.target.value })} description="sftp.example.com" />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Порт" value={settings.sftpPort || ""} onChange={(e) => update({ sftpPort: e.target.value })} description="по умолчанию 22" />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Логин" value={settings.sftpUsername || ""} onChange={(e) => update({ sftpUsername: e.target.value })} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField label="Пароль" value={settings.sftpPassword || ""} onChange={(e) => update({ sftpPassword: e.target.value })} bIsPassword />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField
+              label="Приватный ключ (опционально)"
+              value={settings.sftpKeyPath || ""}
+              onChange={(e) => update({ sftpKeyPath: e.target.value })}
+              description="/home/deck/.ssh/id_ed25519"
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField
+              label="Пароль ключа (опционально)"
+              value={settings.sftpKeyPassphrase || ""}
+              onChange={(e) => update({ sftpKeyPassphrase: e.target.value })}
+              bIsPassword
+            />
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
+      <PanelSection>
         <PanelSectionRow>
-          <TextField
-            label="Bucket"
-            value={settings.s3Bucket || ""}
-            onChange={(e) =>
-              setSettings({ ...settings, s3Bucket: e.target.value })
-            }
-            description="Имя бакета в Object Storage"
-          />
+          <div style={actionRow}>
+            <div style={{ flex: 1 }}>
+              <ButtonItem layout="below" onClick={testConnection} disabled={testing}>
+                {testing ? "Проверка…" : "Тест подключения"}
+              </ButtonItem>
+            </div>
+            <div style={{ flex: 1 }}>
+              <ButtonItem layout="below" onClick={() => saveStorageConfig()}>
+                Сохранить
+              </ButtonItem>
+            </div>
+          </div>
         </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Endpoint"
-            value={settings.s3Endpoint || ""}
-            onChange={(e) =>
-              setSettings({ ...settings, s3Endpoint: e.target.value })
-            }
-            description="S3 endpoint, например https://storage.yandexcloud.net"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Region"
-            value={settings.s3Region || ""}
-            onChange={(e) =>
-              setSettings({ ...settings, s3Region: e.target.value })
-            }
-            description="Регион S3 (например ru-central1, us-east-1)"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Access Key"
-            value={settings.s3AccessKey || ""}
-            onChange={(e) =>
-              setSettings({ ...settings, s3AccessKey: e.target.value })
-            }
-            description="S3 Access Key (идентификатор ключа)"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Secret Key"
-            value={settings.s3SecretKey || ""}
-            onChange={(e) =>
-              setSettings({ ...settings, s3SecretKey: e.target.value })
-            }
-            description="S3 Secret Key (секретный ключ)"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={async () => {
-            setTesting(true);
-            setTestResult(null);
-            try {
-              const result: any = await call("test_storage_connection", {
-                provider: 's3',
-                bucket: settings.s3Bucket,
-                endpoint: settings.s3Endpoint,
-                region: settings.s3Region,
-                access_key: settings.s3AccessKey,
-                secret_key: settings.s3SecretKey,
-                path_style: settings.s3PathStyle,
-                signature_version: settings.s3SignatureVersion
-              });
-              if (result.success) {
-                setTestResult(`✓ ${result.message || "Подключение успешно"}`);
-              } else {
-                setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
-              }
-            } catch (error: any) {
-              setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
-            } finally {
-              setTesting(false);
-            }
-          }} disabled={testing || !settings.s3Bucket || !settings.s3AccessKey || !settings.s3SecretKey}>
-            {testing ? "Тестирование..." : "Тест подключения S3"}
-          </ButtonItem>
-        </PanelSectionRow>
-
         {testResult && (
           <PanelSectionRow>
-            <div
-              style={{
-                padding: "10px",
-                backgroundColor: testResult.startsWith("✓")
-                  ? "#0a4a0a"
-                  : "#4a0a0a",
-                color: "#fff",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {testResult}
-            </div>
+            <StatusMessage tone={testResult.tone}>{testResult.text}</StatusMessage>
           </PanelSectionRow>
         )}
       </PanelSection>
-      )}
 
-      {/* FTP / FTPS Settings Section */}
-      {settings.storageProvider === 'ftp' && (
-      <PanelSection title="FTP / FTPS Settings">
-        <PanelSectionRow>
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
-            FTP — обычный файловый сервер. Включите TLS для FTPS (шифрованное соединение, обычно порт 21).
-          </div>
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Хост"
-            value={settings.ftpHost || ""}
-            onChange={(e) => setSettings({ ...settings, ftpHost: e.target.value })}
-            description="Адрес FTP-сервера, например ftp.example.com"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Порт"
-            value={settings.ftpPort || ""}
-            onChange={(e) => setSettings({ ...settings, ftpPort: e.target.value })}
-            description="Порт FTP (по умолчанию 21)"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Логин"
-            value={settings.ftpUsername || ""}
-            onChange={(e) => setSettings({ ...settings, ftpUsername: e.target.value })}
-            description="Имя пользователя FTP"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Пароль"
-            value={settings.ftpPassword || ""}
-            onChange={(e) => setSettings({ ...settings, ftpPassword: e.target.value })}
-            description="Пароль FTP"
-          />
-        </PanelSectionRow>
-
+      <PanelSection title="Автосинхронизация">
         <PanelSectionRow>
           <ToggleField
-            label="Использовать TLS (FTPS)"
-            description="Включите, если сервер поддерживает FTPS"
-            checked={settings.ftpUseTls}
-            onChange={(value) => setSettings({ ...settings, ftpUseTls: value })}
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <ToggleField
-            label="Пассивный режим (PASV)"
-            description="Обычно должен быть включён"
-            checked={settings.ftpPassive}
-            onChange={(value) => setSettings({ ...settings, ftpPassive: value })}
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={async () => {
-            setTesting(true);
-            setTestResult(null);
-            try {
-              const result: any = await call("test_storage_connection", {
-                provider: 'ftp',
-                host: settings.ftpHost,
-                port: settings.ftpPort,
-                username: settings.ftpUsername,
-                password: settings.ftpPassword,
-                use_tls: settings.ftpUseTls,
-                passive: settings.ftpPassive
-              });
-              if (result.success) {
-                setTestResult(`✓ ${result.message || "Подключение успешно"}`);
-              } else {
-                setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
-              }
-            } catch (error: any) {
-              setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
-            } finally {
-              setTesting(false);
-            }
-          }} disabled={testing || !settings.ftpHost}>
-            {testing ? "Тестирование..." : "Тест подключения FTP"}
-          </ButtonItem>
-        </PanelSectionRow>
-
-        {testResult && (
-          <PanelSectionRow>
-            <div
-              style={{
-                padding: "10px",
-                backgroundColor: testResult.startsWith("✓") ? "#0a4a0a" : "#4a0a0a",
-                color: "#fff",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {testResult}
-            </div>
-          </PanelSectionRow>
-        )}
-      </PanelSection>
-      )}
-
-      {/* SFTP Settings Section */}
-      {settings.storageProvider === 'sftp' && (
-      <PanelSection title="SFTP Settings">
-        <PanelSectionRow>
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
-            SFTP — передача файлов поверх SSH. Авторизация по паролю или по приватному ключу.
-          </div>
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Хост"
-            value={settings.sftpHost || ""}
-            onChange={(e) => setSettings({ ...settings, sftpHost: e.target.value })}
-            description="Адрес SFTP-сервера, например sftp.example.com"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Порт"
-            value={settings.sftpPort || ""}
-            onChange={(e) => setSettings({ ...settings, sftpPort: e.target.value })}
-            description="Порт SSH/SFTP (по умолчанию 22)"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Логин"
-            value={settings.sftpUsername || ""}
-            onChange={(e) => setSettings({ ...settings, sftpUsername: e.target.value })}
-            description="Имя пользователя SSH"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Пароль"
-            value={settings.sftpPassword || ""}
-            onChange={(e) => setSettings({ ...settings, sftpPassword: e.target.value })}
-            description="Пароль (можно оставить пустым при использовании ключа)"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Путь к приватному ключу (опционально)"
-            value={settings.sftpKeyPath || ""}
-            onChange={(e) => setSettings({ ...settings, sftpKeyPath: e.target.value })}
-            description="Например /home/deck/.ssh/id_ed25519"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <TextField
-            label="Пароль ключа (опционально)"
-            value={settings.sftpKeyPassphrase || ""}
-            onChange={(e) => setSettings({ ...settings, sftpKeyPassphrase: e.target.value })}
-            description="Passphrase приватного ключа, если он зашифрован"
-          />
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={async () => {
-            setTesting(true);
-            setTestResult(null);
-            try {
-              const result: any = await call("test_storage_connection", {
-                provider: 'sftp',
-                host: settings.sftpHost,
-                port: settings.sftpPort,
-                username: settings.sftpUsername,
-                password: settings.sftpPassword,
-                key_path: settings.sftpKeyPath,
-                key_passphrase: settings.sftpKeyPassphrase
-              });
-              if (result.success) {
-                setTestResult(`✓ ${result.message || "Подключение успешно"}`);
-              } else {
-                setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
-              }
-            } catch (error: any) {
-              setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
-            } finally {
-              setTesting(false);
-            }
-          }} disabled={testing || !settings.sftpHost}>
-            {testing ? "Тестирование..." : "Тест подключения SFTP"}
-          </ButtonItem>
-        </PanelSectionRow>
-
-        {testResult && (
-          <PanelSectionRow>
-            <div
-              style={{
-                padding: "10px",
-                backgroundColor: testResult.startsWith("✓") ? "#0a4a0a" : "#4a0a0a",
-                color: "#fff",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {testResult}
-            </div>
-          </PanelSectionRow>
-        )}
-      </PanelSection>
-      )}
-
-      {/* Save Settings Section */}
-      <PanelSection title="Сохранение настроек">
-        <PanelSectionRow>
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
-            Сохранить текущие параметры выбранного хранилища (WebDAV, S3, FTP или SFTP) в конфиг плагина.
-          </div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={async () => {
-              await saveStorageConfig(settings);
-            }}
-          >
-            Сохранить настройки
-          </ButtonItem>
-        </PanelSectionRow>
-      </PanelSection>
-
-      {/* Clear Data Section */}
-      <PanelSection title="Очистка данных">
-        <PanelSectionRow>
-          <div style={{ fontSize: "12px", color: "#ff6b6b", marginBottom: "8px" }}>
-            <strong>Внимание:</strong> Это удалит все настройки, кэш и конфигурацию плагина. Действие необратимо!
-          </div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={async () => {
-              if (confirm("Вы уверены? Это удалит все настройки, кэш и конфигурацию плагина.")) {
-                try {
-                  const result: any = await call("clear_all_data", {});
-                  if (result.success) {
-                    setTestResult(`✓ ${result.message || "Все данные очищены"}`);
-                    // Сбрасываем настройки на дефолтные
-                    setSettings(loadSettings());
-                  } else {
-                    setTestResult(`✗ ${result.error || "Ошибка очистки"}`);
-                  }
-                } catch (error: any) {
-                  setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
-                }
-              }
-            }}
-          >
-            Очистить все данные плагина
-          </ButtonItem>
-        </PanelSectionRow>
-      </PanelSection>
-
-      {/* Sync Settings Section */}
-      <PanelSection title="Sync Settings">
-        <PanelSectionRow>
-          <ToggleField
-            label="Автосинхронизация"
-            description="Автоматически синхронизировать сохранения после закрытия игры"
+            label="Синхронизировать при выходе из игры"
             checked={settings.autoSync}
             onChange={async (value) => {
-              setSettings({ ...settings, autoSync: value });
+              update({ autoSync: value });
               try {
                 await call("enable_auto_sync", { enabled: value });
               } catch (error) {
@@ -824,91 +411,70 @@ export function Settings() {
         </PanelSectionRow>
       </PanelSection>
 
-      {/* Default Save Paths Section */}
-      <PanelSection title="Default Save Paths">
+      <PanelSection title="Глобальные пути сохранений">
         <PanelSectionRow>
-          <TextField
-            label="Добавить путь сохранений"
-            value={newPath}
-            onChange={(e) => setNewPath(e.target.value)}
-            description="Глобальные пути применяются ко всем играм"
-          />
+          <Hint>Применяются ко всем играм в дополнение к индивидуальным путям.</Hint>
         </PanelSectionRow>
+        <PanelSectionRow>
+          <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={addDefaultPath} disabled={validating || !newPath.trim()}>
+            {validating ? "Проверка…" : "Добавить путь"}
+          </ButtonItem>
+        </PanelSectionRow>
+        {pathValidationResult && (
+          <PanelSectionRow>
+            <StatusMessage tone={pathValidationResult.startsWith("✓") ? "success" : "error"}>
+              {pathValidationResult}
+            </StatusMessage>
+          </PanelSectionRow>
+        )}
+        {settings.defaultSavePaths.length === 0 ? (
+          <PanelSectionRow>
+            <div style={{ color: colors.dim, fontSize: "12px", fontStyle: "italic" }}>Нет добавленных путей</div>
+          </PanelSectionRow>
+        ) : (
+          settings.defaultSavePaths.map((path, index) => (
+            <PanelSectionRow key={index}>
+              <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ fontSize: "11px", color: "#c7ccd1", wordBreak: "break-all", fontFamily: "monospace" }}>{path}</div>
+                <div style={actionRow}>
+                  <ButtonItem layout="below" onClick={() => removeDefaultPath(index)}>
+                    Удалить
+                  </ButtonItem>
+                </div>
+              </div>
+            </PanelSectionRow>
+          ))
+        )}
+      </PanelSection>
 
+      <PanelSection title="Опасная зона">
+        <PanelSectionRow>
+          <Hint>Удаляет все настройки, кэш, изученные пути и конфигурацию плагина.</Hint>
+        </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem
             layout="below"
-            onClick={addDefaultPath}
-            disabled={validating || !newPath.trim()}
+            onClick={async () => {
+              if (!confirm("Удалить все данные плагина? Действие необратимо.")) return;
+              try {
+                const result: any = await call("clear_all_data", {});
+                setTestResult(
+                  result.success
+                    ? { tone: "success", text: result.message || "Все данные очищены" }
+                    : { tone: "error", text: result.error || "Ошибка очистки" }
+                );
+                setSettings(loadSettings());
+              } catch (error: any) {
+                setTestResult({ tone: "error", text: error?.message || String(error) });
+              }
+            }}
           >
-            {validating ? "Проверка..." : "Добавить путь"}
+            Очистить все данные плагина
           </ButtonItem>
         </PanelSectionRow>
-
-        {pathValidationResult && (
-          <PanelSectionRow>
-            <div
-              style={{
-                fontSize: "12px",
-                color: pathValidationResult.startsWith("✓") ? "#0f0" : "#f00",
-              }}
-            >
-              {pathValidationResult}
-            </div>
-          </PanelSectionRow>
-        )}
-
-        {settings.defaultSavePaths.length > 0 && (
-          <>
-            <PanelSectionRow>
-              <div style={{ fontSize: "12px", color: "#888" }}>
-                Текущие пути ({settings.defaultSavePaths.length}):
-              </div>
-            </PanelSectionRow>
-            {settings.defaultSavePaths.map((path, index) => (
-              <PanelSectionRow key={index}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "8px",
-                    backgroundColor: "#2a2a2a",
-                    borderRadius: "4px",
-                    width: "100%",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      flex: 1,
-                      wordBreak: "break-all",
-                      color: "#ccc",
-                    }}
-                  >
-                    {path}
-                  </span>
-                  <div style={{ marginLeft: "10px" }}>
-                    <ButtonItem
-                      layout="below"
-                      onClick={() => removeDefaultPath(index)}
-                    >
-                      Удалить
-                    </ButtonItem>
-                  </div>
-                </div>
-              </PanelSectionRow>
-            ))}
-          </>
-        )}
-
-        {settings.defaultSavePaths.length === 0 && (
-          <PanelSectionRow>
-            <div style={{ color: "#888", fontStyle: "italic", fontSize: "12px" }}>
-              Нет добавленных путей
-            </div>
-          </PanelSectionRow>
-        )}
       </PanelSection>
     </div>
   );

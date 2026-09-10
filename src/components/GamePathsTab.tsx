@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { call } from "@decky/api";
-import { PanelSection, PanelSectionRow, ButtonItem, Spinner, TextField } from "@decky/ui";
+import { PanelSection, PanelSectionRow, ButtonItem, TextField } from "@decky/ui";
 import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
+import { Badge, EmptyState, ErrorState, Loading, PathText, StatusMessage } from "./ui";
+import { colors, card, actionRow, dimText } from "../utils/theme";
 
 const sourceLabel = (source: string): string => {
   switch (source) {
@@ -45,97 +47,59 @@ export function GamePathsTab() {
     }
   };
 
+  const persistPaths = async (game: GameInfo, savePaths: string[], excludePaths?: string[]): Promise<boolean> => {
+    try {
+      const payload: any = { game_name: game.name, save_paths: savePaths };
+      if (excludePaths !== undefined) payload.exclude_paths = excludePaths;
+      const result: any = await call("update_game_paths", payload);
+      if (result.success) {
+        await loadGames();
+        return true;
+      }
+      setPathValidationResult(`✗ ${result.error || "Ошибка сохранения"}`);
+      return false;
+    } catch (err) {
+      setPathValidationResult(`✗ Ошибка: ${err}`);
+      return false;
+    }
+  };
+
   const addPathToGame = async (game: GameInfo) => {
     if (!newPath.trim()) {
       setPathValidationResult("Введите путь");
       return;
     }
-
     setValidating(true);
     setPathValidationResult(null);
-
     try {
       const result: any = await call("validate_save_path", { path: newPath.trim() });
-
       if (result.success && result.path) {
-        const normalizedPath = result.path;
-        const updatedPaths = [...game.savePaths];
-        
-        if (!updatedPaths.includes(normalizedPath)) {
-          updatedPaths.push(normalizedPath);
-          
-          const updateResult: any = await call("update_game_paths", {
-            game_name: game.name,
-            save_paths: updatedPaths
-          });
-          
-          if (updateResult.success) {
-            setNewPath("");
-            setPathValidationResult(null);
-            await loadGames();
-          } else {
-            setPathValidationResult(`✗ Ошибка сохранения: ${updateResult.error}`);
-          }
-        } else {
+        if (game.savePaths.includes(result.path)) {
           setPathValidationResult("Этот путь уже добавлен");
+        } else if (await persistPaths(game, [...game.savePaths, result.path])) {
+          setNewPath("");
         }
       } else {
         setPathValidationResult(`✗ ${result.error || "Ошибка валидации"}`);
       }
-    } catch (error) {
-      setPathValidationResult(`✗ Ошибка: ${error}`);
     } finally {
       setValidating(false);
     }
   };
 
-  const removePathFromGame = async (game: GameInfo, pathIndex: number) => {
-    const updatedPaths = game.savePaths.filter((_, i) => i !== pathIndex);
-    
-    try {
-      const result: any = await call("update_game_paths", {
-        game_name: game.name,
-        save_paths: updatedPaths
-      });
-      
-      if (result.success) {
-        await loadGames();
-      }
-    } catch (error) {
-      console.error("Error removing path:", error);
-    }
+  const addCandidateToGame = async (game: GameInfo, candidatePath: string) => {
+    if (game.savePaths.includes(candidatePath)) return;
+    await persistPaths(game, [...game.savePaths, candidatePath]);
   };
 
-  const addCandidateToGame = async (game: GameInfo, candidatePath: string) => {
-    const updatedPaths = Array.from(new Set([...game.savePaths, candidatePath]));
-    try {
-      const result: any = await call("update_game_paths", {
-        game_name: game.name,
-        save_paths: updatedPaths
-      });
-      if (result.success) {
-        await loadGames();
-      }
-    } catch (error) {
-      console.error("Error adding candidate:", error);
-    }
+  const removePathFromGame = async (game: GameInfo, pathIndex: number) => {
+    await persistPaths(game, game.savePaths.filter((_, i) => i !== pathIndex));
   };
 
   const excludePathFromGame = async (game: GameInfo, path: string) => {
     const updatedPaths = game.savePaths.filter((p) => p !== path);
     const updatedExcludes = Array.from(new Set([...(game.excludePaths || []), path]));
-    try {
-      const result: any = await call("update_game_paths", {
-        game_name: game.name,
-        save_paths: updatedPaths,
-        exclude_paths: updatedExcludes
-      });
-      if (result.success) {
-        await loadGames();
-      }
-    } catch (error) {
-      console.error("Error excluding path:", error);
-    }
+    await persistPaths(game, updatedPaths, updatedExcludes);
   };
 
   const startEditingPath = (game: GameInfo, pathIndex: number) => {
@@ -149,36 +113,20 @@ export function GamePathsTab() {
       setPathValidationResult("Введите путь");
       return;
     }
-
     setValidating(true);
     setPathValidationResult(null);
-
     try {
       const result: any = await call("validate_save_path", { path: editingPathValue.trim() });
-
       if (result.success && result.path) {
-        const normalizedPath = result.path;
         const updatedPaths = [...game.savePaths];
-        updatedPaths[pathIndex] = normalizedPath;
-        
-        const updateResult: any = await call("update_game_paths", {
-          game_name: game.name,
-          save_paths: updatedPaths
-        });
-        
-        if (updateResult.success) {
+        updatedPaths[pathIndex] = result.path;
+        if (await persistPaths(game, updatedPaths)) {
           setEditingPathIndex(null);
           setEditingPathValue("");
-          setPathValidationResult(null);
-          await loadGames();
-        } else {
-          setPathValidationResult(`✗ Ошибка сохранения: ${updateResult.error}`);
         }
       } else {
         setPathValidationResult(`✗ ${result.error || "Ошибка валидации"}`);
       }
-    } catch (error) {
-      setPathValidationResult(`✗ Ошибка: ${error}`);
     } finally {
       setValidating(false);
     }
@@ -194,39 +142,14 @@ export function GamePathsTab() {
     loadGames();
   }, []);
 
-  if (loading) {
-    return (
-      <PanelSection>
-        <PanelSectionRow>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Spinner />
-            <span>Загрузка игр...</span>
-          </div>
-        </PanelSectionRow>
-      </PanelSection>
-    );
-  }
-
-  if (error) {
-    return (
-      <PanelSection>
-        <PanelSectionRow>
-          <div style={{ color: "red" }}>{error}</div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={loadGames}>
-            Повторить
-          </ButtonItem>
-        </PanelSectionRow>
-      </PanelSection>
-    );
-  }
+  if (loading) return <Loading text="Загрузка игр..." />;
+  if (error) return <ErrorState text={error} onRetry={loadGames} />;
 
   const settings = loadSettings();
 
   return (
-    <div style={{ paddingTop: "var(--basicui-header-height, 40px)" }}>
-      <PanelSection title={`Управление путями игр (${games.length})`}>
+    <div>
+      <PanelSection title={`Управление путями (${games.length})`}>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={loadGames} disabled={loading}>
             Обновить список
@@ -234,214 +157,134 @@ export function GamePathsTab() {
         </PanelSectionRow>
       </PanelSection>
 
+      {games.length === 0 && <EmptyState text="Игры не найдены" />}
+
       {games.map((game, index) => {
         const isEditing = editingGame?.name === game.name;
+        const candidates = (game.saveCandidates || []).filter((c) => !game.savePaths.includes(c.path));
 
         return (
           <PanelSection key={index} title={game.name}>
             <PanelSectionRow>
-              <div style={{ fontSize: "12px", color: "#888" }}>
-                {game.hasSaves ? `Найдено путей: ${game.savePaths.length}` : "Сохранения не найдены"}
-                {typeof game.steamAppId === "number" ? ` · Steam appid: ${game.steamAppId}` : ""}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+                <Badge tone={game.hasSaves ? "success" : "warning"}>
+                  {game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"}
+                </Badge>
+                {typeof game.steamAppId === "number" && <Badge>appid {game.steamAppId}</Badge>}
+                {(game.excludePaths?.length || 0) > 0 && <Badge tone="error">исключено {game.excludePaths!.length}</Badge>}
               </div>
             </PanelSectionRow>
 
             {game.sharedPrefix && (
               <PanelSectionRow>
-                <div style={{ fontSize: "11px", color: "#ffb84d" }}>
-                  ⚠ Общий префикс с: {(game.sharedWith || []).join(", ")}
-                </div>
-              </PanelSectionRow>
-            )}
-
-            {(game.excludePaths && game.excludePaths.length > 0) && (
-              <PanelSectionRow>
-                <div style={{ fontSize: "11px", color: "#ff6b6b" }}>
-                  Исключено из синхронизации: {game.excludePaths.length}
-                </div>
+                <StatusMessage tone="warning">
+                  Общий префикс с: {(game.sharedWith || []).join(", ")}
+                </StatusMessage>
               </PanelSectionRow>
             )}
 
             {settings.defaultSavePaths.length > 0 && (
               <PanelSectionRow>
-                <div style={{ fontSize: "11px", color: "#aaa" }}>
-                  Глобальные пути ({settings.defaultSavePaths.length}): {settings.defaultSavePaths.slice(0, 2).join(", ")}
-                  {settings.defaultSavePaths.length > 2 && ` +${settings.defaultSavePaths.length - 2}`}
+                <div style={dimText}>
+                  Глобальные пути: {settings.defaultSavePaths.length} (применяются ко всем играм)
                 </div>
               </PanelSectionRow>
             )}
 
-            {game.savePaths.length > 0 && (
-              <>
-                <PanelSectionRow>
-                  <div style={{ fontSize: "11px", color: "#888", fontWeight: "bold" }}>
-                    Индивидуальные пути ({game.savePaths.length}):
-                  </div>
-                </PanelSectionRow>
-                {game.savePaths.map((path, pathIndex) => {
-                  const isEditingThisPath = editingGame?.name === game.name && editingPathIndex === pathIndex;
-                  
-                  return (
-                    <PanelSectionRow key={pathIndex}>
-                      {isEditingThisPath ? (
-                        <div style={{ width: "100%" }}>
-                          <TextField
-                            label="Редактировать путь"
-                            value={editingPathValue}
-                            onChange={(e) => setEditingPathValue(e.target.value)}
-                          />
-                          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                            <div style={{ flex: 1 }}>
-                              <ButtonItem
-                                layout="below"
-                                onClick={() => saveEditedPath(game, pathIndex)}
-                                disabled={validating || !editingPathValue.trim()}
-                              >
-                                {validating ? "Проверка..." : "Сохранить"}
-                              </ButtonItem>
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <ButtonItem
-                                layout="below"
-                                onClick={cancelEditingPath}
-                              >
-                                Отмена
-                              </ButtonItem>
-                            </div>
-                          </div>
-                          {pathValidationResult && (
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                color: pathValidationResult.startsWith("✓") ? "#0f0" : "#f00",
-                                marginTop: "4px",
-                              }}
-                            >
-                              {pathValidationResult}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "8px",
-                            backgroundColor: "#2a2a2a",
-                            borderRadius: "4px",
-                            width: "100%",
-                            gap: "8px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "11px",
-                              flex: 1,
-                              wordBreak: "break-all",
-                              color: "#ccc",
-                            }}
-                          >
-                            {path}
-                          </span>
-                          <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                            <ButtonItem
-                              layout="below"
-                              onClick={() => startEditingPath(game, pathIndex)}
-                            >
-                              Изменить
-                            </ButtonItem>
-                            <ButtonItem
-                              layout="below"
-                              onClick={() => excludePathFromGame(game, path)}
-                            >
-                              Исключить
-                            </ButtonItem>
-                            <ButtonItem
-                              layout="below"
-                              onClick={() => removePathFromGame(game, pathIndex)}
-                            >
-                              Удалить
-                            </ButtonItem>
-                          </div>
-                        </div>
-                      )}
-                    </PanelSectionRow>
-                  );
-                })}
-              </>
-            )}
-
-            {(() => {
-              const candidates = (game.saveCandidates || []).filter(
-                (c) => !game.savePaths.includes(c.path)
-              );
-              if (candidates.length === 0) return null;
+            {game.savePaths.map((path, pathIndex) => {
+              const isEditingThisPath = editingGame?.name === game.name && editingPathIndex === pathIndex;
               return (
-                <PanelSectionRow>
-                  <div style={{ width: "100%" }}>
-                    <div style={{ fontSize: "11px", color: "#888", fontWeight: "bold", marginBottom: "4px" }}>
-                      Найденные кандидаты ({candidates.length}):
-                    </div>
-                    {candidates.map((c, ci) => (
-                      <div
-                        key={ci}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "6px",
-                          backgroundColor: "#232323",
-                          borderRadius: "4px",
-                          marginBottom: "4px",
-                          gap: "8px",
-                        }}
-                      >
+                <PanelSectionRow key={pathIndex}>
+                  {isEditingThisPath ? (
+                    <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <TextField label="Путь" value={editingPathValue} onChange={(e) => setEditingPathValue(e.target.value)} />
+                      {pathValidationResult && (
+                        <StatusMessage tone={pathValidationResult.startsWith("✓") ? "success" : "error"}>
+                          {pathValidationResult}
+                        </StatusMessage>
+                      )}
+                      <div style={actionRow}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "10px", color: "#aaa", wordBreak: "break-all" }}>{c.path}</div>
-                          <div style={{ fontSize: "9px", color: "#777" }}>
-                            источник: {sourceLabel(c.source)} · оценка: {c.score}
-                            {c.fileCount ? ` · файлов: ${c.fileCount}` : ""}
-                          </div>
+                          <ButtonItem
+                            layout="below"
+                            onClick={() => saveEditedPath(game, pathIndex)}
+                            disabled={validating || !editingPathValue.trim()}
+                          >
+                            {validating ? "Проверка…" : "Сохранить"}
+                          </ButtonItem>
                         </div>
-                        <ButtonItem layout="below" onClick={() => addCandidateToGame(game, c.path)}>
-                          Добавить
-                        </ButtonItem>
+                        <div style={{ flex: 1 }}>
+                          <ButtonItem layout="below" onClick={cancelEditingPath}>
+                            Отмена
+                          </ButtonItem>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <PathText>{path}</PathText>
+                      <div style={actionRow}>
+                        <div style={{ flex: 1 }}>
+                          <ButtonItem layout="below" onClick={() => startEditingPath(game, pathIndex)}>
+                            Изменить
+                          </ButtonItem>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <ButtonItem layout="below" onClick={() => excludePathFromGame(game, path)}>
+                            Исключить
+                          </ButtonItem>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <ButtonItem layout="below" onClick={() => removePathFromGame(game, pathIndex)}>
+                            Удалить
+                          </ButtonItem>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </PanelSectionRow>
               );
-            })()}
+            })}
+
+            {candidates.length > 0 && (
+              <PanelSectionRow>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+                  <div style={{ ...dimText, fontWeight: 600 }}>Найденные кандидаты ({candidates.length})</div>
+                  {candidates.map((c, ci) => (
+                    <div key={ci} style={{ ...card, display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <PathText>{c.path}</PathText>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "10px", color: colors.dim }}>
+                          источник: {sourceLabel(c.source)} · оценка: {c.score}
+                          {c.fileCount ? ` · файлов: ${c.fileCount}` : ""}
+                        </span>
+                        <div style={{ minWidth: "110px" }}>
+                          <ButtonItem layout="below" onClick={() => addCandidateToGame(game, c.path)}>
+                            Добавить
+                          </ButtonItem>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PanelSectionRow>
+            )}
 
             {isEditing && (
               <>
                 <PanelSectionRow>
-                  <TextField
-                    label="Добавить путь"
-                    value={newPath}
-                    onChange={(e) => setNewPath(e.target.value)}
-                  />
+                  <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
                 </PanelSectionRow>
                 <PanelSectionRow>
-                  <ButtonItem
-                    layout="below"
-                    onClick={() => addPathToGame(game)}
-                    disabled={validating || !newPath.trim()}
-                  >
-                    {validating ? "Проверка..." : "Добавить"}
+                  <ButtonItem layout="below" onClick={() => addPathToGame(game)} disabled={validating || !newPath.trim()}>
+                    {validating ? "Проверка…" : "Добавить"}
                   </ButtonItem>
                 </PanelSectionRow>
-                {pathValidationResult && (
+                {pathValidationResult && !editingPathIndex && (
                   <PanelSectionRow>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: pathValidationResult.startsWith("✓") ? "#0f0" : "#f00",
-                      }}
-                    >
+                    <StatusMessage tone={pathValidationResult.startsWith("✓") ? "success" : "error"}>
                       {pathValidationResult}
-                    </div>
+                    </StatusMessage>
                   </PanelSectionRow>
                 )}
               </>
@@ -460,20 +303,12 @@ export function GamePathsTab() {
                   }
                 }}
               >
-                {isEditing ? "Отмена" : "Редактировать пути"}
+                {isEditing ? "Готово" : "Редактировать пути"}
               </ButtonItem>
             </PanelSectionRow>
           </PanelSection>
         );
       })}
-
-      {games.length === 0 && (
-        <PanelSection>
-          <PanelSectionRow>
-            <div style={{ color: "#888" }}>Игры не найдены</div>
-          </PanelSectionRow>
-        </PanelSection>
-      )}
     </div>
   );
 }

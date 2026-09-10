@@ -1,32 +1,29 @@
 import { useState, useEffect } from "react";
 import { call } from "@decky/api";
-import { ButtonItem, PanelSection, PanelSectionRow, staticClasses, Router } from "@decky/ui";
+import { ButtonItem, PanelSection, PanelSectionRow, Router } from "@decky/ui";
 import { GameList } from "./GameList";
 import { SyncedGamesList } from "./SyncedGamesList";
+import { StatusMessage } from "./ui";
+import { colors } from "../utils/theme";
 
 export function GameSyncMain() {
   const [status, setStatus] = useState<string>("Проверка подключения...");
   const [connected, setConnected] = useState<boolean>(false);
 
   useEffect(() => {
-    // Тестовый вызов Python-метода
     call("get_test", {})
       .then((result: any) => {
         if (result && result.success) {
-          setStatus(result.status || result.message || "Подключено");
           setConnected(true);
+          setStatus("Плагин готов к работе");
         } else {
-          const errorMsg = result?.error || result?.message || "Неизвестная ошибка";
-          setStatus(`Ошибка: ${errorMsg}`);
           setConnected(false);
-          console.error("Backend error:", result);
+          setStatus(result?.error || result?.message || "Неизвестная ошибка");
         }
       })
       .catch((error) => {
-        const errorMsg = error?.message || error?.toString() || String(error);
-        setStatus(`Ошибка подключения: ${errorMsg}`);
         setConnected(false);
-        console.error("Connection error:", error);
+        setStatus(String(error?.message || error));
       });
   }, []);
 
@@ -34,18 +31,10 @@ export function GameSyncMain() {
     <div>
       <PanelSection>
         <PanelSectionRow>
-          <div className={staticClasses.Title}>Статус подключения</div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <div style={{ 
-            fontSize: "14px", 
-            color: connected ? "#0f0" : "#f00",
-            padding: "8px",
-            backgroundColor: connected ? "rgba(0, 255, 0, 0.1)" : "rgba(255, 0, 0, 0.1)",
-            borderRadius: "4px"
-          }}>
-            {status}
-          </div>
+          <StatusMessage tone={connected ? "success" : "error"}>
+            <span style={{ fontWeight: 600 }}>{connected ? "Подключено" : "Нет связи"}</span>
+            <span style={{ color: colors.muted }}>· {status}</span>
+          </StatusMessage>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem
@@ -55,10 +44,11 @@ export function GameSyncMain() {
               Router.Navigate("/gamesync-settings");
             }}
           >
-            Настройки
+            Настройки и пути сохранений
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
+
       {connected && (
         <>
           <SyncedGamesList />
