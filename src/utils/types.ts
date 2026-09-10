@@ -1,9 +1,27 @@
+// Кандидат пути сохранений, найденный автоопределением
+export interface SaveCandidate {
+  path: string;
+  score: number;
+  source: "known" | "learned" | "heuristic" | string;
+  reason?: string;
+  fileCount?: number;
+  saveFileCount?: number;
+  size?: number;
+}
+
 // Типы для игр
 export interface GameInfo {
   name: string;
   prefixPath: string;
   savePaths: string[];
   hasSaves: boolean;
+  desktopFile?: string;
+  exec?: string;
+  steamAppId?: number;
+  sharedPrefix?: boolean;
+  sharedWith?: string[];
+  saveCandidates?: SaveCandidate[];
+  excludePaths?: string[];
   lastSync?: string;
 }
 

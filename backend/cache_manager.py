@@ -1,8 +1,9 @@
 import json
 import logging
+import os
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,10 @@ class CacheManager:
         try:
             with open(CACHE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.cache, f, indent=2)
+            try:
+                os.chmod(CACHE_FILE, 0o600)
+            except OSError:
+                pass
         except Exception as e:
             logger.error(f"Error saving cache: {e}")
     

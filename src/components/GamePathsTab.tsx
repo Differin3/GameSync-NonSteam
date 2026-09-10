@@ -4,6 +4,19 @@ import { PanelSection, PanelSectionRow, ButtonItem, Spinner, TextField } from "@
 import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
 
+const sourceLabel = (source: string): string => {
+  switch (source) {
+    case "known":
+      return "база";
+    case "learned":
+      return "изучено";
+    case "heuristic":
+      return "поиск";
+    default:
+      return source;
+  }
+};
+
 export function GamePathsTab() {
   const [games, setGames] = useState<GameInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -90,6 +103,38 @@ export function GamePathsTab() {
       }
     } catch (error) {
       console.error("Error removing path:", error);
+    }
+  };
+
+  const addCandidateToGame = async (game: GameInfo, candidatePath: string) => {
+    const updatedPaths = Array.from(new Set([...game.savePaths, candidatePath]));
+    try {
+      const result: any = await call("update_game_paths", {
+        game_name: game.name,
+        save_paths: updatedPaths
+      });
+      if (result.success) {
+        await loadGames();
+      }
+    } catch (error) {
+      console.error("Error adding candidate:", error);
+    }
+  };
+
+  const excludePathFromGame = async (game: GameInfo, path: string) => {
+    const updatedPaths = game.savePaths.filter((p) => p !== path);
+    const updatedExcludes = Array.from(new Set([...(game.excludePaths || []), path]));
+    try {
+      const result: any = await call("update_game_paths", {
+        game_name: game.name,
+        save_paths: updatedPaths,
+        exclude_paths: updatedExcludes
+      });
+      if (result.success) {
+        await loadGames();
+      }
+    } catch (error) {
+      console.error("Error excluding path:", error);
     }
   };
 
@@ -197,8 +242,25 @@ export function GamePathsTab() {
             <PanelSectionRow>
               <div style={{ fontSize: "12px", color: "#888" }}>
                 {game.hasSaves ? `Найдено путей: ${game.savePaths.length}` : "Сохранения не найдены"}
+                {typeof game.steamAppId === "number" ? ` · Steam appid: ${game.steamAppId}` : ""}
               </div>
             </PanelSectionRow>
+
+            {game.sharedPrefix && (
+              <PanelSectionRow>
+                <div style={{ fontSize: "11px", color: "#ffb84d" }}>
+                  ⚠ Общий префикс с: {(game.sharedWith || []).join(", ")}
+                </div>
+              </PanelSectionRow>
+            )}
+
+            {(game.excludePaths && game.excludePaths.length > 0) && (
+              <PanelSectionRow>
+                <div style={{ fontSize: "11px", color: "#ff6b6b" }}>
+                  Исключено из синхронизации: {game.excludePaths.length}
+                </div>
+              </PanelSectionRow>
+            )}
 
             {settings.defaultSavePaths.length > 0 && (
               <PanelSectionRow>
@@ -291,6 +353,12 @@ export function GamePathsTab() {
                             </ButtonItem>
                             <ButtonItem
                               layout="below"
+                              onClick={() => excludePathFromGame(game, path)}
+                            >
+                              Исключить
+                            </ButtonItem>
+                            <ButtonItem
+                              layout="below"
                               onClick={() => removePathFromGame(game, pathIndex)}
                             >
                               Удалить
@@ -303,6 +371,48 @@ export function GamePathsTab() {
                 })}
               </>
             )}
+
+            {(() => {
+              const candidates = (game.saveCandidates || []).filter(
+                (c) => !game.savePaths.includes(c.path)
+              );
+              if (candidates.length === 0) return null;
+              return (
+                <PanelSectionRow>
+                  <div style={{ width: "100%" }}>
+                    <div style={{ fontSize: "11px", color: "#888", fontWeight: "bold", marginBottom: "4px" }}>
+                      Найденные кандидаты ({candidates.length}):
+                    </div>
+                    {candidates.map((c, ci) => (
+                      <div
+                        key={ci}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "6px",
+                          backgroundColor: "#232323",
+                          borderRadius: "4px",
+                          marginBottom: "4px",
+                          gap: "8px",
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: "10px", color: "#aaa", wordBreak: "break-all" }}>{c.path}</div>
+                          <div style={{ fontSize: "9px", color: "#777" }}>
+                            источник: {sourceLabel(c.source)} · оценка: {c.score}
+                            {c.fileCount ? ` · файлов: ${c.fileCount}` : ""}
+                          </div>
+                        </div>
+                        <ButtonItem layout="below" onClick={() => addCandidateToGame(game, c.path)}>
+                          Добавить
+                        </ButtonItem>
+                      </div>
+                    ))}
+                  </div>
+                </PanelSectionRow>
+              );
+            })()}
 
             {isEditing && (
               <>

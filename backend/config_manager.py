@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -10,6 +11,23 @@ CONFIG_DIR = Path.home() / ".config" / "gamesync"
 CONFIG_FILE = CONFIG_DIR / "games.json"
 SYNCED_GAMES_FILE = CONFIG_DIR / "synced_games.json"
 STORAGE_CONFIG_FILE = CONFIG_DIR / "storage_config.json"
+
+
+def _ensure_config_dir() -> None:
+    """Создаёт директорию конфига и ограничивает доступ владельцу."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(CONFIG_DIR, 0o700)
+    except OSError:
+        pass
+
+
+def _restrict_permissions(path: Path) -> None:
+    """Ограничивает доступ к файлу (в нём могут быть секреты)."""
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 def load_game_configs() -> Dict[str, Dict]:
     """Загрузка конфигурации игр"""
@@ -25,11 +43,12 @@ def load_game_configs() -> Dict[str, Dict]:
 
 def save_game_configs(configs: Dict[str, Dict]):
     """Сохранение конфигурации игр"""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_config_dir()
     
     try:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(configs, f, indent=2, ensure_ascii=False)
+        _restrict_permissions(CONFIG_FILE)
         logger.info(f"Saved game configs to {CONFIG_FILE}")
     except Exception as e:
         logger.error(f"Error saving game configs: {e}")
@@ -40,14 +59,22 @@ def get_game_config(game_name: str) -> Optional[Dict]:
     configs = load_game_configs()
     return configs.get(game_name)
 
-def update_game_config(game_name: str, save_paths: List[str], enabled: bool = True):
-    """Обновление конфигурации игры"""
+def update_game_config(game_name: str, save_paths: List[str], enabled: bool = True, exclude_paths: Optional[List[str]] = None):
+    """Обновление конфигурации игры."""
     configs = load_game_configs()
+    existing = configs.get(game_name) or {}
     configs[game_name] = {
         "savePaths": save_paths,
-        "enabled": enabled
+        "enabled": enabled,
+        "excludePaths": exclude_paths if exclude_paths is not None else existing.get("excludePaths", []),
     }
     save_game_configs(configs)
+
+
+def get_excluded_paths(game_name: str) -> List[str]:
+    """Пути, исключённые из синхронизации для игры."""
+    config = get_game_config(game_name) or {}
+    return config.get("excludePaths") or []
 
 def remove_game_config(game_name: str):
     """Удаление конфигурации игры"""
@@ -82,11 +109,12 @@ def load_synced_games() -> Dict[str, Dict]:
 
 def save_synced_games(synced_games: Dict[str, Dict]):
     """Сохранение списка синхронизированных игр"""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_config_dir()
     
     try:
         with open(SYNCED_GAMES_FILE, 'w', encoding='utf-8') as f:
             json.dump(synced_games, f, indent=2, ensure_ascii=False)
+        _restrict_permissions(SYNCED_GAMES_FILE)
         logger.info(f"Saved synced games to {SYNCED_GAMES_FILE}")
     except Exception as e:
         logger.error(f"Error saving synced games: {e}")
@@ -109,7 +137,7 @@ def add_synced_game(game_name: str, file_id: Optional[str] = None, file_size: Op
 
 def save_storage_config(provider: str, **kwargs):
     """Сохранение конфигурации хранилища"""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_config_dir()
     config = {
         "provider": provider,
         **kwargs,
@@ -117,6 +145,7 @@ def save_storage_config(provider: str, **kwargs):
     try:
         with open(STORAGE_CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
+        _restrict_permissions(STORAGE_CONFIG_FILE)
         logger.info(f"Saved storage config to {STORAGE_CONFIG_FILE}")
     except Exception as e:
         logger.error(f"Error saving storage config: {e}")
