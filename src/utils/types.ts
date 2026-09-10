@@ -32,19 +32,6 @@ export interface SyncStatus {
   message?: string;
 }
 
-// Конфигурация облака
-export interface CloudConfig {
-  provider: "webdav";
-  autoSync: boolean;
-}
-
-// Конфигурация игры
-export interface GameConfig {
-  gameName: string;
-  savePaths: string[];
-  enabled: boolean;
-}
-
 // Синхронизированная игра
 export interface SyncedGame {
   gameName: string;

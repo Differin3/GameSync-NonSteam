@@ -1,31 +1,21 @@
 import { useState, useEffect } from "react";
 import { call } from "@decky/api";
-import { PanelSection, PanelSectionRow, Spinner, ButtonItem } from "@decky/ui";
+import { PanelSection, PanelSectionRow } from "@decky/ui";
 import { SyncStats } from "../utils/types";
-
-const statBoxStyle = {
-  background: "rgba(255, 255, 255, 0.05)",
-  borderRadius: "4px",
-  padding: "8px 12px",
-  fontSize: "12px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginBottom: "6px",
-};
+import { EmptyState, ErrorState, Loading } from "./ui";
+import { colors, card } from "../utils/theme";
 
 const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return "0 B";
+  if (!bytes) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
 };
 
 const formatDate = (isoString: string): string => {
   try {
-    const date = new Date(isoString);
-    return date.toLocaleString("ru-RU", {
+    return new Date(isoString).toLocaleString("ru-RU", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -36,6 +26,15 @@ const formatDate = (isoString: string): string => {
     return isoString;
   }
 };
+
+function StatRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+      <span style={{ fontSize: "12px", color: colors.muted }}>{label}</span>
+      <span style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>{value}</span>
+    </div>
+  );
+}
 
 export function StatsTab() {
   const [stats, setStats] = useState<SyncStats | null>(null);
@@ -63,103 +62,43 @@ export function StatsTab() {
     loadStats();
   }, []);
 
-  if (loading) {
-    return (
-      <PanelSection>
-        <PanelSectionRow>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Spinner />
-            <span>Загрузка статистики...</span>
-          </div>
-        </PanelSectionRow>
-      </PanelSection>
-    );
-  }
-
-  if (error) {
-    return (
-      <PanelSection>
-        <PanelSectionRow>
-          <div style={{ color: "red" }}>{error}</div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={loadStats}>
-            Повторить
-          </ButtonItem>
-        </PanelSectionRow>
-      </PanelSection>
-    );
-  }
-
-  if (!stats) {
-    return (
-      <PanelSection>
-        <PanelSectionRow>
-          <div style={{ color: "#888" }}>Нет данных для отображения</div>
-        </PanelSectionRow>
-      </PanelSection>
-    );
-  }
+  if (loading) return <Loading text="Загрузка статистики..." />;
+  if (error) return <ErrorState text={error} onRetry={loadStats} />;
+  if (!stats) return <EmptyState text="Нет данных для отображения" />;
 
   return (
-    <div style={{ padding: "4px" }}>
-      <PanelSection title="Статистика синхронизаций">
-        <PanelSectionRow>
-          <div style={{ fontWeight: "bold", marginBottom: "8px", fontSize: "13px" }}>
-            Общая статистика
-          </div>
-        </PanelSectionRow>
+    <PanelSection title="Статистика синхронизаций">
+      <PanelSectionRow>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+          <StatRow label="Всего синхронизаций" value={stats.totalSyncs.toLocaleString()} />
+          <StatRow label="Игр синхронизировано" value={stats.gamesCount.toLocaleString()} />
+          {stats.lastSync && <StatRow label="Последняя синхронизация" value={formatDate(stats.lastSync)} />}
+          {typeof stats.totalSize === "number" && stats.totalSize > 0 && (
+            <StatRow label="Общий размер" value={formatBytes(stats.totalSize)} />
+          )}
+        </div>
+      </PanelSectionRow>
 
-        <PanelSectionRow>
-          <div style={statBoxStyle}>
-            <span>Всего синхронизаций</span>
-            <span style={{ fontWeight: "bold" }}>{stats.totalSyncs.toLocaleString()}</span>
-          </div>
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <div style={statBoxStyle}>
-            <span>Игр синхронизировано</span>
-            <span style={{ fontWeight: "bold" }}>{stats.gamesCount.toLocaleString()}</span>
-          </div>
-        </PanelSectionRow>
-
-        {stats.lastSync && (
+      {stats.syncsByDate && stats.syncsByDate.length > 0 && (
+        <>
           <PanelSectionRow>
-            <div style={statBoxStyle}>
-              <span>Последняя синхронизация</span>
-              <span style={{ fontSize: "11px" }}>{formatDate(stats.lastSync)}</span>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: colors.muted, marginTop: "6px" }}>
+              Синхронизации по датам
             </div>
           </PanelSectionRow>
-        )}
-
-        {stats.totalSize && stats.totalSize > 0 && (
           <PanelSectionRow>
-            <div style={statBoxStyle}>
-              <span>Общий размер сохранений</span>
-              <span style={{ fontWeight: "bold" }}>{formatBytes(stats.totalSize)}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+              {stats.syncsByDate.slice(0, 10).map((item, index) => (
+                <StatRow
+                  key={index}
+                  label={new Date(item.date).toLocaleDateString("ru-RU")}
+                  value={item.count.toLocaleString()}
+                />
+              ))}
             </div>
           </PanelSectionRow>
-        )}
-
-        {stats.syncsByDate && stats.syncsByDate.length > 0 && (
-          <>
-            <PanelSectionRow>
-              <div style={{ fontWeight: "bold", marginTop: "12px", marginBottom: "8px", fontSize: "13px" }}>
-                Синхронизации по датам
-              </div>
-            </PanelSectionRow>
-            {stats.syncsByDate.slice(0, 10).map((item, index) => (
-              <PanelSectionRow key={index}>
-                <div style={statBoxStyle}>
-                  <span>{new Date(item.date).toLocaleDateString("ru-RU")}</span>
-                  <span style={{ fontWeight: "bold" }}>{item.count}</span>
-                </div>
-              </PanelSectionRow>
-            ))}
-          </>
-        )}
-      </PanelSection>
-    </div>
+        </>
+      )}
+    </PanelSection>
   );
 }
