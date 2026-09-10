@@ -1,14 +1,32 @@
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
-
-import boto3
-from botocore.config import Config
-from botocore.exceptions import BotoCoreError, ClientError
+import sys
+import subprocess
 
 from base_provider import StorageProvider
 
 logger = logging.getLogger(__name__)
+
+# Пытаемся гарантировать наличие boto3 в окружении Decky.
+try:
+    import boto3  # type: ignore
+    from botocore.config import Config  # type: ignore
+    from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
+except ImportError:
+    try:
+        logger.warning("boto3 not found, attempting to install via pip...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "boto3", "botocore"])
+        import boto3  # type: ignore  # noqa: E402
+        from botocore.config import Config  # type: ignore  # noqa: E402
+        from botocore.exceptions import BotoCoreError, ClientError  # type: ignore  # noqa: E402
+        logger.info("Successfully installed boto3 and botocore.")
+    except Exception as e:
+        logger.error(f"Failed to install boto3/botocore via pip: {e}")
+        boto3 = None  # type: ignore
+        Config = None  # type: ignore
+        BotoCoreError = Exception  # type: ignore
+        ClientError = Exception  # type: ignore
 
 
 class S3Provider(StorageProvider):
@@ -31,6 +49,12 @@ class S3Provider(StorageProvider):
         self.secret_key = secret_key
         self.path_style = path_style
         self.signature_version = signature_version
+
+        if boto3 is None or Config is None:
+            raise RuntimeError(
+                "boto3 недоступен в окружении Decky. "
+                "Проверьте подключение к интернету и логи плагина для деталей установки boto3."
+            )
 
         session = boto3.session.Session()
         extra_config = {

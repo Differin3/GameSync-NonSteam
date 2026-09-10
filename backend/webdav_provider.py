@@ -171,7 +171,10 @@ class WebDAVProvider(StorageProvider):
         try:
             # Пробуем выполнить PROPFIND на корневую папку
             headers = self._get_headers()
-            response = requests.request('PROPFIND', self.base_url, auth=self.auth, headers=headers, timeout=10, depth=0)
+            # Параметр Depth передаётся через заголовок, а не как аргумент функции
+            if "Depth" not in headers:
+                headers["Depth"] = "0"
+            response = requests.request('PROPFIND', self.base_url, auth=self.auth, headers=headers, timeout=10)
             
             if response.status_code in [207, 200, 301, 302]:
                 return {

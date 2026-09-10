@@ -474,6 +474,27 @@ class Plugin:
         """Сохранение конфигурации хранилища"""
         try:
             from config_manager import save_storage_config
+
+            logger.info(f"[save_storage_config] Called with provider={provider}, args={len(args)}, kwargs keys: {list(kwargs.keys())}")
+
+            # Decky может передавать параметры:
+            # 1) одним dict в args[0]
+            # 2) одним dict в ПЕРВОМ позиционном параметре (provider)
+            # Приводим всё к kwargs + строковому provider.
+            if isinstance(provider, dict):
+                incoming = dict(provider)
+                merged = dict(kwargs)
+                merged.update(incoming)
+                kwargs = merged
+                provider = incoming.get("provider", "webdav")
+                logger.info(f"[save_storage_config] Normalized dict provider to string '{provider}', kwargs keys now: {list(kwargs.keys())}")
+
+            # Вариант 1: dict в args[0]
+            if args and isinstance(args[0], dict):
+                merged = dict(kwargs)
+                merged.update(args[0])
+                kwargs = merged
+                logger.info(f"[save_storage_config] Merged args[0] into kwargs, keys now: {list(kwargs.keys())}")
             
             if provider is None:
                 provider = kwargs.get("provider", "webdav")
@@ -591,7 +612,20 @@ class Plugin:
             logger.info(f"[test_storage_connection] Called with provider={provider}, args={len(args)}, kwargs keys: {list(kwargs.keys())}")
             logger.info(f"[test_storage_connection] arg types: {[type(a).__name__ for a in args]}")
 
-            # Decky часто передаёт параметры не как kwargs, а как один dict в args[0]
+            # Decky может передавать параметры:
+            # 1) одним dict в args[0]
+            # 2) одним dict в ПЕРВОМ позиционном параметре (provider)
+            # Приводим всё к kwargs + строковому provider.
+            if isinstance(provider, dict):
+                logger.info(f"[test_storage_connection] Detected dict provider with keys: {list(provider.keys())}")
+                incoming = dict(provider)
+                merged = dict(kwargs)
+                merged.update(incoming)
+                kwargs = merged
+                provider = incoming.get("provider", "webdav")
+                logger.info(f"[test_storage_connection] Normalized dict provider to string '{provider}', kwargs keys now: {list(kwargs.keys())}")
+
+            # Вариант 1: dict в args[0]
             if args and isinstance(args[0], dict):
                 logger.info(f"[test_storage_connection] Detected dict in args[0] with keys: {list(args[0].keys())}")
                 merged = dict(kwargs)

@@ -466,6 +466,25 @@ export function Settings() {
       </PanelSection>
       )}
 
+      {/* Save Settings Section */}
+      <PanelSection title="Сохранение настроек">
+        <PanelSectionRow>
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
+            Сохранить текущие параметры выбранного хранилища (WebDAV или S3) в конфиг плагина.
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={async () => {
+              await saveStorageConfig(settings);
+            }}
+          >
+            Сохранить настройки
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+
       {/* Clear Data Section */}
       <PanelSection title="Очистка данных">
         <PanelSectionRow>
