@@ -1,7 +1,7 @@
 {
   "name": "gamesync-nonsteam",
   "version": "0.2.0",
-  "description": "Синхронизация сохранений игр PortProton через WebDAV (Яндекс Диск, Nextcloud и др.)",
+  "description": "Синхронизация сохранений игр PortProton через WebDAV (Яндекс Диск, Nextcloud и др.) или S3-совместимое хранилище",
   "type": "module",
   "scripts": {
     "build": "rollup -c",
@@ -24,6 +24,8 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.45.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
     "rollup": "^4.53.3",
     "shx": "^0.3.4",
     "rimraf": "^5.0.5",

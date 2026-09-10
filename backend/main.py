@@ -1,11 +1,8 @@
 import decky
 import os
-import json
 import asyncio
-import urllib.request
-from urllib.parse import urlparse, parse_qs
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List
 
 # Используем логгер Decky Loader
 logger = decky.logger
@@ -19,6 +16,137 @@ except ImportError:
     sys.path.insert(0, str(backend_path))
     from portproton_scanner import scan_portproton_games
 
+
+def _merge_game_save_paths(game: Dict[str, Any], game_configs: Dict[str, Any]) -> Dict[str, Any]:
+    """Подмешивает вручную заданные пути игры и убирает исключённые."""
+    config = game_configs.get(game.get("name")) or {}
+    manual_paths = config.get("savePaths") or []
+    excludes = config.get("excludePaths") or []
+    merged = list(dict.fromkeys((game.get("savePaths") or []) + manual_paths))
+    if excludes:
+        merged = [
+            p for p in merged
+            if not any(p == ex or p.startswith(ex.rstrip("/") + "/") for ex in excludes)
+        ]
+    game["savePaths"] = merged
+    game["excludePaths"] = excludes
+    game["hasSaves"] = len(merged) > 0
+    return game
+
+
+def _resolve_save_paths_for_game(game_name: str) -> List[str]:
+    """Найти пути сохранений для игры по имени игры или имени префикса.
+
+    Нужно автосинхронизации: монитор процессов знает только имя префикса,
+    но не пути сохранений.
+    """
+    if not game_name:
+        return []
+
+    paths: List[str] = []
+
+    try:
+        games = scan_portproton_games()
+    except Exception as e:
+        logger.error(f"Failed to scan games while resolving paths for '{game_name}': {e}")
+        games = []
+
+    target = game_name.strip().lower()
+    for game in games:
+        names = {
+            str(game.get("name", "")).strip().lower(),
+            Path(game.get("prefixPath", "")).name.strip().lower(),
+        }
+        if target in names:
+            paths.extend(game.get("savePaths") or [])
+            break
+
+    try:
+        from config_manager import get_game_config
+        config = get_game_config(game_name) or {}
+        paths.extend(config.get("savePaths") or [])
+    except Exception as e:
+        logger.warning(f"Failed to load config while resolving paths for '{game_name}': {e}")
+
+    return list(dict.fromkeys(p for p in paths if p))
+
+
+def _build_provider(config: Dict[str, Any]):
+    """Создаёт провайдер хранилища по конфигу.
+
+    Возвращает кортеж (provider, error). При ошибке provider=None.
+    """
+    provider_type = (config.get("provider") or "webdav").lower()
+
+    if provider_type == "s3":
+        from s3_provider import S3Provider
+
+        bucket = config.get("bucket", "")
+        access_key = config.get("access_key", "")
+        secret_key = config.get("secret_key", "")
+        if not bucket:
+            return None, "Не настроен S3. Укажите bucket в настройках."
+        if not access_key or not secret_key:
+            return None, "Не настроен S3. Укажите Access Key и Secret Key в настройках."
+
+        return S3Provider(
+            endpoint=config.get("endpoint", ""),
+            region=config.get("region", "us-east-1"),
+            bucket=bucket,
+            access_key=access_key,
+            secret_key=secret_key,
+            path_style=bool(config.get("path_style", False)),
+            signature_version=config.get("signature_version", "s3v4"),
+        ), None
+
+    if provider_type == "ftp":
+        from ftp_provider import FTPProvider
+
+        host = config.get("host", "")
+        if not host:
+            return None, "Не настроен FTP. Укажите host в настройках."
+
+        return FTPProvider(
+            host=host,
+            port=int(config.get("port") or 21),
+            username=config.get("username", ""),
+            password=config.get("password", ""),
+            use_tls=bool(config.get("use_tls", False)),
+            passive=bool(config.get("passive", True)),
+        ), None
+
+    if provider_type == "sftp":
+        from sftp_provider import SFTPProvider
+
+        host = config.get("host", "")
+        if not host:
+            return None, "Не настроен SFTP. Укажите host в настройках."
+
+        return SFTPProvider(
+            host=host,
+            port=int(config.get("port") or 22),
+            username=config.get("username", ""),
+            password=config.get("password", ""),
+            key_path=config.get("key_path", ""),
+            key_passphrase=config.get("key_passphrase", ""),
+        ), None
+
+    # WebDAV по умолчанию
+    from webdav_provider import WebDAVProvider
+
+    url = config.get("url", "")
+    username = config.get("username", "")
+    password = config.get("password", "")
+    oauth_token = config.get("oauth_token", "")
+
+    if not url:
+        return None, "Не настроен WebDAV. Укажите URL в настройках."
+    if not oauth_token and (not username or not password):
+        return None, "Не настроен WebDAV. Укажите логин/пароль или OAuth токен в настройках."
+
+    return WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token), None
+
+
 class Plugin:
     # Классовые переменные для состояния
     auto_sync_enabled = False
@@ -29,7 +157,24 @@ class Plugin:
         logger.info("GameSync NonSteam plugin initialized")
         Plugin.auto_sync_enabled = False
         Plugin.game_monitor = None
-        pass
+
+        # Ставим зависимости в фоне, чтобы плагин работал «из коробки».
+        try:
+            import dependencies
+            dependencies._ensure_py_modules_on_path()
+            asyncio.create_task(dependencies.ensure_dependencies_async("all"))
+            logger.info("Dependency bootstrap started")
+        except Exception as e:
+            logger.warning(f"Dependency bootstrap failed: {e}")
+
+    async def install_dependencies(self, *args, **kwargs) -> Dict[str, Any]:
+        """Ручной повторный запуск установки зависимостей (на случай сбоя сети)."""
+        try:
+            import dependencies
+            return await dependencies.ensure_dependencies_async("all")
+        except Exception as e:
+            logger.error(f"Error installing dependencies: {e}")
+            return {"success": False, "error": str(e)}
 
     async def _unload(self):
         """Выгрузка плагина"""
@@ -56,6 +201,19 @@ class Plugin:
                 force_refresh = kwargs.get('force_refresh', False)
             
             games = scan_portproton_games(force_refresh=force_refresh)
+
+            # Подмешиваем пути, сохранённые пользователем вручную, чтобы они
+            # не терялись при повторном сканировании.
+            try:
+                from config_manager import load_game_configs
+                game_configs = load_game_configs()
+            except Exception as e:
+                logger.warning(f"Failed to load game configs: {e}")
+                game_configs = {}
+
+            for game in games:
+                _merge_game_save_paths(game, game_configs)
+
             return {"success": True, "games": games}
         except Exception as e:
             logger.error(f"Error scanning games: {e}")
@@ -72,6 +230,22 @@ class Plugin:
             
             if not game_name or not save_paths:
                 return {"success": False, "error": "Не указаны game_name или save_paths"}
+
+            # Убираем исключённые пользователем пути
+            try:
+                from config_manager import get_excluded_paths
+                excludes = get_excluded_paths(game_name)
+                if excludes:
+                    save_paths = [
+                        p for p in save_paths
+                        if not any(p == ex or p.startswith(ex.rstrip("/") + "/") for ex in excludes)
+                    ]
+            except Exception as e:
+                logger.debug(f"Exclude filter skipped: {e}")
+
+            if not save_paths:
+                return {"success": False, "error": "Все пути сохранений исключены"}
+
             try:
                 from sync_engine import create_backup
             except ImportError:
@@ -97,69 +271,24 @@ class Plugin:
                 from config_manager import load_storage_config
             
             storage_config = load_storage_config()
-            provider_type = storage_config.get("provider", "webdav")
 
-            provider = None
+            # Гарантируем наличие зависимостей выбранного провайдера
+            try:
+                import dependencies
+                dep = await dependencies.ensure_dependencies_async(storage_config.get("provider", "webdav"))
+                if not dep.get("success"):
+                    return {"success": False, "error": "Не удалось установить зависимости: " + ", ".join(dep.get("missing", []))}
+            except Exception as e:
+                logger.warning(f"Dependency check failed: {e}")
 
-            if provider_type == "s3":
-                try:
-                    from s3_provider import S3Provider
-                except ImportError:
-                    import sys
-                    import pathlib
-                    backend_path = pathlib.Path(__file__).parent
-                    sys.path.insert(0, str(backend_path))
-                    from s3_provider import S3Provider
+            provider, error = _build_provider(storage_config)
+            if error:
+                return {"success": False, "error": error}
 
-                endpoint = storage_config.get("endpoint", "")
-                region = storage_config.get("region", "us-east-1")
-                bucket = storage_config.get("bucket", "")
-                access_key = storage_config.get("access_key", "")
-                secret_key = storage_config.get("secret_key", "")
-                path_style = bool(storage_config.get("path_style", False))
-                signature_version = storage_config.get("signature_version", "s3v4")
-
-                if not bucket:
-                    return {"success": False, "error": "Не настроен S3. Укажите bucket в настройках."}
-                if not access_key or not secret_key:
-                    return {"success": False, "error": "Не настроен S3. Укажите Access Key и Secret Key в настройках."}
-
-                provider = S3Provider(
-                    endpoint=endpoint,
-                    region=region,
-                    bucket=bucket,
-                    access_key=access_key,
-                    secret_key=secret_key,
-                    path_style=path_style,
-                    signature_version=signature_version,
-                )
-            else:
-                try:
-                    from webdav_provider import WebDAVProvider
-                except ImportError:
-                    import sys
-                    import pathlib
-                    backend_path = pathlib.Path(__file__).parent
-                    sys.path.insert(0, str(backend_path))
-                    from webdav_provider import WebDAVProvider
-                
-                url = storage_config.get('url', '')
-                username = storage_config.get('username', '')
-                password = storage_config.get('password', '')
-                oauth_token = storage_config.get('oauth_token', '')
-                
-                if not url:
-                    return {"success": False, "error": "Не настроен WebDAV. Укажите URL в настройках."}
-                
-                if not oauth_token and (not username or not password):
-                    return {"success": False, "error": "Не настроен WebDAV. Укажите логин/пароль или OAuth токен в настройках."}
-                
-                provider = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
-            
             file_id = provider.upload_file(archive_path, "GameSync")
-            
+
             if not file_id:
-                return {"success": False, "error": "Не удалось загрузить файл в WebDAV хранилище"}
+                return {"success": False, "error": "Не удалось загрузить архив в хранилище"}
             
             # Получаем размер загруженного файла для статистики
             file_size = None
@@ -188,88 +317,6 @@ class Plugin:
         except Exception as e:
             logger.error(f"Error syncing game: {e}")
             return {"success": False, "error": str(e)}
-    
-    async def load_credentials_from_file(self, file_path: str = None, *args, **kwargs) -> Dict[str, Any]:
-        """Загрузка credentials из JSON файла Google Cloud Console"""
-        try:
-            logger.info(f"load_credentials_from_file called with file_path={file_path}, kwargs={kwargs}")
-            
-            # Сначала проверяем kwargs, потом file_path
-            if file_path is None:
-                file_path = kwargs.get('file_path')
-            
-            # Если file_path все еще None, проверяем, может быть он в kwargs как вложенный dict
-            if file_path is None and kwargs:
-                # Проверяем, может быть весь kwargs и есть file_path
-                if 'file_path' in kwargs and isinstance(kwargs['file_path'], dict):
-                    file_path = kwargs['file_path'].get('file_path')
-            
-            # Проверяем, что file_path - это строка, а не dict
-            if isinstance(file_path, dict):
-                logger.warning(f"file_path is dict: {file_path}")
-                # Если передан dict, пытаемся извлечь path, realpath или file_path
-                # Важно: проверяем 'file_path' первым, так как это ключ, который использует Decky
-                file_path = file_path.get('file_path') or file_path.get('realpath') or file_path.get('path')
-            
-            logger.info(f"After processing, file_path={file_path}, type={type(file_path)}")
-            
-            if not file_path:
-                logger.error("file_path is empty or None")
-                return {"success": False, "error": "Не указан путь к файлу"}
-            
-            if not isinstance(file_path, (str, bytes, os.PathLike)):
-                logger.error(f"Invalid file_path type: {type(file_path).__name__}, value: {file_path}")
-                return {"success": False, "error": f"Неверный тип пути: {type(file_path).__name__}, ожидается строка"}
-            
-            # Преобразуем в строку если нужно
-            file_path_str = str(file_path) if not isinstance(file_path, str) else file_path
-            logger.info(f"Using file_path_str: {file_path_str}")
-            file_path_obj = Path(file_path_str)
-            if not file_path_obj.exists():
-                return {"success": False, "error": f"Файл не найден: {file_path}"}
-            
-            if not file_path_obj.is_file():
-                return {"success": False, "error": f"Указанный путь не является файлом: {file_path}"}
-            
-            try:
-                with open(file_path_obj, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            except json.JSONDecodeError as e:
-                return {"success": False, "error": f"Ошибка парсинга JSON: {str(e)}"}
-            except Exception as e:
-                return {"success": False, "error": f"Ошибка чтения файла: {str(e)}"}
-            
-            # Извлекаем credentials из структуры Google Cloud Console
-            # Формат: {"web": {"client_id": "...", "client_secret": "..."}}
-            client_id = None
-            client_secret = None
-            
-            if isinstance(data, dict):
-                # Проверяем структуру с вложенным объектом "web"
-                if "web" in data and isinstance(data["web"], dict):
-                    client_id = data["web"].get("client_id")
-                    client_secret = data["web"].get("client_secret")
-                # Также проверяем прямую структуру (на случай другого формата)
-                elif "client_id" in data:
-                    client_id = data.get("client_id")
-                    client_secret = data.get("client_secret")
-            
-            if not client_id:
-                return {"success": False, "error": "В файле не найден client_id. Проверьте формат JSON файла."}
-            
-            if not client_secret:
-                return {"success": False, "error": "В файле не найден client_secret. Проверьте формат JSON файла."}
-            
-            return {
-                "success": True,
-                "client_id": client_id,
-                "client_secret": client_secret
-            }
-        except Exception as e:
-            logger.error(f"Error loading credentials from file: {e}")
-            return {"success": False, "error": str(e)}
-    
-    # Google Drive больше не поддерживается – тест подключения не реализован
     
     async def validate_save_path(self, path: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Валидация пути сохранений"""
@@ -313,7 +360,17 @@ class Plugin:
                 sys.path.insert(0, str(backend_path))
                 from config_manager import update_game_config
             
-            update_game_config(game_name, save_paths)
+            exclude_paths = kwargs.get('exclude_paths')
+            update_game_config(game_name, save_paths, exclude_paths=exclude_paths)
+
+            # Запоминаем ручные пути, чтобы подсказывать их похожим играм
+            try:
+                from learning import record_path
+                for path in (save_paths or []):
+                    record_path(game_name, path)
+            except Exception as e:
+                logger.debug(f"Learning skipped: {e}")
+
             return {"success": True, "message": "Пути сохранены"}
         except Exception as e:
             logger.error(f"Error updating game paths: {e}")
@@ -364,6 +421,13 @@ class Plugin:
             Plugin.auto_sync_enabled = enabled
             
             if enabled:
+                # auto_sync требует psutil
+                try:
+                    import dependencies
+                    await dependencies.ensure_dependencies_async("auto_sync")
+                except Exception as e:
+                    logger.warning(f"Dependency check failed for auto-sync: {e}")
+
                 try:
                     from auto_sync import GameMonitor
                 except ImportError:
@@ -376,15 +440,18 @@ class Plugin:
                 async def sync_callback(game_name: str, save_paths: List[str]):
                     """Callback для автосинхронизации"""
                     logger.info(f"Auto-syncing game: {game_name}")
+                    resolved_paths = save_paths or _resolve_save_paths_for_game(game_name)
+                    if not resolved_paths:
+                        logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
+                        return
                     plugin_instance = Plugin()
-                    result = await plugin_instance.sync_game(game_name, save_paths)
+                    result = await plugin_instance.sync_game(game_name, resolved_paths)
                     if result.get("success"):
                         logger.info(f"Auto-sync completed for {game_name}")
                     else:
                         logger.error(f"Auto-sync failed for {game_name}: {result.get('error')}")
                 
                 Plugin.game_monitor = GameMonitor(sync_callback)
-                import asyncio
                 asyncio.create_task(Plugin.game_monitor.start_monitoring())
             else:
                 if Plugin.game_monitor:
@@ -418,13 +485,13 @@ class Plugin:
         """Получение статистики синхронизаций"""
         try:
             try:
-                from config_manager import get_synced_games, load_synced_games
+                from config_manager import load_synced_games
             except ImportError:
                 import sys
                 import pathlib
                 backend_path = pathlib.Path(__file__).parent
                 sys.path.insert(0, str(backend_path))
-                from config_manager import get_synced_games, load_synced_games
+                from config_manager import load_synced_games
             
             synced_games = load_synced_games()
             total_syncs = len(synced_games)
@@ -467,8 +534,6 @@ class Plugin:
         except Exception as e:
             logger.error(f"Error getting sync stats: {e}")
             return {"success": False, "error": str(e), "stats": None}
-    
-    # Google OAuth и отдельная конфигурация для Google Drive больше не используются
     
     async def save_storage_config(self, provider: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Сохранение конфигурации хранилища"""
@@ -520,6 +585,26 @@ class Plugin:
                     path_style=path_style,
                     signature_version=signature_version,
                 )
+            elif provider == "ftp":
+                save_storage_config(
+                    provider="ftp",
+                    host=kwargs.get("host", ""),
+                    port=int(kwargs.get("port") or 21),
+                    username=kwargs.get("username", ""),
+                    password=kwargs.get("password", ""),
+                    use_tls=bool(kwargs.get("use_tls", False)),
+                    passive=bool(kwargs.get("passive", True)),
+                )
+            elif provider == "sftp":
+                save_storage_config(
+                    provider="sftp",
+                    host=kwargs.get("host", ""),
+                    port=int(kwargs.get("port") or 22),
+                    username=kwargs.get("username", ""),
+                    password=kwargs.get("password", ""),
+                    key_path=kwargs.get("key_path", ""),
+                    key_passphrase=kwargs.get("key_passphrase", ""),
+                )
             else:
                 url = kwargs.get('url', '')
                 username = kwargs.get('username', '')
@@ -562,10 +647,22 @@ class Plugin:
             
             # Очистка кэша
             try:
-                cache_manager.clear_all()
+                cache_manager.clear()
                 logger.info("Cache cleared")
             except Exception as e:
                 logger.warning(f"Error clearing cache: {e}")
+
+            # Сброс изученных путей и кэша Ludusavi
+            try:
+                from learning import clear as clear_learned
+                clear_learned()
+            except Exception as e:
+                logger.warning(f"Error clearing learned paths: {e}")
+            try:
+                from ludusavi import clear_cache as clear_ludusavi
+                clear_ludusavi()
+            except Exception as e:
+                logger.warning(f"Error clearing Ludusavi cache: {e}")
             
             # Удаление всех конфигурационных файлов и директории
             if CONFIG_DIR.exists():
@@ -632,95 +729,51 @@ class Plugin:
                 merged.update(args[0])
                 kwargs = merged
             
-            # Загружаем значения из конфига (используем их как базовые)
+            # Загружаем сохранённый конфиг как базовый
             storage_config = load_storage_config()
-            url = (storage_config.get('url') or '')
-            username = storage_config.get('username', '')
-            password = storage_config.get('password', '')
-            oauth_token = storage_config.get('oauth_token', '')
+
+            # Явно переданный провайдер приоритетнее сохранённого
+            storage_provider = (provider or storage_config.get("provider") or "webdav").lower()
+
+            # Если тестируем не тот провайдер, что сохранён, не смешиваем чужие поля
+            if storage_provider == (storage_config.get("provider") or "webdav").lower():
+                config = dict(storage_config)
+            else:
+                config = {}
+            config["provider"] = storage_provider
 
             # Перекрываем значениями из kwargs ТОЛЬКО если они непустые
-            incoming_url = kwargs.get('url')
-            if isinstance(incoming_url, dict):
-                incoming_url = incoming_url.get('url') or incoming_url.get('path')
-            if incoming_url not in (None, ''):
-                url = str(incoming_url)
+            for key, value in kwargs.items():
+                if key == "url" and isinstance(value, dict):
+                    value = value.get("url") or value.get("path")
+                if value not in (None, ""):
+                    config[key] = value
 
-            if kwargs.get('username'):
-                username = kwargs.get('username')
-            if kwargs.get('password'):
-                password = kwargs.get('password')
-            if kwargs.get('oauth_token'):
-                oauth_token = kwargs.get('oauth_token')
-            
-            # Небольшая нормализация URL
-            if url is None:
-                url = ''
-            url = str(url).strip()
+            if config.get("url") is not None:
+                config["url"] = str(config["url"]).strip()
 
-            # Выбираем провайдера: если явно передан, используем его, иначе читаем из конфига
-            storage_provider = storage_config.get("provider", "webdav")
-            if provider:
-                storage_provider = provider
+            logger.info(
+                f"[test_storage_connection] provider={storage_provider}, "
+                f"config keys={sorted(config.keys())}"
+            )
 
-            if storage_provider == "s3":
-                # Для S3 читаем параметры из конфига + kwargs
-                s3_bucket = storage_config.get("bucket", "")
-                s3_endpoint = storage_config.get("endpoint", "")
-                s3_region = storage_config.get("region", "us-east-1")
-                s3_access_key = storage_config.get("access_key", "")
-                s3_secret_key = storage_config.get("secret_key", "")
-                s3_path_style = bool(storage_config.get("path_style", False))
-                s3_signature_version = storage_config.get("signature_version", "s3v4")
+            # Гарантируем наличие зависимостей выбранного провайдера
+            try:
+                import dependencies
+                dep = await dependencies.ensure_dependencies_async(storage_provider)
+                if not dep.get("success"):
+                    return {
+                        "success": False,
+                        "error": "Не удалось установить зависимости: " + ", ".join(dep.get("missing", [])),
+                    }
+            except Exception as e:
+                logger.warning(f"Dependency check failed: {e}")
 
-                # Перекрытие из kwargs (если пришли не пустые значения)
-                if kwargs.get("bucket"):
-                    s3_bucket = kwargs.get("bucket")
-                if kwargs.get("endpoint"):
-                    s3_endpoint = kwargs.get("endpoint")
-                if kwargs.get("region"):
-                    s3_region = kwargs.get("region")
-                if kwargs.get("access_key"):
-                    s3_access_key = kwargs.get("access_key")
-                if kwargs.get("secret_key"):
-                    s3_secret_key = kwargs.get("secret_key")
-                if "path_style" in kwargs:
-                    s3_path_style = bool(kwargs.get("path_style"))
-                if kwargs.get("signature_version"):
-                    s3_signature_version = kwargs.get("signature_version")
+            provider_obj, error = _build_provider(config)
+            if error:
+                return {"success": False, "error": error}
 
-                if not s3_bucket:
-                    return {"success": False, "error": "Не указан bucket для S3"}
-                if not s3_access_key or not s3_secret_key:
-                    return {"success": False, "error": "Не указаны Access Key / Secret Key для S3"}
-
-                from s3_provider import S3Provider
-
-                provider_obj = S3Provider(
-                    endpoint=s3_endpoint,
-                    region=s3_region,
-                    bucket=s3_bucket,
-                    access_key=s3_access_key,
-                    secret_key=s3_secret_key,
-                    path_style=s3_path_style,
-                    signature_version=s3_signature_version,
-                )
-                return provider_obj.test_connection()
-
-            # WebDAV по умолчанию
-            from webdav_provider import WebDAVProvider
-            
-            logger.info(f"[test_storage_connection] Using URL='{url}' username='{username}' oauth_token_len={len(oauth_token or '')}")
-            
-            if not url:
-                return {"success": False, "error": "Не указан URL (проверьте, что поле WebDAV URL заполнено и без пробелов)"}
-            
-            if not oauth_token and (not username or not password):
-                return {"success": False, "error": "Не указаны логин/пароль или OAuth токен"}
-            
-            provider_obj = WebDAVProvider(url=url, username=username, password=password, oauth_token=oauth_token)
-            result = provider_obj.test_connection()
-            return result
+            return provider_obj.test_connection()
         except Exception as e:
             logger.error(f"Error testing storage connection: {e}")
             return {"success": False, "error": str(e)}

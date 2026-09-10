@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List
-from pathlib import Path
+from typing import Optional, Dict, Any
 
 class StorageProvider(ABC):
     """Базовый класс для провайдеров хранилища"""
     
     @abstractmethod
-    def upload_file(self, file_path: str, remote_path: str = None) -> Optional[str]:
-        """Загрузка файла. Возвращает ID файла или путь"""
+    def upload_file(self, file_path: str, remote_dir: str = None) -> Optional[str]:
+        """Загрузка файла в папку remote_dir. Возвращает путь/ID файла.
+
+        Если remote_dir не задан, используется папка по умолчанию (GameSync).
+        Имя файла берётся из file_path.
+        """
         pass
     
     @abstractmethod
