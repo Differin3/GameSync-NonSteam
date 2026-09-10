@@ -67,9 +67,13 @@ jobs:
     name: Package Decky plugin (zip)
     needs: [backend, frontend]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download frontend build
         uses: actions/download-artifact@v4
@@ -108,3 +112,25 @@ jobs:
         with:
           name: gamesync-nonsteam-${{ github.sha }}
           path: gamesync-nonsteam.zip
+
+      - name: Commit built plugin into repository
+        if: github.event_name == 'push'
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Обновляем распакованную копию плагина в репозитории
+          rm -rf dist-plugin/gamesync-nonsteam
+          mkdir -p dist-plugin
+          unzip -oq gamesync-nonsteam.zip -d dist-plugin
+
+          # -f, потому что dist/ внутри dist-plugin/ игнорируется .gitignore
+          git add -f gamesync-nonsteam.zip dist-plugin
+
+          if git diff --cached --quiet; then
+            echo "Нет изменений для коммита"
+          else
+            git commit -m "chore: update built plugin [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
