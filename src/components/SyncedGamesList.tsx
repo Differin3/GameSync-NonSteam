@@ -1,14 +1,31 @@
 import { useState, useEffect } from "react";
 import { call } from "@decky/api";
-import { PanelSection, PanelSectionRow, ButtonItem, Spinner } from "@decky/ui";
+import { ButtonItem, PanelSection, PanelSectionRow, Spinner } from "@decky/ui";
 import { SyncedGame } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
+import { EmptyState, ErrorState, Loading, StatusMessage } from "./ui";
+import { colors, actionRow } from "../utils/theme";
+
+const formatDate = (isoString: string): string => {
+  try {
+    return new Date(isoString).toLocaleString("ru-RU", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return isoString;
+  }
+};
 
 export function SyncedGamesList() {
   const [syncedGames, setSyncedGames] = useState<SyncedGame[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<{ [key: string]: boolean }>({});
+  const [status, setStatus] = useState<string | null>(null);
 
   const loadSyncedGames = async () => {
     setLoading(true);
@@ -27,45 +44,28 @@ export function SyncedGamesList() {
     }
   };
 
-  const formatDate = (isoString: string) => {
-    try {
-      const date = new Date(isoString);
-      return date.toLocaleString("ru-RU", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-    } catch {
-      return isoString;
-    }
-  };
-
   const resyncGame = async (game: SyncedGame) => {
     setSyncing((prev) => ({ ...prev, [game.gameName]: true }));
+    setStatus(null);
     try {
-      // Получаем пути сохранений для игры
       const scanResult: any = await call("scan_games", {});
       if (scanResult.success && scanResult.games) {
         const gameInfo = scanResult.games.find((g: any) => g.name === game.gameName);
         if (gameInfo && gameInfo.savePaths && gameInfo.savePaths.length > 0) {
-          // Используем глобальные пути из настроек + пути игры
           const settings = loadSettings();
-          const allSavePaths = [...settings.defaultSavePaths, ...gameInfo.savePaths];
-          const uniquePaths = Array.from(new Set(allSavePaths));
-          
-          const syncResult: any = await call("sync_game", {
-            game_name: game.gameName,
-            save_paths: uniquePaths
-          });
+          const uniquePaths = Array.from(new Set([...settings.defaultSavePaths, ...gameInfo.savePaths]));
+          const syncResult: any = await call("sync_game", { game_name: game.gameName, save_paths: uniquePaths });
           if (syncResult.success) {
             await loadSyncedGames();
+          } else {
+            setStatus(syncResult.error || "Ошибка синхронизации");
           }
+        } else {
+          setStatus(`Для «${game.gameName}» не найдены пути сохранений`);
         }
       }
     } catch (err) {
-      console.error("Error resyncing game:", err);
+      setStatus(`Ошибка: ${err}`);
     } finally {
       setSyncing((prev) => ({ ...prev, [game.gameName]: false }));
     }
@@ -76,41 +76,15 @@ export function SyncedGamesList() {
   }, []);
 
   if (loading) {
-    return (
-      <PanelSection title="Синхронизированные игры">
-        <PanelSectionRow>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <Spinner />
-            <span>Загрузка...</span>
-          </div>
-        </PanelSectionRow>
-      </PanelSection>
-    );
+    return <Loading text="Загрузка списка синхронизаций..." />;
   }
 
   if (error) {
-    return (
-      <PanelSection title="Синхронизированные игры">
-        <PanelSectionRow>
-          <div style={{ color: "red" }}>{error}</div>
-        </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={loadSyncedGames}>
-            Повторить
-          </ButtonItem>
-        </PanelSectionRow>
-      </PanelSection>
-    );
+    return <ErrorState text={error} onRetry={loadSyncedGames} />;
   }
 
   if (syncedGames.length === 0) {
-    return (
-      <PanelSection title="Синхронизированные игры">
-        <PanelSectionRow>
-          <div style={{ color: "#888" }}>Нет синхронизированных игр</div>
-        </PanelSectionRow>
-      </PanelSection>
-    );
+    return <EmptyState text="Синхронизированных игр пока нет" />;
   }
 
   return (
@@ -121,34 +95,35 @@ export function SyncedGamesList() {
         </ButtonItem>
       </PanelSectionRow>
 
+      {status && (
+        <PanelSectionRow>
+          <StatusMessage tone="error">{status}</StatusMessage>
+        </PanelSectionRow>
+      )}
+
       {syncedGames.map((game, index) => {
         const isSyncing = syncing[game.gameName];
-
         return (
-          <PanelSection key={index} title={game.gameName}>
-            <PanelSectionRow>
-              <div style={{ fontSize: "12px", color: "#888" }}>
-                Последняя синхронизация: {formatDate(game.lastSync)}
+          <PanelSectionRow key={index}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>{game.gameName}</span>
+                <span style={{ fontSize: "11px", color: colors.dim }}>{formatDate(game.lastSync)}</span>
               </div>
-            </PanelSectionRow>
-
-            <PanelSectionRow>
-              <ButtonItem
-                layout="below"
-                onClick={() => resyncGame(game)}
-                disabled={isSyncing}
-              >
-                {isSyncing ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <Spinner />
-                    <span>Синхронизация...</span>
-                  </div>
-                ) : (
-                  "Повторить синхронизацию"
-                )}
-              </ButtonItem>
-            </PanelSectionRow>
-          </PanelSection>
+              <div style={actionRow}>
+                <ButtonItem layout="below" onClick={() => resyncGame(game)} disabled={isSyncing}>
+                  {isSyncing ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
+                      <Spinner />
+                      <span>Синхронизация…</span>
+                    </span>
+                  ) : (
+                    "Синхронизировать снова"
+                  )}
+                </ButtonItem>
+              </div>
+            </div>
+          </PanelSectionRow>
         );
       })}
     </PanelSection>
