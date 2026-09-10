@@ -2,8 +2,10 @@ export type WebDAVProviderType = 'custom' | 'nextcloud' | 'yandex' | 'box' | 'ow
 
 export type S3ProviderType = 'custom' | 'yandex' | 'vk' | 'cloudru' | 'aws' | 'backblaze' | 'wasabi' | 'digitalocean';
 
+export type StorageProviderType = 'webdav' | 's3' | 'ftp' | 'sftp';
+
 export interface Settings {
-  storageProvider: 'webdav' | 's3';
+  storageProvider: StorageProviderType;
   // WebDAV
   webdavProvider: WebDAVProviderType;
   webdavUrl: string;
@@ -19,6 +21,20 @@ export interface Settings {
   s3SecretKey: string;
   s3PathStyle: boolean;
   s3SignatureVersion: string;
+  // FTP / FTPS
+  ftpHost: string;
+  ftpPort: string;
+  ftpUsername: string;
+  ftpPassword: string;
+  ftpUseTls: boolean;
+  ftpPassive: boolean;
+  // SFTP
+  sftpHost: string;
+  sftpPort: string;
+  sftpUsername: string;
+  sftpPassword: string;
+  sftpKeyPath: string;
+  sftpKeyPassphrase: string;
   // Общие
   autoSync: boolean;
   defaultSavePaths: string[];
@@ -58,6 +74,18 @@ export const DEFAULT_SETTINGS: Settings = {
   s3SecretKey: "",
   s3PathStyle: false,
   s3SignatureVersion: "s3v4",
+  ftpHost: "",
+  ftpPort: "21",
+  ftpUsername: "",
+  ftpPassword: "",
+  ftpUseTls: false,
+  ftpPassive: true,
+  sftpHost: "",
+  sftpPort: "22",
+  sftpUsername: "",
+  sftpPassword: "",
+  sftpKeyPath: "",
+  sftpKeyPassphrase: "",
   autoSync: false,
   defaultSavePaths: []
 };

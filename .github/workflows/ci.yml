@@ -10,10 +10,34 @@ on:
       - main
       - master
 
-jobs:
-  build-and-package:
-    runs-on: ubuntu-latest
+permissions:
+  contents: read
 
+jobs:
+  backend:
+    name: Backend checks (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linters
+        run: python -m pip install --upgrade pip pyflakes==3.2.0
+
+      - name: Syntax check (compileall)
+        run: python -m compileall -q backend main.py
+
+      - name: Static analysis (pyflakes)
+        run: python -m pyflakes backend main.py
+
+  frontend:
+    name: Frontend checks (lint + build)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,6 +46,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -32,7 +57,27 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Package Decky plugin (zip)
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+  package:
+    name: Package Decky plugin (zip)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Package plugin
         run: |
           set -e
           PLUGIN_DIR="gamesync-nonsteam"
@@ -53,6 +98,9 @@ jobs:
             cp install_plugin.sh "$PLUGIN_DIR"/
           fi
 
+          # Не тащим кэш Python в архив
+          find "$PLUGIN_DIR" -name "__pycache__" -type d -prune -exec rm -rf {} +
+
           zip -r "${PLUGIN_DIR}.zip" "$PLUGIN_DIR"
 
       - name: Upload plugin artifact
@@ -60,4 +108,3 @@ jobs:
         with:
           name: gamesync-nonsteam-${{ github.sha }}
           path: gamesync-nonsteam.zip
-

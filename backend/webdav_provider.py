@@ -53,16 +53,14 @@ class WebDAVProvider(StorageProvider):
             logger.warning(f"Error ensuring folder {folder_path}: {e}")
             return False
     
-    def upload_file(self, file_path: str, remote_path: str = None) -> Optional[str]:
-        """Загрузка файла на WebDAV"""
+    def upload_file(self, file_path: str, remote_dir: str = None) -> Optional[str]:
+        """Загрузка файла на WebDAV в папку remote_dir (по умолчанию GameSync)"""
         try:
             file_name = Path(file_path).name
-            if remote_path:
-                remote_file_path = remote_path
-            else:
-                # Создаем папку GameSync если нужно
-                self._ensure_folder(self.folder_name)
-                remote_file_path = f"{self.folder_name}/{file_name}"
+            directory = (remote_dir or self.folder_name).strip("/")
+            # Создаем папку назначения, если нужно
+            self._ensure_folder(directory)
+            remote_file_path = f"{directory}/{file_name}"
             
             full_path = self._get_full_path(remote_file_path)
             headers = self._get_headers()

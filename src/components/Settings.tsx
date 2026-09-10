@@ -26,7 +26,7 @@ export function Settings() {
           const config = result.config;
           setSettings(prev => ({
             ...prev,
-            storageProvider: (config.provider === 's3' || config.provider === 'webdav') ? config.provider : 'webdav',
+            storageProvider: ['s3', 'webdav', 'ftp', 'sftp'].includes(config.provider) ? config.provider : 'webdav',
             webdavProvider: (config.webdav_provider && ['custom', 'nextcloud', 'yandex', 'box', 'owncloud'].includes(config.webdav_provider)) 
               ? (config.webdav_provider as WebDAVProviderType) 
               : (prev.webdavProvider || 'custom'),
@@ -43,7 +43,19 @@ export function Settings() {
             s3AccessKey: config.access_key || prev.s3AccessKey || '',
             s3SecretKey: config.secret_key || prev.s3SecretKey || '',
             s3PathStyle: typeof config.path_style === 'boolean' ? config.path_style : (prev.s3PathStyle ?? false),
-            s3SignatureVersion: config.signature_version || prev.s3SignatureVersion || 's3v4'
+            s3SignatureVersion: config.signature_version || prev.s3SignatureVersion || 's3v4',
+            ftpHost: config.provider === 'ftp' ? (config.host || '') : (prev.ftpHost || ''),
+            ftpPort: config.provider === 'ftp' ? String(config.port ?? prev.ftpPort ?? '21') : (prev.ftpPort || '21'),
+            ftpUsername: config.provider === 'ftp' ? (config.username || '') : (prev.ftpUsername || ''),
+            ftpPassword: config.provider === 'ftp' ? (config.password || '') : (prev.ftpPassword || ''),
+            ftpUseTls: config.provider === 'ftp' ? !!config.use_tls : (prev.ftpUseTls ?? false),
+            ftpPassive: config.provider === 'ftp' ? (config.passive ?? true) : (prev.ftpPassive ?? true),
+            sftpHost: config.provider === 'sftp' ? (config.host || '') : (prev.sftpHost || ''),
+            sftpPort: config.provider === 'sftp' ? String(config.port ?? prev.sftpPort ?? '22') : (prev.sftpPort || '22'),
+            sftpUsername: config.provider === 'sftp' ? (config.username || '') : (prev.sftpUsername || ''),
+            sftpPassword: config.provider === 'sftp' ? (config.password || '') : (prev.sftpPassword || ''),
+            sftpKeyPath: config.provider === 'sftp' ? (config.key_path || '') : (prev.sftpKeyPath || ''),
+            sftpKeyPassphrase: config.provider === 'sftp' ? (config.key_passphrase || '') : (prev.sftpKeyPassphrase || '')
           }));
         }
       } catch (error) {
@@ -101,27 +113,53 @@ export function Settings() {
   const saveStorageConfig = async (customSettings?: Settings) => {
     try {
       const settingsToSave = customSettings || settings;
-      const result: any = await call("save_storage_config", {
-        provider: settingsToSave.storageProvider,
-        ...(settingsToSave.storageProvider === 'webdav'
-          ? {
-              url: settingsToSave.webdavUrl,
-              username: settingsToSave.webdavUsername,
-              password: settingsToSave.webdavPassword,
-              oauth_token: settingsToSave.webdavOAuthToken,
-              webdav_provider: settingsToSave.webdavProvider
-            }
-          : {
-              s3_provider: settingsToSave.s3Provider,
-              endpoint: settingsToSave.s3Endpoint,
-              region: settingsToSave.s3Region,
-              bucket: settingsToSave.s3Bucket,
-              access_key: settingsToSave.s3AccessKey,
-              secret_key: settingsToSave.s3SecretKey,
-              path_style: settingsToSave.s3PathStyle,
-              signature_version: settingsToSave.s3SignatureVersion
-            })
-      });
+      const provider = settingsToSave.storageProvider;
+      let payload: any = { provider };
+
+      if (provider === 'webdav') {
+        payload = {
+          ...payload,
+          url: settingsToSave.webdavUrl,
+          username: settingsToSave.webdavUsername,
+          password: settingsToSave.webdavPassword,
+          oauth_token: settingsToSave.webdavOAuthToken,
+          webdav_provider: settingsToSave.webdavProvider
+        };
+      } else if (provider === 's3') {
+        payload = {
+          ...payload,
+          s3_provider: settingsToSave.s3Provider,
+          endpoint: settingsToSave.s3Endpoint,
+          region: settingsToSave.s3Region,
+          bucket: settingsToSave.s3Bucket,
+          access_key: settingsToSave.s3AccessKey,
+          secret_key: settingsToSave.s3SecretKey,
+          path_style: settingsToSave.s3PathStyle,
+          signature_version: settingsToSave.s3SignatureVersion
+        };
+      } else if (provider === 'ftp') {
+        payload = {
+          ...payload,
+          host: settingsToSave.ftpHost,
+          port: settingsToSave.ftpPort,
+          username: settingsToSave.ftpUsername,
+          password: settingsToSave.ftpPassword,
+          use_tls: settingsToSave.ftpUseTls,
+          passive: settingsToSave.ftpPassive
+        };
+      } else if (provider === 'sftp') {
+        payload = {
+          ...payload,
+          host: settingsToSave.sftpHost,
+          port: settingsToSave.sftpPort,
+          username: settingsToSave.sftpUsername,
+          password: settingsToSave.sftpPassword,
+          key_path: settingsToSave.sftpKeyPath,
+          key_passphrase: settingsToSave.sftpKeyPassphrase
+        };
+      }
+
+      const result: any = await call("save_storage_config", payload);
       if (result.success) {
         setTestResult("✓ Настройки сохранены");
       } else {
@@ -140,7 +178,7 @@ export function Settings() {
           <ButtonItem
             layout="below"
             onClick={async () => {
-              const newSettings = { ...settings, storageProvider: 'webdav' };
+              const newSettings: Settings = { ...settings, storageProvider: 'webdav' };
               setSettings(newSettings);
               setTimeout(async () => {
                 await saveStorageConfig(newSettings);
@@ -155,7 +193,7 @@ export function Settings() {
           <ButtonItem
             layout="below"
             onClick={async () => {
-              const newSettings = { ...settings, storageProvider: 's3' };
+              const newSettings: Settings = { ...settings, storageProvider: 's3' };
               setSettings(newSettings);
               setTimeout(async () => {
                 await saveStorageConfig(newSettings);
@@ -164,6 +202,36 @@ export function Settings() {
             disabled={settings.storageProvider === 's3'}
           >
             {settings.storageProvider === 's3' ? '✓ S3 (Object Storage)' : 'S3 (Object Storage)'}
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={async () => {
+              const newSettings: Settings = { ...settings, storageProvider: 'ftp' };
+              setSettings(newSettings);
+              setTimeout(async () => {
+                await saveStorageConfig(newSettings);
+              }, 100);
+            }}
+            disabled={settings.storageProvider === 'ftp'}
+          >
+            {settings.storageProvider === 'ftp' ? '✓ FTP / FTPS' : 'FTP / FTPS'}
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={async () => {
+              const newSettings: Settings = { ...settings, storageProvider: 'sftp' };
+              setSettings(newSettings);
+              setTimeout(async () => {
+                await saveStorageConfig(newSettings);
+              }, 100);
+            }}
+            disabled={settings.storageProvider === 'sftp'}
+          >
+            {settings.storageProvider === 'sftp' ? '✓ SFTP' : 'SFTP'}
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
@@ -222,7 +290,7 @@ export function Settings() {
                 <div><strong>1. Basic-аутентификация:</strong> Логин и пароль приложения (проще)</div>
                 <div><strong>2. OAuth-токен:</strong> Токен из oauth.yandex.ru (безопаснее)</div>
                 <div style={{ marginTop: "8px", fontSize: "10px" }}>
-                  Для Basic: создайте пароль приложения с типом "Файлы" в настройках Яндекс ID
+                  Для Basic: создайте пароль приложения с типом «Файлы» в настройках Яндекс ID
                 </div>
               </div>
             </PanelSectionRow>
@@ -466,11 +534,231 @@ export function Settings() {
       </PanelSection>
       )}
 
+      {/* FTP / FTPS Settings Section */}
+      {settings.storageProvider === 'ftp' && (
+      <PanelSection title="FTP / FTPS Settings">
+        <PanelSectionRow>
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
+            FTP — обычный файловый сервер. Включите TLS для FTPS (шифрованное соединение, обычно порт 21).
+          </div>
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Хост"
+            value={settings.ftpHost || ""}
+            onChange={(e) => setSettings({ ...settings, ftpHost: e.target.value })}
+            description="Адрес FTP-сервера, например ftp.example.com"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Порт"
+            value={settings.ftpPort || ""}
+            onChange={(e) => setSettings({ ...settings, ftpPort: e.target.value })}
+            description="Порт FTP (по умолчанию 21)"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Логин"
+            value={settings.ftpUsername || ""}
+            onChange={(e) => setSettings({ ...settings, ftpUsername: e.target.value })}
+            description="Имя пользователя FTP"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Пароль"
+            value={settings.ftpPassword || ""}
+            onChange={(e) => setSettings({ ...settings, ftpPassword: e.target.value })}
+            description="Пароль FTP"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <ToggleField
+            label="Использовать TLS (FTPS)"
+            description="Включите, если сервер поддерживает FTPS"
+            checked={settings.ftpUseTls}
+            onChange={(value) => setSettings({ ...settings, ftpUseTls: value })}
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <ToggleField
+            label="Пассивный режим (PASV)"
+            description="Обычно должен быть включён"
+            checked={settings.ftpPassive}
+            onChange={(value) => setSettings({ ...settings, ftpPassive: value })}
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={async () => {
+            setTesting(true);
+            setTestResult(null);
+            try {
+              const result: any = await call("test_storage_connection", {
+                provider: 'ftp',
+                host: settings.ftpHost,
+                port: settings.ftpPort,
+                username: settings.ftpUsername,
+                password: settings.ftpPassword,
+                use_tls: settings.ftpUseTls,
+                passive: settings.ftpPassive
+              });
+              if (result.success) {
+                setTestResult(`✓ ${result.message || "Подключение успешно"}`);
+              } else {
+                setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
+              }
+            } catch (error: any) {
+              setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
+            } finally {
+              setTesting(false);
+            }
+          }} disabled={testing || !settings.ftpHost}>
+            {testing ? "Тестирование..." : "Тест подключения FTP"}
+          </ButtonItem>
+        </PanelSectionRow>
+
+        {testResult && (
+          <PanelSectionRow>
+            <div
+              style={{
+                padding: "10px",
+                backgroundColor: testResult.startsWith("✓") ? "#0a4a0a" : "#4a0a0a",
+                color: "#fff",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              {testResult}
+            </div>
+          </PanelSectionRow>
+        )}
+      </PanelSection>
+      )}
+
+      {/* SFTP Settings Section */}
+      {settings.storageProvider === 'sftp' && (
+      <PanelSection title="SFTP Settings">
+        <PanelSectionRow>
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
+            SFTP — передача файлов поверх SSH. Авторизация по паролю или по приватному ключу.
+          </div>
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Хост"
+            value={settings.sftpHost || ""}
+            onChange={(e) => setSettings({ ...settings, sftpHost: e.target.value })}
+            description="Адрес SFTP-сервера, например sftp.example.com"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Порт"
+            value={settings.sftpPort || ""}
+            onChange={(e) => setSettings({ ...settings, sftpPort: e.target.value })}
+            description="Порт SSH/SFTP (по умолчанию 22)"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Логин"
+            value={settings.sftpUsername || ""}
+            onChange={(e) => setSettings({ ...settings, sftpUsername: e.target.value })}
+            description="Имя пользователя SSH"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Пароль"
+            value={settings.sftpPassword || ""}
+            onChange={(e) => setSettings({ ...settings, sftpPassword: e.target.value })}
+            description="Пароль (можно оставить пустым при использовании ключа)"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Путь к приватному ключу (опционально)"
+            value={settings.sftpKeyPath || ""}
+            onChange={(e) => setSettings({ ...settings, sftpKeyPath: e.target.value })}
+            description="Например /home/deck/.ssh/id_ed25519"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <TextField
+            label="Пароль ключа (опционально)"
+            value={settings.sftpKeyPassphrase || ""}
+            onChange={(e) => setSettings({ ...settings, sftpKeyPassphrase: e.target.value })}
+            description="Passphrase приватного ключа, если он зашифрован"
+          />
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={async () => {
+            setTesting(true);
+            setTestResult(null);
+            try {
+              const result: any = await call("test_storage_connection", {
+                provider: 'sftp',
+                host: settings.sftpHost,
+                port: settings.sftpPort,
+                username: settings.sftpUsername,
+                password: settings.sftpPassword,
+                key_path: settings.sftpKeyPath,
+                key_passphrase: settings.sftpKeyPassphrase
+              });
+              if (result.success) {
+                setTestResult(`✓ ${result.message || "Подключение успешно"}`);
+              } else {
+                setTestResult(`✗ ${result.error || result.message || "Ошибка подключения"}`);
+              }
+            } catch (error: any) {
+              setTestResult(`✗ Ошибка: ${error?.message || String(error)}`);
+            } finally {
+              setTesting(false);
+            }
+          }} disabled={testing || !settings.sftpHost}>
+            {testing ? "Тестирование..." : "Тест подключения SFTP"}
+          </ButtonItem>
+        </PanelSectionRow>
+
+        {testResult && (
+          <PanelSectionRow>
+            <div
+              style={{
+                padding: "10px",
+                backgroundColor: testResult.startsWith("✓") ? "#0a4a0a" : "#4a0a0a",
+                color: "#fff",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              {testResult}
+            </div>
+          </PanelSectionRow>
+        )}
+      </PanelSection>
+      )}
+
       {/* Save Settings Section */}
       <PanelSection title="Сохранение настроек">
         <PanelSectionRow>
           <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>
-            Сохранить текущие параметры выбранного хранилища (WebDAV или S3) в конфиг плагина.
+            Сохранить текущие параметры выбранного хранилища (WebDAV, S3, FTP или SFTP) в конфиг плагина.
           </div>
         </PanelSectionRow>
         <PanelSectionRow>
