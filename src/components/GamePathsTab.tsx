@@ -30,11 +30,11 @@ export function GamePathsTab() {
   const [validating, setValidating] = useState<boolean>(false);
   const [pathValidationResult, setPathValidationResult] = useState<string | null>(null);
 
-  const loadGames = async () => {
+  const loadGames = async (forceRefresh: boolean = false) => {
     setLoading(true);
     setError(null);
     try {
-      const result: any = await call("scan_games", {});
+      const result: any = await call("scan_games", { force_refresh: forceRefresh });
       if (result.success && result.games) {
         setGames(result.games);
       } else {
@@ -151,7 +151,7 @@ export function GamePathsTab() {
     <div>
       <PanelSection title={`Управление путями (${games.length})`}>
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={loadGames} disabled={loading}>
+          <ButtonItem layout="below" onClick={() => loadGames(true)} disabled={loading}>
             Обновить список
           </ButtonItem>
         </PanelSectionRow>

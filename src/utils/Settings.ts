@@ -1,19 +1,18 @@
-export type WebDAVProviderType = 'custom' | 'nextcloud' | 'yandex' | 'box' | 'owncloud';
+import { normalizeWebDAVProviderId } from "./storagePresets";
 
-export type S3ProviderType = 'custom' | 'yandex' | 'vk' | 'cloudru' | 'aws' | 'backblaze' | 'wasabi' | 'digitalocean';
-
-export type StorageProviderType = 'webdav' | 's3' | 'ftp' | 'sftp';
+export type StorageProviderType = "webdav" | "s3" | "ftp" | "sftp";
 
 export interface Settings {
   storageProvider: StorageProviderType;
   // WebDAV
-  webdavProvider: WebDAVProviderType;
+  /** id пресета из storagePresets.ts (mail, yandex, nextcloud, ...). */
+  webdavProvider: string;
   webdavUrl: string;
   webdavUsername: string;
   webdavPassword: string;
   webdavOAuthToken: string; // Для Яндекс Диска через OAuth
   // S3
-  s3Provider: S3ProviderType;
+  s3Provider: string;
   s3Endpoint: string;
   s3Region: string;
   s3Bucket: string;
@@ -40,33 +39,16 @@ export interface Settings {
   defaultSavePaths: string[];
 }
 
-export const WEBDAV_PROVIDERS: Record<WebDAVProviderType, { name: string; url: string; description: string }> = {
-  custom: { name: 'Другой', url: '', description: 'Введите URL вручную' },
-  nextcloud: { name: 'Nextcloud', url: 'https://nextcloud.com/remote.php/dav/files/USERNAME/', description: 'Бесплатный облачный хостинг' },
-  yandex: { name: 'Яндекс Диск', url: 'https://webdav.yandex.ru', description: '10GB бесплатно, Basic или OAuth' },
-  box: { name: 'Box', url: 'https://dav.box.com/dav/', description: 'Корпоративное хранилище' },
-  owncloud: { name: 'ownCloud', url: 'https://your-server.com/remote.php/dav/files/USERNAME/', description: 'Свой сервер ownCloud' }
-};
-
-export const S3_PROVIDERS: Record<S3ProviderType, { name: string; endpoint: string; region: string; pathStyle: boolean }> = {
-  custom: { name: 'Другой S3', endpoint: '', region: 'us-east-1', pathStyle: false },
-  yandex: { name: 'Yandex Object Storage', endpoint: 'https://storage.yandexcloud.net', region: 'ru-central1', pathStyle: false },
-  vk: { name: 'VK Cloud', endpoint: 'https://s3.mcs.mail.ru', region: 'ru-1', pathStyle: true },
-  cloudru: { name: 'Cloud.ru', endpoint: 'https://s3.cloud.ru', region: 'ru-central1', pathStyle: true },
-  aws: { name: 'AWS S3', endpoint: 'https://s3.amazonaws.com', region: 'us-east-1', pathStyle: false },
-  backblaze: { name: 'Backblaze B2', endpoint: 'https://s3.us-west-004.backblazeb2.com', region: 'us-west-004', pathStyle: true },
-  wasabi: { name: 'Wasabi', endpoint: 'https://s3.wasabisys.com', region: 'us-east-1', pathStyle: true },
-  digitalocean: { name: 'DigitalOcean Spaces', endpoint: 'https://nyc3.digitaloceanspaces.com', region: 'nyc3', pathStyle: true }
-};
-
 export const DEFAULT_SETTINGS: Settings = {
-  storageProvider: 'webdav',
-  webdavProvider: 'custom',
-  webdavUrl: "",
+  storageProvider: "webdav",
+  // По умолчанию — самый доступный бесплатный вариант для русскоязычного
+  // пользователя: Облако Mail.ru. URL подставляется автоматически.
+  webdavProvider: "mail",
+  webdavUrl: "https://webdav.cloud.mail.ru",
   webdavUsername: "",
   webdavPassword: "",
   webdavOAuthToken: "",
-  s3Provider: 'custom',
+  s3Provider: "custom",
   s3Endpoint: "",
   s3Region: "us-east-1",
   s3Bucket: "",
@@ -87,29 +69,51 @@ export const DEFAULT_SETTINGS: Settings = {
   sftpKeyPath: "",
   sftpKeyPassphrase: "",
   autoSync: false,
-  defaultSavePaths: []
+  defaultSavePaths: [],
 };
 
-const SETTINGS_CHANGE_EVENT = 'gamesync-settings-change';
+/** Поля с секретами: их нельзя держать в localStorage (он виден любому скрипту Steam). */
+const SECRET_FIELDS: (keyof Settings)[] = [
+  "webdavPassword",
+  "webdavOAuthToken",
+  "s3SecretKey",
+  "ftpPassword",
+  "sftpPassword",
+  "sftpKeyPassphrase",
+];
+
+const SETTINGS_KEY = "gamesyncSettings";
+const SETTINGS_CHANGE_EVENT = "gamesync-settings-change";
 
 export function loadSettings(): Settings {
   try {
-    const saved = localStorage.getItem('gamesyncSettings');
+    const saved = localStorage.getItem(SETTINGS_KEY);
     if (saved) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved) as Partial<Settings>;
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        webdavProvider: normalizeWebDAVProviderId(parsed.webdavProvider ?? DEFAULT_SETTINGS.webdavProvider),
+      };
     }
   } catch (error) {
-    console.error('Failed to load settings:', error);
+    console.error("Failed to load settings:", error);
   }
   return DEFAULT_SETTINGS;
 }
 
 export function saveSettings(settings: Settings): void {
   try {
-    localStorage.setItem('gamesyncSettings', JSON.stringify(settings));
+    // Секреты живут только в конфиге бэкенда (~/.config/gamesync, права 0600),
+    // а в localStorage остаётся всё остальное — чтобы не терять пути и провайдера.
+    const persisted: Settings = { ...settings };
+    for (const field of SECRET_FIELDS) {
+      (persisted as unknown as Record<string, unknown>)[field] = "";
+    }
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(persisted));
     window.dispatchEvent(new CustomEvent(SETTINGS_CHANGE_EVENT, { detail: settings }));
   } catch (error) {
-    console.error('Failed to save settings:', error);
+    console.error("Failed to save settings:", error);
   }
 }
 
