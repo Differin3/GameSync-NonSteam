@@ -1,11 +1,33 @@
 import decky
 import os
 import asyncio
+import functools
 from pathlib import Path
 from typing import Dict, Any, List
 
 # Используем логгер Decky Loader
 logger = decky.logger
+
+
+def decky_params(func):
+    """Нормализует аргументы вызова из фронтенда.
+
+    Decky передаёт аргументы позиционно (``method(*args)``), а фронтенд
+    вызывает методы одним объектом: ``call("sync_game", {game_name, save_paths})``.
+    Без нормализации такой объект попадает в первый позиционный параметр
+    целиком, и метод получает dict вместо значений. Здесь единственный
+    dict из аргументов распаковывается в именованные параметры.
+    """
+
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], dict):
+            merged = dict(kwargs)
+            merged.update(args[0])
+            return await func(self, **merged)
+        return await func(self, *args, **kwargs)
+
+    return wrapper
 
 try:
     from portproton_scanner import scan_portproton_games
@@ -167,6 +189,7 @@ class Plugin:
         except Exception as e:
             logger.warning(f"Dependency bootstrap failed: {e}")
 
+    @decky_params
     async def install_dependencies(self, *args, **kwargs) -> Dict[str, Any]:
         """Ручной повторный запуск установки зависимостей (на случай сбоя сети)."""
         try:
@@ -185,6 +208,7 @@ class Plugin:
             logger.error(f"Error stopping game monitor: {e}")
         logger.info("GameSync NonSteam plugin unloaded")
 
+    @decky_params
     async def get_test(self, *args, **kwargs) -> Dict[str, Any]:
         """Тестовый метод для проверки связи с фронтендом"""
         try:
@@ -193,6 +217,7 @@ class Plugin:
             logger.error(f"Error in get_test: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def scan_games(self, force_refresh: bool = False, *args, **kwargs) -> Dict[str, Any]:
         """Сканирование игр PortProton"""
         try:
@@ -219,6 +244,7 @@ class Plugin:
             logger.error(f"Error scanning games: {e}")
             return {"success": False, "error": str(e), "games": []}
     
+    @decky_params
     async def sync_game(self, game_name: str = None, save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:
         """Синхронизация игры"""
         try:
@@ -318,6 +344,7 @@ class Plugin:
             logger.error(f"Error syncing game: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def validate_save_path(self, path: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Валидация пути сохранений"""
         try:
@@ -341,6 +368,7 @@ class Plugin:
             logger.error(f"Error validating path: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def update_game_paths(self, game_name: str = None, save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:
         """Обновление путей сохранений для игры"""
         try:
@@ -376,6 +404,7 @@ class Plugin:
             logger.error(f"Error updating game paths: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def get_game_config(self, game_name: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Получение конфигурации игры"""
         try:
@@ -399,6 +428,7 @@ class Plugin:
             logger.error(f"Error getting game config: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def check_conflicts(self, game_name: str = None, save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:
         """Проверка конфликтов версий файлов"""
         try:
@@ -415,6 +445,7 @@ class Plugin:
             logger.error(f"Error checking conflicts: {e}")
             return {"success": False, "error": str(e), "conflicts": []}
     
+    @decky_params
     async def enable_auto_sync(self, enabled: bool = False, *args, **kwargs) -> Dict[str, Any]:
         """Включение/выключение автосинхронизации"""
         try:
@@ -463,6 +494,7 @@ class Plugin:
             logger.error(f"Error enabling auto-sync: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def get_synced_games(self, *args, **kwargs) -> Dict[str, Any]:
         """Получение списка синхронизированных игр"""
         try:
@@ -481,6 +513,7 @@ class Plugin:
             logger.error(f"Error getting synced games: {e}")
             return {"success": False, "error": str(e), "games": []}
     
+    @decky_params
     async def get_sync_stats(self, *args, **kwargs) -> Dict[str, Any]:
         """Получение статистики синхронизаций"""
         try:
@@ -535,6 +568,7 @@ class Plugin:
             logger.error(f"Error getting sync stats: {e}")
             return {"success": False, "error": str(e), "stats": None}
     
+    @decky_params
     async def save_storage_config(self, provider: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Сохранение конфигурации хранилища"""
         try:
@@ -542,25 +576,6 @@ class Plugin:
 
             logger.info(f"[save_storage_config] Called with provider={provider}, args={len(args)}, kwargs keys: {list(kwargs.keys())}")
 
-            # Decky может передавать параметры:
-            # 1) одним dict в args[0]
-            # 2) одним dict в ПЕРВОМ позиционном параметре (provider)
-            # Приводим всё к kwargs + строковому provider.
-            if isinstance(provider, dict):
-                incoming = dict(provider)
-                merged = dict(kwargs)
-                merged.update(incoming)
-                kwargs = merged
-                provider = incoming.get("provider", "webdav")
-                logger.info(f"[save_storage_config] Normalized dict provider to string '{provider}', kwargs keys now: {list(kwargs.keys())}")
-
-            # Вариант 1: dict в args[0]
-            if args and isinstance(args[0], dict):
-                merged = dict(kwargs)
-                merged.update(args[0])
-                kwargs = merged
-                logger.info(f"[save_storage_config] Merged args[0] into kwargs, keys now: {list(kwargs.keys())}")
-            
             if provider is None:
                 provider = kwargs.get("provider", "webdav")
 
@@ -625,6 +640,7 @@ class Plugin:
             logger.error(f"Error saving storage config: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def load_storage_config(self, *args, **kwargs) -> Dict[str, Any]:
         """Загрузка конфигурации хранилища"""
         try:
@@ -635,6 +651,7 @@ class Plugin:
             logger.error(f"Error loading storage config: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def clear_all_data(self, *args, **kwargs) -> Dict[str, Any]:
         """Полная очистка всех данных плагина (конфигурация, кэш, токены)"""
         try:
@@ -701,34 +718,14 @@ class Plugin:
             logger.error(f"Error clearing all data: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
     
+    @decky_params
     async def test_storage_connection(self, provider: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Тест подключения к хранилищу"""
         try:
             from config_manager import load_storage_config
             
-            logger.info(f"[test_storage_connection] Called with provider={provider}, args={len(args)}, kwargs keys: {list(kwargs.keys())}")
-            logger.info(f"[test_storage_connection] arg types: {[type(a).__name__ for a in args]}")
+            logger.info(f"[test_storage_connection] provider={provider}, kwargs keys={sorted(kwargs.keys())}")
 
-            # Decky может передавать параметры:
-            # 1) одним dict в args[0]
-            # 2) одним dict в ПЕРВОМ позиционном параметре (provider)
-            # Приводим всё к kwargs + строковому provider.
-            if isinstance(provider, dict):
-                logger.info(f"[test_storage_connection] Detected dict provider with keys: {list(provider.keys())}")
-                incoming = dict(provider)
-                merged = dict(kwargs)
-                merged.update(incoming)
-                kwargs = merged
-                provider = incoming.get("provider", "webdav")
-                logger.info(f"[test_storage_connection] Normalized dict provider to string '{provider}', kwargs keys now: {list(kwargs.keys())}")
-
-            # Вариант 1: dict в args[0]
-            if args and isinstance(args[0], dict):
-                logger.info(f"[test_storage_connection] Detected dict in args[0] with keys: {list(args[0].keys())}")
-                merged = dict(kwargs)
-                merged.update(args[0])
-                kwargs = merged
-            
             # Загружаем сохранённый конфиг как базовый
             storage_config = load_storage_config()
 

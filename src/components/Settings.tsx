@@ -1,51 +1,61 @@
 import { useState, useEffect } from "react";
 import { call } from "@decky/api";
 import { PanelSection, PanelSectionRow, TextField, ToggleField, ButtonItem, Dropdown } from "@decky/ui";
+import { loadSettings, saveSettings, Settings, DEFAULT_SETTINGS } from "../utils/Settings";
 import {
-  loadSettings,
-  saveSettings,
-  Settings,
-  WEBDAV_PROVIDERS,
-  WebDAVProviderType,
+  WEBDAV_PRESETS,
   S3_PROVIDERS,
-  S3ProviderType,
-} from "../utils/Settings";
+  detectWebDAVProvider,
+  getWebDAVPreset,
+  normalizeWebDAVProviderId,
+} from "../utils/storagePresets";
 import { Hint, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
-import { colors, actionRow, card } from "../utils/theme";
+import { colors, actionRow, card, dimText } from "../utils/theme";
+
+const STORAGE_OPTIONS = [
+  { data: "webdav", label: "Облако (WebDAV) — рекомендуется" },
+  { data: "sftp", label: "Свой сервер: SFTP" },
+  { data: "ftp", label: "Свой сервер: FTP/FTPS" },
+  { data: "s3", label: "S3: для продвинутых" },
+];
+
+const PROVIDER_OPTIONS = WEBDAV_PRESETS.map((preset) => ({
+  data: preset.id,
+  label: `${preset.name} · ${preset.status}`,
+}));
 
 export function Settings() {
   const [settings, setSettings] = useState<Settings>(loadSettings());
-  const [testing, setTesting] = useState<boolean>(false);
-  const [testResult, setTestResult] = useState<{ tone: Tone; text: string } | null>(null);
+  const [busy, setBusy] = useState<"test" | "save" | null>(null);
+  const [result, setResult] = useState<{ tone: Tone; text: string } | null>(null);
+  const [dirty, setDirty] = useState<boolean>(false);
   const [newPath, setNewPath] = useState<string>("");
   const [validating, setValidating] = useState<boolean>(false);
   const [pathValidationResult, setPathValidationResult] = useState<string | null>(null);
 
-  const update = (patch: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...patch }));
+  const update = (patch: Partial<Settings>) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
+    setDirty(true);
+  };
+
+  const preset = getWebDAVPreset(settings.webdavProvider);
 
   useEffect(() => {
     const loadStorageConfig = async () => {
       try {
-        const result: any = await call("load_storage_config", {});
-        if (result.success && result.config) {
-          const config = result.config;
+        const response: any = await call("load_storage_config", {});
+        if (response?.success && response.config) {
+          const config = response.config;
           setSettings((prev) => ({
             ...prev,
             storageProvider: ["s3", "webdav", "ftp", "sftp"].includes(config.provider) ? config.provider : "webdav",
-            webdavProvider:
-              config.webdav_provider && ["custom", "nextcloud", "yandex", "box", "owncloud"].includes(config.webdav_provider)
-                ? (config.webdav_provider as WebDAVProviderType)
-                : prev.webdavProvider || "custom",
+            webdavProvider: normalizeWebDAVProviderId(config.webdav_provider ?? prev.webdavProvider),
             webdavUrl: config.url || prev.webdavUrl || "",
             webdavUsername: config.username || prev.webdavUsername || "",
             webdavPassword: config.password || prev.webdavPassword || "",
             webdavOAuthToken: config.oauth_token || prev.webdavOAuthToken || "",
-            s3Provider:
-              config.s3_provider &&
-              ["custom", "yandex", "vk", "cloudru", "aws", "backblaze", "wasabi", "digitalocean"].includes(config.s3_provider)
-                ? (config.s3_provider as S3ProviderType)
-                : prev.s3Provider || "custom",
+            s3Provider: S3_PROVIDERS[config.s3_provider] ? config.s3_provider : prev.s3Provider || "custom",
             s3Endpoint: config.endpoint || prev.s3Endpoint || "",
             s3Region: config.region || prev.s3Region || "us-east-1",
             s3Bucket: config.bucket || prev.s3Bucket || "",
@@ -74,6 +84,7 @@ export function Settings() {
     loadStorageConfig();
   }, []);
 
+  // Секреты в localStorage не пишутся (см. saveSettings), остальное — да.
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
@@ -125,33 +136,79 @@ export function Settings() {
     };
   };
 
-  const saveStorageConfig = async (customSettings?: Settings) => {
+  /** Сохраняет конфигурацию на бэкенде. Возвращает текст ошибки или null. */
+  const persist = async (customSettings?: Settings): Promise<string | null> => {
     try {
-      const result: any = await call("save_storage_config", buildPayload(customSettings || settings));
-      setTestResult(
-        result.success
-          ? { tone: "success", text: "Настройки сохранены" }
-          : { tone: "error", text: result.error || "Ошибка сохранения" }
-      );
+      const response: any = await call("save_storage_config", buildPayload(customSettings || settings));
+      if (response?.success) {
+        setDirty(false);
+        return null;
+      }
+      return response?.error || "Ошибка сохранения";
     } catch (error: any) {
-      setTestResult({ tone: "error", text: error?.message || String(error) });
+      return error?.message || String(error);
     }
   };
 
-  const testConnection = async () => {
-    setTesting(true);
-    setTestResult(null);
+  /** Проверяет подключение. Возвращает текст ошибки или null. */
+  const testConnection = async (customSettings?: Settings): Promise<string | null> => {
     try {
-      const result: any = await call("test_storage_connection", buildPayload(settings));
-      setTestResult(
-        result.success
-          ? { tone: "success", text: result.message || "Подключение успешно" }
-          : { tone: "error", text: result.error || result.message || "Ошибка подключения" }
-      );
+      const response: any = await call("test_storage_connection", buildPayload(customSettings || settings));
+      if (response?.success) return null;
+      return response?.error || response?.message || "Ошибка подключения";
     } catch (error: any) {
-      setTestResult({ tone: "error", text: error?.message || String(error) });
+      return error?.message || String(error);
+    }
+  };
+
+  const saveOnly = async () => {
+    setBusy("save");
+    setResult(null);
+    try {
+      const error = await persist();
+      setResult(
+        error
+          ? { tone: "error", text: error }
+          : { tone: "success", text: "Настройки сохранены" }
+      );
     } finally {
-      setTesting(false);
+      setBusy(null);
+    }
+  };
+
+  const saveAndTest = async () => {
+    setBusy("test");
+    setResult(null);
+    try {
+      const testError = await testConnection();
+      if (testError) {
+        setResult({ tone: "error", text: testError });
+        return;
+      }
+      const saveError = await persist();
+      setResult(
+        saveError
+          ? { tone: "warning", text: `Подключение работает, но настройки не сохранились: ${saveError}` }
+          : { tone: "success", text: "Подключение успешно, настройки сохранены" }
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleProviderChange = (id: string) => {
+    const nextPreset = getWebDAVPreset(id);
+    // Для «своего» URL не затираем то, что пользователь уже ввёл.
+    const keepUrl = !nextPreset.url;
+    update({ webdavProvider: id, webdavUrl: keepUrl ? settings.webdavUrl : nextPreset.url });
+  };
+
+  const handleUrlChange = (value: string) => {
+    const detected = detectWebDAVProvider(value);
+    if (detected && detected !== settings.webdavProvider) {
+      update({ webdavUrl: value, webdavProvider: detected });
+    } else {
+      update({ webdavUrl: value });
     }
   };
 
@@ -163,16 +220,16 @@ export function Settings() {
     setValidating(true);
     setPathValidationResult(null);
     try {
-      const result: any = await call("validate_save_path", { path: newPath.trim() });
-      if (result.success && result.path) {
-        if (settings.defaultSavePaths.includes(result.path)) {
+      const response: any = await call("validate_save_path", { path: newPath.trim() });
+      if (response.success && response.path) {
+        if (settings.defaultSavePaths.includes(response.path)) {
           setPathValidationResult("Этот путь уже добавлен");
         } else {
-          update({ defaultSavePaths: [...settings.defaultSavePaths, result.path] });
+          update({ defaultSavePaths: [...settings.defaultSavePaths, response.path] });
           setNewPath("");
         }
       } else {
-        setPathValidationResult(`✗ ${result.error || "Ошибка валидации"}`);
+        setPathValidationResult(`✗ ${response.error || "Ошибка валидации"}`);
       }
     } catch (error) {
       setPathValidationResult(`✗ Ошибка: ${error}`);
@@ -185,55 +242,52 @@ export function Settings() {
     update({ defaultSavePaths: settings.defaultSavePaths.filter((_, i) => i !== index) });
   };
 
-  const storageOptions = [
-    { data: "webdav", label: "WebDAV" },
-    { data: "s3", label: "S3 (Object Storage)" },
-    { data: "ftp", label: "FTP / FTPS" },
-    { data: "sftp", label: "SFTP" },
-  ];
-
   return (
     <div>
-      <PanelSection title="Хранилище">
+      <PanelSection title="Куда сохранять">
         <PanelSectionRow>
           <Dropdown
             menuLabel="Тип хранилища"
-            rgOptions={storageOptions}
+            rgOptions={STORAGE_OPTIONS}
             selectedOption={settings.storageProvider}
-            onChange={(opt) => {
-              const next: Settings = { ...settings, storageProvider: opt.data };
-              setSettings(next);
-              setTimeout(() => saveStorageConfig(next), 100);
-            }}
+            onChange={(option) => update({ storageProvider: option.data as Settings["storageProvider"] })}
           />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <Hint>
+            Облако (WebDAV) — самый простой вариант: два поля и бесплатный тариф. Свой сервер нужен, если у вас NAS
+            или VPS. S3 — для тех, кто уже пользуется объектным хранилищем.
+          </Hint>
         </PanelSectionRow>
       </PanelSection>
 
       {settings.storageProvider === "webdav" && (
-        <PanelSection title="WebDAV">
+        <PanelSection title="Облако (WebDAV)">
           <PanelSectionRow>
             <Dropdown
-              menuLabel="Провайдер"
-              rgOptions={Object.entries(WEBDAV_PROVIDERS).map(([key, provider]) => ({ data: key, label: provider.name }))}
+              menuLabel="Сервис"
+              rgOptions={PROVIDER_OPTIONS}
               selectedOption={settings.webdavProvider}
-              onChange={(opt) => {
-                const key = opt.data as WebDAVProviderType;
-                const next: Settings = {
-                  ...settings,
-                  webdavProvider: key,
-                  webdavUrl: key === "custom" ? settings.webdavUrl : WEBDAV_PROVIDERS[key].url,
-                };
-                setSettings(next);
-                setTimeout(() => saveStorageConfig(next), 100);
-              }}
+              onChange={(option) => handleProviderChange(option.data as string)}
             />
           </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ ...card, display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ fontSize: "12px", color: colors.muted, lineHeight: 1.4 }}>{preset.description}</div>
+              <div style={dimText}>{preset.credentials}</div>
+            </div>
+          </PanelSectionRow>
+          {preset.warning && (
+            <PanelSectionRow>
+              <StatusMessage tone="warning">{preset.warning}</StatusMessage>
+            </PanelSectionRow>
+          )}
           <PanelSectionRow>
             <TextField
               label="URL"
               value={settings.webdavUrl || ""}
-              onChange={(e) => update({ webdavUrl: e.target.value })}
-              description={WEBDAV_PROVIDERS[settings.webdavProvider || "custom"]?.description || "URL WebDAV сервера"}
+              onChange={(e) => handleUrlChange(e.target.value)}
+              description="Подставляется автоматически; можно изменить на свой адрес"
             />
           </PanelSectionRow>
           {settings.webdavProvider === "yandex" && (
@@ -266,7 +320,10 @@ export function Settings() {
             </>
           )}
           <PanelSectionRow>
-            <Hint>Nextcloud, Яндекс Диск, Box, ownCloud и другие WebDAV‑серверы.</Hint>
+            <Hint>
+              Файлы сохраняются в папку GameSync вашего облака — их можно открыть в веб-интерфейсе сервиса.
+              Пароли приложений и токены хранятся только на самом Steam Deck.
+            </Hint>
           </PanelSectionRow>
         </PanelSection>
       )}
@@ -276,22 +333,28 @@ export function Settings() {
           <PanelSectionRow>
             <Dropdown
               menuLabel="Провайдер S3"
-              rgOptions={Object.entries(S3_PROVIDERS).map(([key, provider]) => ({ data: key, label: provider.name }))}
+              rgOptions={Object.entries(S3_PROVIDERS).map(([key, provider]) => ({
+                data: key,
+                label: `${provider.name} · ${provider.status}`,
+              }))}
               selectedOption={settings.s3Provider}
-              onChange={(opt) => {
-                const key = opt.data as S3ProviderType;
-                const preset = S3_PROVIDERS[key];
-                const next: Settings = {
-                  ...settings,
-                  s3Provider: key,
-                  s3Endpoint: preset.endpoint || settings.s3Endpoint,
-                  s3Region: preset.region || settings.s3Region,
-                  s3PathStyle: preset.pathStyle,
-                };
-                setSettings(next);
-                setTimeout(() => saveStorageConfig(next), 100);
+              onChange={(option) => {
+                const presetKey = option.data as string;
+                const selected = S3_PROVIDERS[presetKey];
+                update({
+                  s3Provider: presetKey,
+                  s3Endpoint: selected.endpoint || settings.s3Endpoint,
+                  s3Region: selected.region || settings.s3Region,
+                  s3PathStyle: selected.pathStyle,
+                });
               }}
             />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <Hint>
+              Потребуется создать бакет и Access/Secret ключи в панели провайдера. При первом обращении плагин
+              скачает клиент S3 (~100 МБ), это может занять время.
+            </Hint>
           </PanelSectionRow>
           <PanelSectionRow>
             <TextField label="Bucket" value={settings.s3Bucket || ""} onChange={(e) => update({ s3Bucket: e.target.value })} />
@@ -319,6 +382,9 @@ export function Settings() {
       {settings.storageProvider === "ftp" && (
         <PanelSection title="FTP / FTPS">
           <PanelSectionRow>
+            <Hint>Для домашнего сервера или NAS. FTP без TLS передаёт пароль открытым текстом — включайте TLS, если сервер умеет.</Hint>
+          </PanelSectionRow>
+          <PanelSectionRow>
             <TextField label="Хост" value={settings.ftpHost || ""} onChange={(e) => update({ ftpHost: e.target.value })} description="ftp.example.com" />
           </PanelSectionRow>
           <PanelSectionRow>
@@ -331,16 +397,19 @@ export function Settings() {
             <TextField label="Пароль" value={settings.ftpPassword || ""} onChange={(e) => update({ ftpPassword: e.target.value })} bIsPassword />
           </PanelSectionRow>
           <PanelSectionRow>
-            <ToggleField label="Использовать TLS (FTPS)" checked={settings.ftpUseTls} onChange={(v) => update({ ftpUseTls: v })} />
+            <ToggleField label="Использовать TLS (FTPS)" checked={settings.ftpUseTls} onChange={(value) => update({ ftpUseTls: value })} />
           </PanelSectionRow>
           <PanelSectionRow>
-            <ToggleField label="Пассивный режим (PASV)" checked={settings.ftpPassive} onChange={(v) => update({ ftpPassive: v })} />
+            <ToggleField label="Пассивный режим (PASV)" checked={settings.ftpPassive} onChange={(value) => update({ ftpPassive: value })} />
           </PanelSectionRow>
         </PanelSection>
       )}
 
       {settings.storageProvider === "sftp" && (
         <PanelSection title="SFTP">
+          <PanelSectionRow>
+            <Hint>SSH-доступ к NAS, VPS или домашнему серверу. Пароль или приватный ключ.</Hint>
+          </PanelSectionRow>
           <PanelSectionRow>
             <TextField label="Хост" value={settings.sftpHost || ""} onChange={(e) => update({ sftpHost: e.target.value })} description="sftp.example.com" />
           </PanelSectionRow>
@@ -376,20 +445,25 @@ export function Settings() {
         <PanelSectionRow>
           <div style={actionRow}>
             <div style={{ flex: 1 }}>
-              <ButtonItem layout="below" onClick={testConnection} disabled={testing}>
-                {testing ? "Проверка…" : "Тест подключения"}
+              <ButtonItem layout="below" onClick={saveAndTest} disabled={busy !== null}>
+                {busy === "test" ? "Проверка…" : busy === "save" ? "Сохранение…" : "Проверить и сохранить"}
               </ButtonItem>
             </div>
             <div style={{ flex: 1 }}>
-              <ButtonItem layout="below" onClick={() => saveStorageConfig()}>
+              <ButtonItem layout="below" onClick={saveOnly} disabled={busy !== null}>
                 Сохранить
               </ButtonItem>
             </div>
           </div>
         </PanelSectionRow>
-        {testResult && (
+        {dirty && busy === null && (
           <PanelSectionRow>
-            <StatusMessage tone={testResult.tone}>{testResult.text}</StatusMessage>
+            <Hint>Изменения ещё не сохранены.</Hint>
+          </PanelSectionRow>
+        )}
+        {result && (
+          <PanelSectionRow>
+            <StatusMessage tone={result.tone}>{result.text}</StatusMessage>
           </PanelSectionRow>
         )}
       </PanelSection>
@@ -408,6 +482,9 @@ export function Settings() {
               }
             }}
           />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <Hint>После перезапуска Decky автосинхронизацию нужно включить заново — состояние хранится на бэкенде.</Hint>
         </PanelSectionRow>
       </PanelSection>
 
@@ -460,15 +537,16 @@ export function Settings() {
             onClick={async () => {
               if (!confirm("Удалить все данные плагина? Действие необратимо.")) return;
               try {
-                const result: any = await call("clear_all_data", {});
-                setTestResult(
-                  result.success
-                    ? { tone: "success", text: result.message || "Все данные очищены" }
-                    : { tone: "error", text: result.error || "Ошибка очистки" }
+                const response: any = await call("clear_all_data", {});
+                setResult(
+                  response?.success
+                    ? { tone: "success", text: response.message || "Все данные очищены" }
+                    : { tone: "error", text: response?.error || "Ошибка очистки" }
                 );
-                setSettings(loadSettings());
+                setSettings({ ...DEFAULT_SETTINGS });
+                setDirty(false);
               } catch (error: any) {
-                setTestResult({ tone: "error", text: error?.message || String(error) });
+                setResult({ tone: "error", text: error?.message || String(error) });
               }
             }}
           >

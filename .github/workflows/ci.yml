@@ -105,6 +105,9 @@ jobs:
           # Не тащим кэш Python в архив
           find "$PLUGIN_DIR" -name "__pycache__" -type d -prune -exec rm -rf {} +
 
+          # Пересоздаём архив с нуля: zip -r обновляет существующий файл и
+          # оставляет в нём записи удалённых модулей.
+          rm -f "${PLUGIN_DIR}.zip"
           zip -r "${PLUGIN_DIR}.zip" "$PLUGIN_DIR"
 
       - name: Upload plugin artifact
