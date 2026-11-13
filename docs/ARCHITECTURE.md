@@ -111,6 +111,23 @@ FTP/FTPS или SFTP. Умеет создавать версии бэкапов 
 | `~/.config/gamesync/ludusavi_manifest.yaml` | кэш манифеста Ludusavi (30 дней) |
 | `~/.config/gamesync/cache.json` | кэш сканирования (5 минут) |
 
+## Строка на странице игры
+
+Фича реализована патчем React-дерева страницы игры (`src/patches/appDetailsPatch.tsx`):
+
+1. `routerHook.addPatch("/library/app/:appid", ...)` перехватывает рендер страницы.
+2. `afterPatch` на `routeProps.renderFunc` получает готовое дерево; из него
+   берутся `overview.appid` и контейнер `appDetailsClasses.InnerContainer`.
+3. В контейнер вставляется `GameSyncGameRow` (позиция 2 — между Play и описанием).
+4. Компонент вызывает `get_game_sync_status`: бэкенд сопоставляет игру по appid
+   или названию и отдаёт последнюю синхронизацию из истории бэкапов.
+5. «Синхронизировать» вызывает `sync_game`, «Настроить» открывает маршрут
+   плагина на вкладке «Пути игр».
+
+Защита: `WeakSet` от повторного патча одного `renderFunc`, ключ `gamesync-status-<appid>`
+от дублей при ре-рендерах, `try/catch` вокруг всей инъекции, снятие патчей и
+`unpatch()` в `onDismount`. Если Steam изменит разметку, строка просто не появится —
+плагин продолжит работать.
 ## Автосинхронизация
 
 1. `enable_auto_sync(true)` создаёт `GameMonitor` и сохраняет флаг в `settings.json`.

@@ -594,6 +594,37 @@ class Plugin:
             return {"success": False, "error": str(e)}
     
     @decky_params
+    async def get_game_sync_status(self, appid: int = None, game_name: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Статус синхронизации игры — строка на странице Steam-библиотеки.
+
+        Вызывается патчем страницы игры: по appid ярлыка (или названию) находит
+        игру PortProton и отдаёт последнюю синхронизацию. Для игр, которые
+        плагин не знает, возвращает found=False — патч тогда ничего не рисует.
+        """
+        try:
+            from backup_index import list_for
+            from config_manager import load_storage_config, load_synced_games
+            from game_status import build_game_status, find_game_for_app
+
+            games = await asyncio.to_thread(scan_portproton_games, False)
+            game = find_game_for_app(games, appid, game_name)
+            if not game:
+                return {"success": True, "found": False}
+
+            name = game.get("name") or ""
+            synced = (load_synced_games() or {}).get(name) or {}
+            entries = list_for(name)
+            provider = (load_storage_config() or {}).get("provider") or "webdav"
+
+            status = build_game_status(game, synced, entries, provider)
+            status["success"] = True
+            status["found"] = True
+            return status
+        except Exception as e:
+            logger.error(f"Error getting game sync status: {e}")
+            return {"success": False, "found": False, "error": str(e)}
+
+    @decky_params
     async def get_backups(self, *args, **kwargs) -> Dict[str, Any]:
         """Список бэкапов для вкладки «Бэкапы».
 

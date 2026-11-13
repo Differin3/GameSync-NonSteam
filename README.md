@@ -81,6 +81,7 @@ Python‑зависимости (requests, boto3, paramiko, psutil) плагин
 - Для каждой игры можно настроить пути сохранений
 - Нажмите "Синхронизировать" для загрузки сохранений в облако
 - Каждая синхронизация создаёт версию бэкапа в облаке (последние 10 хранятся в истории)
+- На странице non-Steam игры в библиотеке видна строка GameSync: статус сохранений и кнопка синхронизации
 - Включите автосинхронизацию для автоматической загрузки при выходе из игры (настройка сохраняется после перезапуска Decky)
 
 ### Восстановление сохранений
@@ -210,6 +211,7 @@ is needed the first time.
 - Save paths can be configured for each game
 - Click "Synchronize" to upload saves to cloud
 - Every sync creates a versioned backup (the last 10 are kept in history)
+- Non-Steam game pages in the library show a GameSync row with save status and a sync button
 - Enable auto-sync for automatic upload when exiting game (the setting survives a Decky restart)
 
 ### Restoring saves
