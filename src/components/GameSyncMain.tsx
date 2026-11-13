@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { call } from "@decky/api";
 import { ButtonItem, Field, PanelSection, PanelSectionRow, Router, Spinner } from "@decky/ui";
 import { FaCloud, FaCloudDownloadAlt, FaCog, FaSyncAlt } from "react-icons/fa";
-import { StatusMessage } from "./ui";
+import { Hint, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
 
 interface Summary {
@@ -119,6 +119,10 @@ export function GameSyncMain() {
           <StatusMessage tone={message.tone}>{message.text}</StatusMessage>
         </PanelSectionRow>
       )}
+
+      <PanelSectionRow>
+        <Hint>Пути сохранений и история бэкапов — на полноэкранной странице плагина.</Hint>
+      </PanelSectionRow>
     </PanelSection>
   );
 }
