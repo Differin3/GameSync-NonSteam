@@ -5,7 +5,7 @@ class StorageProvider(ABC):
     """Базовый класс для провайдеров хранилища"""
     
     @abstractmethod
-    def upload_file(self, file_path: str, remote_dir: str = None) -> Optional[str]:
+    def upload_file(self, file_path: str, remote_dir: str = None, remote_name: str = None) -> Optional[str]:
         """Загрузка файла в папку remote_dir. Возвращает путь/ID файла.
 
         Если remote_dir не задан, используется папка по умолчанию (GameSync).

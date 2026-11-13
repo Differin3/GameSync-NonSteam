@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>GameSync — макеты интерфейса</title>
+<style>
+  body{margin:0;background:#0b0f14;color:#dfe8ee;font-family:"Segoe UI",system-ui,Arial,sans-serif}
+  header{padding:28px 40px 10px}
+  h1{font-size:22px;margin:0 0 6px;font-weight:600}
+  p.sub{margin:0;color:#8aa0ae;font-size:13px}
+  main{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:22px 40px 40px}
+  figure{margin:0;background:#12171d;border:1px solid #1e262e;border-radius:10px;overflow:hidden}
+  figure img{display:block;width:100%;height:auto}
+  figcaption{padding:10px 14px 12px;font-size:12.5px;color:#a9bcc7;display:flex;gap:8px;align-items:center}
+  figcaption b{color:#eaf1f5;font-weight:600}
+  .full{grid-column:1 / -1}
+</style>
+</head>
+<body>
+<header>
+  <h1>GameSync — макеты интерфейса</h1>
+  <p class="sub">Steam Deck, 1280×800. Макеты отражают текущий экран плагина и концепт значка на странице non-Steam игры.</p>
+</header>
+<main>
+  <figure class="full">
+    <a href="shots/01-qam.png"><img src="shots/01-qam.png" alt="Боковое меню"></a>
+    <figcaption><b>1. Боковое меню (QAM)</b> — плагин открыт в Decky: статус подключения, кнопка настроек, синхронизированные и найденные игры</figcaption>
+  </figure>
+  <figure>
+    <a href="shots/02-settings-main.png"><img src="shots/02-settings-main.png" alt="Настройки: Основные"></a>
+    <figcaption><b>2. Настройки → Основные</b> — выбор хранилища, пресет, проверка и сохранение</figcaption>
+  </figure>
+  <figure>
+    <a href="shots/03-settings-paths.png"><img src="shots/03-settings-paths.png" alt="Настройки: Пути игр"></a>
+    <figcaption><b>3. Настройки → Пути игр</b> — пути, исключения, найденные кандидаты</figcaption>
+  </figure>
+  <figure>
+    <a href="shots/04-settings-stats.png"><img src="shots/04-settings-stats.png" alt="Настройки: Статистика"></a>
+    <figcaption><b>4. Настройки → Статистика</b> — сводные цифры, график по датам</figcaption>
+  </figure>
+  <figure>
+    <a href="shots/06-settings-backups.png"><img src="shots/06-settings-backups.png" alt="Настройки: Бэкапы"></a>
+    <figcaption><b>5. Настройки → Бэкапы</b> — список сохранений в облаке и восстановление в один клик</figcaption>
+  </figure>
+  <figure>
+    <a href="shots/07-restore-confirm.png"><img src="shots/07-restore-confirm.png" alt="Подтверждение восстановления"></a>
+    <figcaption><b>6. Подтверждение восстановления</b> — модальное окно с предупреждением о перезаписи</figcaption>
+  </figure>
+  <figure>
+    <a href="shots/05-game-page.png"><img src="shots/05-game-page.png" alt="Страница non-Steam игры"></a>
+    <figcaption><b>7. Концепт: страница non-Steam игры</b> — значок на плитке и блок GameSync со статусом сейвов</figcaption>
+  </figure>
+</main>
+</body>
+</html>

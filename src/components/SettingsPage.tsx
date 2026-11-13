@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { Tabs } from "@decky/ui";
 import { Settings } from "./Settings";
 import { GamePathsTab } from "./GamePathsTab";
+import { BackupsTab } from "./BackupsTab";
 import { StatsTab } from "./StatsTab";
 
 enum SettingsTab {
   MAIN = "main",
   GAME_PATHS = "game_paths",
+  BACKUPS = "backups",
   STATS = "stats",
 }
 
@@ -16,7 +18,7 @@ export function SettingsPage() {
   useEffect(() => {
     const handleTabSwitch = (event: CustomEvent) => {
       const tab = event.detail;
-      if (tab === "game_paths" || tab === "main" || tab === "stats") {
+      if (tab === "game_paths" || tab === "main" || tab === "stats" || tab === "backups") {
         setCurrentTab(tab);
       }
     };
@@ -41,6 +43,11 @@ export function SettingsPage() {
           id: SettingsTab.GAME_PATHS,
           title: "Пути игр",
           content: <GamePathsTab />,
+        },
+        {
+          id: SettingsTab.BACKUPS,
+          title: "Бэкапы",
+          content: <BackupsTab />,
         },
         {
           id: SettingsTab.STATS,

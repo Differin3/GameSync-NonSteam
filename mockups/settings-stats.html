@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>GameSync — настройки: Статистика</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="screen" style="background:linear-gradient(180deg,#10151b,#0a0d11)">
+  <div class="topbar">
+    <div class="back"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></div>
+    <h1>GameSync NonSteam</h1>
+    <span class="crumb">· плагин Decky Loader</span>
+  </div>
+
+  <nav class="tabbar">
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+      Основные
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8z"/></svg>
+      Пути игр
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.6l3.3-3.3 1.4 1.4L12 17.4l-4.7-4.7 1.4-1.4L12 13.6V3zM5 19h14v2H5z"/></svg>
+      Бэкапы
+    </div>
+    <div class="tab active">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 21h3V9H5v12zM10.5 21h3V3h-3v18zM16 21h3v-8h-3v8z"/></svg>
+      Статистика
+    </div>
+  </nav>
+
+  <main class="content">
+    <div class="wrap">
+
+      <div class="stats-grid">
+        <div class="stat"><div class="k">Всего синхронизаций</div><div class="v">42</div><div class="s">за всё время</div></div>
+        <div class="stat"><div class="k">Игр</div><div class="v">7</div><div class="s">в облаке</div></div>
+        <div class="stat"><div class="k">Общий размер</div><div class="v">1,24 ГБ</div><div class="s">в GameSync</div></div>
+        <div class="stat"><div class="k">Последняя</div><div class="v">23:12</div><div class="s">сегодня · Cyberpunk 2077</div></div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-title">Синхронизации по датам</div>
+        <div class="bars">
+          <div class="bar-row"><div class="d">13.11.2026</div><div class="bar" style="width:420px"></div><div class="n">9</div></div>
+          <div class="bar-row"><div class="d">12.11.2026</div><div class="bar" style="width:190px"></div><div class="n">4</div></div>
+          <div class="bar-row"><div class="d">11.11.2026</div><div class="bar" style="width:280px"></div><div class="n">6</div></div>
+          <div class="bar-row"><div class="d">10.11.2026</div><div class="bar" style="width:95px"></div><div class="n">2</div></div>
+          <div class="bar-row"><div class="d">09.11.2026</div><div class="bar" style="width:140px"></div><div class="n">3</div></div>
+          <div class="bar-row"><div class="d">08.11.2026</div><div class="bar" style="width:235px"></div><div class="n">5</div></div>
+        </div>
+        <div class="legend"><span>▌ последние 30 дней</span><span>· всего 42 записи</span></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Последние синхронизации</div>
+        <div class="row"><div class="label">Cyberpunk 2077</div><div class="control value">сегодня, 23:12 · 42,3 МБ</div></div>
+        <div class="row"><div class="label">Baldur's Gate 3</div><div class="control value">вчера, 21:40 · 128,7 МБ</div></div>
+        <div class="row"><div class="label">Dwarf Fortress</div><div class="control value">12.11.2026 · 6,1 МБ</div></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">По играм</div>
+        <div class="row"><div class="label">Cyberpunk 2077</div><div class="control value">640,2 МБ · сегодня</div></div>
+        <div class="row"><div class="label">Baldur's Gate 3</div><div class="control value">412,8 МБ · вчера</div></div>
+        <div class="row"><div class="label">Dwarf Fortress</div><div class="control value">96,4 МБ · 12.11</div></div>
+        <div class="row"><div class="label">Factorio</div><div class="control value">58,1 МБ · 08.11</div></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>
