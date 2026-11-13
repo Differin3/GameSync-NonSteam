@@ -77,6 +77,7 @@ Python‑зависимости (requests, boto3, paramiko, psutil) плагин
 
 ### Использование
 
+- В быстром меню — статус и три действия: «Синхронизировать всё», «Бэкапы и восстановление», «Настройки»
 - Плагин автоматически сканирует игры PortProton
 - Для каждой игры можно настроить пути сохранений
 - Нажмите "Синхронизировать" для загрузки сохранений в облако
@@ -207,6 +208,7 @@ is needed the first time.
 
 ### Usage
 
+- The quick access menu shows status and three actions: "Sync all", "Backups & restore", "Settings"
 - Plugin automatically scans PortProton games
 - Save paths can be configured for each game
 - Click "Synchronize" to upload saves to cloud

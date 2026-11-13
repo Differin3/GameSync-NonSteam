@@ -13,6 +13,7 @@
 | `shots/04-settings-stats.png` | Настройки → Статистика |
 | `shots/06-settings-backups.png` | Настройки → Бэкапы |
 | `shots/07-restore-confirm.png` | Подтверждение восстановления |
+| `shots/08-qam-concept.png` | Концепт QAM: статус и три действия (0.5.0) |
 | `shots/05-game-page.png` | Страница non-Steam игры: строка GameSync со статусом и кнопками |
 
 ## Исходники
