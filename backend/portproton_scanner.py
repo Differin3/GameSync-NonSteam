@@ -654,15 +654,19 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
         game["hasSaves"] = len(candidates) > 0
         games.append(game)
 
-    # 3. Общий префикс: несколько игр на один префикс
+    # 3. Общий префикс: несколько игр на один префикс.
+    # DEFAULT — штатный общий префикс PortProton, предупреждение про него
+    # показывать бессмысленно: иначе оно висит почти на каждой игре.
     by_prefix: Dict[str, List[str]] = {}
     for game in games:
         by_prefix.setdefault(game["prefixPath"], []).append(game["name"])
     for game in games:
+        if Path(game["prefixPath"]).name.upper() == "DEFAULT":
+            continue
         shared = by_prefix.get(game["prefixPath"], [])
         if len(shared) > 1:
             game["sharedPrefix"] = True
-            game["sharedWith"] = [n for n in shared if n != game["name"]]
+            game["sharedWith"] = [n for n in shared if n != game["name"]][:5]
 
     games.sort(key=lambda g: g["name"].lower())
 

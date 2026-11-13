@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { call } from "@decky/api";
 import { ButtonItem, PanelSection, PanelSectionRow, Spinner } from "@decky/ui";
+import { FaCloud, FaRedo, FaSyncAlt } from "react-icons/fa";
 import { SyncedGame } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
-import { EmptyState, ErrorState, Loading, StatusMessage } from "./ui";
-import { colors, actionRow } from "../utils/theme";
+import { Badge, EmptyState, ErrorState, Loading, StatusMessage } from "./ui";
+import { card, colors, dimText } from "../utils/theme";
 
 const formatDate = (isoString: string): string => {
   try {
@@ -91,7 +92,10 @@ export function SyncedGamesList() {
     <PanelSection title={`Синхронизированные игры (${syncedGames.length})`}>
       <PanelSectionRow>
         <ButtonItem layout="below" onClick={loadSyncedGames} disabled={loading}>
-          Обновить список
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+            <FaRedo />
+            Обновить список
+          </span>
         </ButtonItem>
       </PanelSectionRow>
 
@@ -105,23 +109,30 @@ export function SyncedGamesList() {
         const isSyncing = syncing[game.gameName];
         return (
           <PanelSectionRow key={index}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+            <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>{game.gameName}</span>
                 <span style={{ fontSize: "11px", color: colors.dim }}>{formatDate(game.lastSync)}</span>
               </div>
-              <div style={actionRow}>
-                <ButtonItem layout="below" onClick={() => resyncGame(game)} disabled={isSyncing}>
-                  {isSyncing ? (
-                    <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
-                      <Spinner />
-                      <span>Синхронизация…</span>
-                    </span>
-                  ) : (
-                    "Синхронизировать снова"
-                  )}
-                </ButtonItem>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <Badge tone="success">
+                  <FaCloud style={{ marginRight: "4px" }} />в облаке
+                </Badge>
+                <span style={dimText}>{game.fileId ? "GameSync" : ""}</span>
               </div>
+              <ButtonItem layout="below" onClick={() => resyncGame(game)} disabled={isSyncing}>
+                {isSyncing ? (
+                  <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
+                    <Spinner />
+                    <span>Синхронизация…</span>
+                  </span>
+                ) : (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+                    <FaSyncAlt />
+                    Синхронизировать снова
+                  </span>
+                )}
+              </ButtonItem>
             </div>
           </PanelSectionRow>
         );

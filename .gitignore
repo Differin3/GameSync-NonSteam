@@ -11,3 +11,6 @@ py_modules/
 # собранный фронтенд внутри распакованного плагина
 !dist-plugin/gamesync-nonsteam/dist/
 !dist-plugin/gamesync-nonsteam/dist/**
+
+# отладка CEF (локальные скриншоты/скрипты)
+.cdp/

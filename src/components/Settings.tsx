@@ -9,6 +9,7 @@ import {
   getWebDAVPreset,
   normalizeWebDAVProviderId,
 } from "../utils/storagePresets";
+import { FaCheck, FaExclamationTriangle, FaPlus, FaSave, FaTrash } from "react-icons/fa";
 import { Hint, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
 import { colors, actionRow, card, dimText } from "../utils/theme";
@@ -476,12 +477,12 @@ export function Settings() {
           <div style={actionRow}>
             <div style={{ flex: 1 }}>
               <ButtonItem layout="below" onClick={saveAndTest} disabled={busy !== null}>
-                {busy === "test" ? "Проверка…" : busy === "save" ? "Сохранение…" : "Проверить и сохранить"}
+                <span style={{display:"inline-flex",alignItems:"center",gap:"7px"}}><FaCheck />{busy === "test" ? "Проверка…" : busy === "save" ? "Сохранение…" : "Проверить и сохранить"}</span>
               </ButtonItem>
             </div>
             <div style={{ flex: 1 }}>
               <ButtonItem layout="below" onClick={saveOnly} disabled={busy !== null}>
-                Сохранить
+                <span style={{display:"inline-flex",alignItems:"center",gap:"7px"}}><FaSave />Сохранить</span>
               </ButtonItem>
             </div>
           </div>
@@ -527,7 +528,7 @@ export function Settings() {
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={addDefaultPath} disabled={validating || !newPath.trim()}>
-            {validating ? "Проверка…" : "Добавить путь"}
+            <span style={{display:"inline-flex",alignItems:"center",gap:"7px"}}><FaPlus />{validating ? "Проверка…" : "Добавить путь"}</span>
           </ButtonItem>
         </PanelSectionRow>
         {pathValidationResult && (
@@ -548,7 +549,7 @@ export function Settings() {
                 <div style={{ fontSize: "11px", color: "#c7ccd1", wordBreak: "break-all", fontFamily: "monospace" }}>{path}</div>
                 <div style={actionRow}>
                   <ButtonItem layout="below" onClick={() => removeDefaultPath(index)}>
-                    Удалить
+                    <span style={{display:"inline-flex",alignItems:"center",gap:"7px"}}><FaTrash />Удалить</span>
                   </ButtonItem>
                 </div>
               </div>
@@ -580,7 +581,7 @@ export function Settings() {
               }
             }}
           >
-            Очистить все данные плагина
+            <span style={{display:"inline-flex",alignItems:"center",gap:"7px"}}><FaExclamationTriangle />Очистить все данные плагина</span>
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>

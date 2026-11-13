@@ -1,6 +1,6 @@
 {
   "name": "gamesync-nonsteam",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Синхронизация сохранений игр PortProton через WebDAV (Яндекс Диск, Nextcloud и др.) или S3-совместимое хранилище",
   "type": "module",
   "scripts": {
