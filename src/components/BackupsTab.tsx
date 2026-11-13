@@ -3,7 +3,7 @@ import { call } from "@decky/api";
 import { ButtonItem, ConfirmModal, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
 import { FaCloud, FaCloudDownloadAlt, FaHistory, FaRedo, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
-import { Badge, EmptyState, ErrorState, Hint, Icon, Loading, StatusMessage } from "./ui";
+import { ActionButton, Badge, EmptyState, ErrorState, Hint, Icon, Loading, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
 import { card, colors } from "../utils/theme";
 
@@ -130,9 +130,9 @@ export function BackupsTab() {
               </div>
             </div>
             <div style={{ minWidth: "160px" }}>
-              <ButtonItem layout="below" icon={<Icon><FaRedo /></Icon>} onClick={() => load(true)} disabled={refreshing}>
+              <ActionButton   icon={<FaRedo />} onClick={() => load(true)} disabled={refreshing}>
                 {refreshing ? "Обновление…" : "Обновить"}
-              </ButtonItem>
+              </ActionButton>
             </div>
           </div>
         </PanelSectionRow>
@@ -178,19 +178,19 @@ export function BackupsTab() {
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <div style={{ flex: 1 }}>
-                    <ButtonItem layout="below" icon={<Icon><FaHistory /></Icon>} onClick={() => setSelected(item.game)}>
+                    <ActionButton   icon={<FaHistory />} onClick={() => setSelected(item.game)}>
                       Версии
-                    </ButtonItem>
+                    </ActionButton>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <ButtonItem
-                      layout="below"
-                      icon={<Icon><FaUndoAlt /></Icon>}
+                    <ActionButton
+                      
+                       icon={<FaUndoAlt />}
                       onClick={() => last && askRestore(item.game, last)}
                       disabled={!last || restoring}
                     >
                       Восстановить
-                    </ButtonItem>
+                    </ActionButton>
                   </div>
                 </div>
               </div>
