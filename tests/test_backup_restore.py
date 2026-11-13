@@ -571,5 +571,59 @@ class AppSettingsPersistenceTest(unittest.TestCase):
         self.assertEqual(config_manager.load_app_settings()["max_backup_versions"], 1)
         config_manager.save_app_settings(max_backup_versions=1000)
         self.assertEqual(config_manager.load_app_settings()["max_backup_versions"], 100)
+import auto_sync  # noqa: E402
+
+
+class AutoSyncDetectionTest(unittest.TestCase):
+    def test_exe_hint_linux_path(self):
+        hint = auto_sync.find_game_hint_from_process(
+            {"cmdline": ["bash", "start.sh", "/home/deck/GAEM/Tomb Raider - Underworld/tru.exe"]}
+        )
+        self.assertEqual(hint, "/home/deck/gaem/tomb raider - underworld")
+
+    def test_exe_hint_windows_path(self):
+        hint = auto_sync.find_game_hint_from_process(
+            {"cmdline": ["wine", "Z:\\home\\deck\\GAEM\\SomeGame\\game.exe"]}
+        )
+        self.assertEqual(hint, "/home/deck/gaem/somegame")
+
+    def test_system_exe_ignored(self):
+        hint = auto_sync.find_game_hint_from_process(
+            {"cmdline": ["wine", "C:\\windows\\system32\\wineboot.exe"]}
+        )
+        self.assertIsNone(hint)
+
+    def test_default_prefix_grouped_by_game_dir(self):
+        processes = [
+            {
+                "pid": 1,
+                "cmdline": ["bash", "start.sh", "/home/deck/GAEM/Tomb Raider - Underworld/tru.exe"],
+                "cwd": "/home/deck/PortProton/prefixes/DEFAULT/drive_c",
+            },
+            {
+                "pid": 2,
+                "cmdline": ["wine", "/home/deck/GAEM/Tomb Raider - Underworld/tru.exe"],
+                "cwd": "/home/deck/PortProton/prefixes/DEFAULT/drive_c",
+            },
+        ]
+        running = auto_sync.collect_running_games(processes)
+        self.assertEqual(list(running.keys()), ["exe:/home/deck/gaem/tomb raider - underworld"])
+        self.assertEqual(running["exe:/home/deck/gaem/tomb raider - underworld"], {1, 2})
+
+    def test_named_prefix_uses_prefix_name(self):
+        processes = [
+            {
+                "pid": 3,
+                "cmdline": ["wine", "/home/deck/GAEM/Other/game.exe"],
+                "cwd": "/home/deck/PortProton/prefixes/Hades/drive_c",
+            }
+        ]
+        running = auto_sync.collect_running_games(processes)
+        self.assertEqual(list(running.keys()), ["Hades"])
+
+    def test_finished_games(self):
+        previous = {"exe:/home/deck/gaem/game": {1, 2}}
+        current = {}
+        self.assertEqual(auto_sync.finished_games(previous, current), ["exe:/home/deck/gaem/game"])
 if __name__ == "__main__":
     unittest.main(verbosity=2)
