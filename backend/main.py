@@ -12,6 +12,25 @@ from typing import Dict, Any, List
 logger = decky.logger
 
 
+def _ensure_ca_bundle() -> None:
+    """Python на SteamOS не видит системные CA: /etc/ssl/cert.pem отсутствует.
+
+    Без этого urllib и requests падают с CERTIFICATE_VERIFY_FAILED, и плагин
+    не может ни скачать манифест Ludusavi, ни обратиться к WebDAV.
+    """
+    if os.environ.get("SSL_CERT_FILE"):
+        return
+    for path in (
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/ssl/cert.pem",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+    ):
+        if os.path.exists(path):
+            os.environ["SSL_CERT_FILE"] = path
+            os.environ.setdefault("REQUESTS_CA_BUNDLE", path)
+            return
+
+
 def decky_params(func):
     """Нормализует аргументы вызова из фронтенда.
 
@@ -187,6 +206,7 @@ class Plugin:
     
     async def _main(self):
         """Инициализация плагина"""
+        _ensure_ca_bundle()
         logger.info("GameSync NonSteam plugin initialized")
         Plugin.auto_sync_enabled = False
         Plugin.game_monitor = None
@@ -195,7 +215,14 @@ class Plugin:
         try:
             import dependencies
             dependencies._ensure_py_modules_on_path()
-            asyncio.create_task(dependencies.ensure_dependencies_async("all"))
+            # Ставим зависимости только для выбранного провайдера: тянуть boto3
+            # и paramiko «на всякий случай» на Deck долго и не всегда возможно.
+            try:
+                from config_manager import load_storage_config
+                provider = (load_storage_config() or {}).get("provider") or "webdav"
+            except Exception:
+                provider = "webdav"
+            asyncio.create_task(dependencies.ensure_dependencies_async(provider))
             logger.info("Dependency bootstrap started")
         except Exception as e:
             logger.warning(f"Dependency bootstrap failed: {e}")
