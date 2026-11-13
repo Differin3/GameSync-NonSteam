@@ -17,14 +17,18 @@ class WebDAVProvider(StorageProvider):
         self.oauth_token = oauth_token
         self.folder_name = "GameSync"
         
-        # Определяем тип авторизации
-        if oauth_token:
-            # OAuth токен (для Яндекс Диска)
+        # Определяем тип авторизации.
+        # Basic имеет приоритет: OAuth поддерживает Яндекс, но Mail.ru и
+        # большинство WebDAV-серверов на OAuth отвечают 403. Если остался
+        # старый токен, но введены логин/пароль — используем пароль.
+        if username and password:
+            self.auth = (username, password)
+            self.auth_header = None
+        elif oauth_token:
             self.auth = None
             self.auth_header = f"OAuth {oauth_token}"
         else:
-            # Basic auth
-            self.auth = (username, password) if username and password else None
+            self.auth = None
             self.auth_header = None
     
     def _get_full_path(self, path: str) -> str:

@@ -239,7 +239,14 @@ export function Settings() {
     const nextPreset = getWebDAVPreset(id);
     // Для «своего» URL не затираем то, что пользователь уже ввёл.
     const keepUrl = !nextPreset.url;
-    update({ webdavProvider: id, webdavUrl: keepUrl ? settings.webdavUrl : nextPreset.url });
+    // OAuth поддерживает только Яндекс: у остальных сервисов токен даёт 403,
+    // поэтому при смене провайдера очищаем его.
+    const oauthReset = id === "yandex" ? {} : { webdavOAuthToken: "" };
+    update({
+      webdavProvider: id,
+      webdavUrl: keepUrl ? settings.webdavUrl : nextPreset.url,
+      ...oauthReset,
+    });
   };
 
   const handleUrlChange = (value: string) => {
@@ -357,7 +364,7 @@ export function Settings() {
               />
             </PanelSectionRow>
           )}
-          {!settings.webdavOAuthToken && (
+          {settings.webdavProvider === "yandex" && (
             <>
               <PanelSectionRow>
                 <TextField
