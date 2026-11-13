@@ -629,6 +629,34 @@ class Plugin:
             return {"success": False, "error": str(e)}
     
     @decky_params
+    async def sync_all_games(self, *args, **kwargs) -> Dict[str, Any]:
+        """Синхронизирует все найденные игры, у которых есть пути сохранений."""
+        try:
+            games = await asyncio.to_thread(scan_portproton_games, False)
+            targets = [game for game in games if game.get("savePaths")]
+
+            synced: List[str] = []
+            failed: List[Dict[str, str]] = []
+
+            for game in targets:
+                name = game.get("name") or ""
+                result = await self.sync_game(name, game.get("savePaths") or [])
+                if result.get("success"):
+                    synced.append(name)
+                else:
+                    failed.append({"game": name, "error": str(result.get("error") or "unknown error")})
+
+            return {
+                "success": True,
+                "total": len(targets),
+                "synced": synced,
+                "failed": failed,
+            }
+        except Exception as e:
+            logger.error(f"Error syncing all games: {e}")
+            return {"success": False, "error": str(e), "synced": [], "failed": []}
+
+    @decky_params
     async def get_game_sync_status(self, appid: int = None, game_name: str = None, *args, **kwargs) -> Dict[str, Any]:
         """Статус синхронизации игры — строка на странице Steam-библиотеки.
 

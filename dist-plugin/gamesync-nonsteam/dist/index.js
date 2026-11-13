@@ -113,12 +113,189 @@ function FaBan (props) {
   return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"},"child":[]}]})(props);
 }function FaSlidersH (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M496 384H160v-16c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v16H16c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h80v16c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-16h336c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zm0-160h-80v-16c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v16H16c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h336v16c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-16h80c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zm0-160H288V48c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v16H16C7.2 64 0 71.2 0 80v32c0 8.8 7.2 16 16 16h208v16c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-16h208c8.8 0 16-7.2 16-16V80c0-8.8-7.2-16-16-16z"},"child":[]}]})(props);
+}function FaSyncAlt (props) {
+  return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"},"child":[]}]})(props);
 }function FaTimes (props) {
   return GenIcon({"attr":{"viewBox":"0 0 352 512"},"child":[{"tag":"path","attr":{"d":"M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"},"child":[]}]})(props);
 }function FaTrash (props) {
   return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z"},"child":[]}]})(props);
 }function FaUndoAlt (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M255.545 8c-66.269.119-126.438 26.233-170.86 68.685L48.971 40.971C33.851 25.851 8 36.559 8 57.941V192c0 13.255 10.745 24 24 24h134.059c21.382 0 32.09-25.851 16.971-40.971l-41.75-41.75c30.864-28.899 70.801-44.907 113.23-45.273 92.398-.798 170.283 73.977 169.484 169.442C423.236 348.009 349.816 424 256 424c-41.127 0-79.997-14.678-110.63-41.556-4.743-4.161-11.906-3.908-16.368.553L89.34 422.659c-4.872 4.872-4.631 12.815.482 17.433C133.798 479.813 192.074 504 256 504c136.966 0 247.999-111.033 248-247.998C504.001 119.193 392.354 7.755 255.545 8z"},"child":[]}]})(props);
+}
+
+/** Единая палитра интерфейса (совместима с тёмной темой Steam). */
+const colors = {
+    text: "#e8eaed",
+    muted: "#9aa0a6",
+    dim: "#71767b",
+    success: "#5bb85b",
+    error: "#e06060",
+    warning: "#e0a94a",
+    accent: "#66aaff",
+    card: "rgba(255, 255, 255, 0.05)",
+    border: "rgba(255, 255, 255, 0.08)",
+};
+const radius = { sm: 6, md: 8 };
+const card = {
+    background: colors.card,
+    border: `1px solid ${colors.border}`,
+    borderRadius: radius.md,
+    padding: "8px 10px",
+    width: "100%",
+    boxSizing: "border-box",
+};
+const dimText = {
+    fontSize: "11px",
+    color: colors.dim,
+    lineHeight: 1.4,
+};
+const pathText = {
+    fontSize: "11px",
+    color: "#c7ccd1",
+    wordBreak: "break-all",
+    fontFamily: "monospace",
+    lineHeight: 1.35,
+};
+const actionRow = {
+    display: "flex",
+    gap: "8px",
+    alignItems: "stretch",
+    width: "100%",
+};
+
+const toneColor = {
+    success: colors.success,
+    error: colors.error,
+    warning: colors.warning,
+    info: colors.accent,
+};
+const toneBg = {
+    success: "rgba(91, 184, 91, 0.12)",
+    error: "rgba(224, 96, 96, 0.12)",
+    warning: "rgba(224, 169, 74, 0.12)",
+    info: "rgba(102, 170, 255, 0.12)",
+};
+/** Короткая подсказка под заголовком. */
+function Hint({ children }) {
+    return SP_JSX.jsx("div", { style: { fontSize: "12px", color: colors.muted, lineHeight: 1.4 }, children: children });
+}
+/** Цветное сообщение статуса (успех/ошибка/предупреждение). */
+function StatusMessage({ tone, children }) {
+    return (SP_JSX.jsx("div", { style: {
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 10px",
+            borderRadius: radius.sm,
+            background: toneBg[tone],
+            borderLeft: `3px solid ${toneColor[tone]}`,
+            color: colors.text,
+            fontSize: "12px",
+            lineHeight: 1.4,
+            width: "100%",
+            boxSizing: "border-box",
+        }, children: children }));
+}
+/** Небольшой цветной бейдж. */
+function Badge({ tone = "info", children }) {
+    return (SP_JSX.jsx("span", { style: {
+            display: "inline-block",
+            padding: "1px 7px",
+            borderRadius: "999px",
+            fontSize: "10px",
+            fontWeight: 600,
+            color: toneColor[tone],
+            background: toneBg[tone],
+            border: `1px solid ${toneColor[tone]}44`,
+            whiteSpace: "nowrap",
+        }, children: children }));
+}
+/** Моноширинный путь с переносом. */
+function PathText({ children }) {
+    return SP_JSX.jsx("div", { style: pathText, children: children });
+}
+function Loading({ text }) {
+    return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px", color: colors.muted, fontSize: "12px" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: text })] }) }) }));
+}
+function EmptyState({ text }) {
+    return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { textAlign: "center", color: colors.dim, fontSize: "12px", padding: "12px 0" }, children: text }) }) }));
+}
+function ErrorState({ text, onRetry }) {
+    return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: text }) }), onRetry && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onRetry, children: "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C" }) }))] }));
+}
+
+const formatDate$3 = (value) => {
+    if (!value)
+        return "";
+    try {
+        return new Date(value).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+    }
+    catch {
+        return value;
+    }
+};
+function GameSyncMain() {
+    const [connected, setConnected] = SP_REACT.useState(false);
+    const [summary, setSummary] = SP_REACT.useState(null);
+    const [syncing, setSyncing] = SP_REACT.useState(false);
+    const [message, setMessage] = SP_REACT.useState(null);
+    const load = async () => {
+        try {
+            const [test, stats, scan] = await Promise.all([
+                call("get_test", {}),
+                call("get_sync_stats", {}),
+                call("scan_games", {}),
+            ]);
+            const ok = Boolean(test?.success);
+            setConnected(ok);
+            setSummary({
+                games: Array.isArray(scan?.games) ? scan.games.length : 0,
+                synced: Number(stats?.stats?.gamesCount || 0),
+                lastSync: stats?.stats?.lastSync,
+            });
+        }
+        catch (error) {
+            setConnected(false);
+            setSummary(null);
+        }
+    };
+    SP_REACT.useEffect(() => {
+        load();
+    }, []);
+    const openSettings = (tab) => {
+        DFL.Router.CloseSideMenus();
+        DFL.Router.Navigate("/gamesync-settings");
+        setTimeout(() => window.dispatchEvent(new CustomEvent("gamesync-switch-tab", { detail: tab })), 120);
+    };
+    const syncAll = async () => {
+        setSyncing(true);
+        setMessage(null);
+        try {
+            const result = await call("sync_all_games", {});
+            if (result?.success) {
+                const synced = (result.synced || []).length;
+                const failed = (result.failed || []).length;
+                setMessage({
+                    tone: failed > 0 ? "warning" : "success",
+                    text: failed > 0 ? `Синхронизировано ${synced}, с ошибками ${failed}` : `Синхронизировано игр: ${synced}`,
+                });
+                await load();
+            }
+            else {
+                setMessage({ tone: "error", text: result?.error || "Не удалось синхронизировать" });
+            }
+        }
+        catch (error) {
+            setMessage({ tone: "error", text: error?.message || String(error) });
+        }
+        finally {
+            setSyncing(false);
+        }
+    };
+    const description = connected
+        ? `подключено · ${summary?.games ?? "…"} игр · ${summary?.synced ?? 0} в облаке${summary?.lastSync ? ` · ${formatDate$3(summary.lastSync)}` : ""}`
+        : "нет связи с бэкендом";
+    return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { icon: SP_JSX.jsx(FaCloud, { style: { color: "#66c0f4" } }), label: "GameSync", description: description }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: syncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaSyncAlt, {}), onClick: syncAll, disabled: syncing || !connected, children: syncing ? "Синхронизация…" : "Синхронизировать всё" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaCloudDownloadAlt, {}), onClick: () => openSettings("backups"), children: "\u0411\u044D\u043A\u0430\u043F\u044B \u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaCog, {}), onClick: () => openSettings("main"), children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438" }) }), message && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: message.tone, children: message.text }) }))] }));
 }
 
 /**
@@ -303,305 +480,6 @@ function saveSettings(settings) {
     catch (error) {
         console.error("Failed to save settings:", error);
     }
-}
-
-/** Единая палитра интерфейса (совместима с тёмной темой Steam). */
-const colors = {
-    text: "#e8eaed",
-    muted: "#9aa0a6",
-    dim: "#71767b",
-    success: "#5bb85b",
-    error: "#e06060",
-    warning: "#e0a94a",
-    accent: "#66aaff",
-    card: "rgba(255, 255, 255, 0.05)",
-    border: "rgba(255, 255, 255, 0.08)",
-};
-const radius = { sm: 6, md: 8 };
-const card = {
-    background: colors.card,
-    border: `1px solid ${colors.border}`,
-    borderRadius: radius.md,
-    padding: "8px 10px",
-    width: "100%",
-    boxSizing: "border-box",
-};
-const dimText = {
-    fontSize: "11px",
-    color: colors.dim,
-    lineHeight: 1.4,
-};
-const pathText = {
-    fontSize: "11px",
-    color: "#c7ccd1",
-    wordBreak: "break-all",
-    fontFamily: "monospace",
-    lineHeight: 1.35,
-};
-const actionRow = {
-    display: "flex",
-    gap: "8px",
-    alignItems: "stretch",
-    width: "100%",
-};
-
-const toneColor = {
-    success: colors.success,
-    error: colors.error,
-    warning: colors.warning,
-    info: colors.accent,
-};
-const toneBg = {
-    success: "rgba(91, 184, 91, 0.12)",
-    error: "rgba(224, 96, 96, 0.12)",
-    warning: "rgba(224, 169, 74, 0.12)",
-    info: "rgba(102, 170, 255, 0.12)",
-};
-/** Короткая подсказка под заголовком. */
-function Hint({ children }) {
-    return SP_JSX.jsx("div", { style: { fontSize: "12px", color: colors.muted, lineHeight: 1.4 }, children: children });
-}
-/** Цветное сообщение статуса (успех/ошибка/предупреждение). */
-function StatusMessage({ tone, children }) {
-    return (SP_JSX.jsx("div", { style: {
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "8px 10px",
-            borderRadius: radius.sm,
-            background: toneBg[tone],
-            borderLeft: `3px solid ${toneColor[tone]}`,
-            color: colors.text,
-            fontSize: "12px",
-            lineHeight: 1.4,
-            width: "100%",
-            boxSizing: "border-box",
-        }, children: children }));
-}
-/** Небольшой цветной бейдж. */
-function Badge({ tone = "info", children }) {
-    return (SP_JSX.jsx("span", { style: {
-            display: "inline-block",
-            padding: "1px 7px",
-            borderRadius: "999px",
-            fontSize: "10px",
-            fontWeight: 600,
-            color: toneColor[tone],
-            background: toneBg[tone],
-            border: `1px solid ${toneColor[tone]}44`,
-            whiteSpace: "nowrap",
-        }, children: children }));
-}
-/** Моноширинный путь с переносом. */
-function PathText({ children }) {
-    return SP_JSX.jsx("div", { style: pathText, children: children });
-}
-function Loading({ text }) {
-    return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px", color: colors.muted, fontSize: "12px" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: text })] }) }) }));
-}
-function EmptyState({ text }) {
-    return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { textAlign: "center", color: colors.dim, fontSize: "12px", padding: "12px 0" }, children: text }) }) }));
-}
-function ErrorState({ text, onRetry }) {
-    return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: text }) }), onRetry && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onRetry, children: "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C" }) }))] }));
-}
-
-const VISIBLE_LIMIT$1 = 8;
-const descriptionFor = (game) => {
-    const parts = [game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"];
-    if (typeof game.steamAppId === "number")
-        parts.push(`appid ${game.steamAppId}`);
-    if (game.sharedPrefix)
-        parts.push(`общий префикс: ${(game.sharedWith || []).slice(0, 2).join(", ")}`);
-    parts.push("синхронизировать");
-    return parts.join(" · ");
-};
-function GameList() {
-    const [games, setGames] = SP_REACT.useState([]);
-    const [loading, setLoading] = SP_REACT.useState(true);
-    const [error, setError] = SP_REACT.useState(null);
-    const [syncing, setSyncing] = SP_REACT.useState({});
-    const [syncStatus, setSyncStatus] = SP_REACT.useState({});
-    const loadGames = async (forceRefresh = false) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await call("scan_games", { force_refresh: forceRefresh });
-            if (result.success && result.games) {
-                setGames(result.games);
-            }
-            else {
-                setError(result.error || "Ошибка загрузки игр");
-            }
-        }
-        catch (err) {
-            setError(`Ошибка: ${err}`);
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-    const openPaths = () => {
-        DFL.Router.CloseSideMenus();
-        DFL.Router.Navigate("/gamesync-settings");
-        setTimeout(() => window.dispatchEvent(new CustomEvent("gamesync-switch-tab", { detail: "game_paths" })), 100);
-    };
-    const syncGame = async (game) => {
-        const settings = loadSettings();
-        const uniquePaths = Array.from(new Set([...settings.defaultSavePaths, ...game.savePaths]));
-        if (uniquePaths.length === 0) {
-            setSyncStatus((prev) => ({
-                ...prev,
-                [game.name]: { gameName: game.name, status: "error", message: "Нет путей сохранений" },
-            }));
-            return;
-        }
-        setSyncing((prev) => ({ ...prev, [game.name]: true }));
-        setSyncStatus((prev) => ({ ...prev, [game.name]: { gameName: game.name, status: "syncing" } }));
-        try {
-            const result = await call("sync_game", { game_name: game.name, save_paths: uniquePaths });
-            setSyncStatus((prev) => ({
-                ...prev,
-                [game.name]: {
-                    gameName: game.name,
-                    status: result.success ? "success" : "error",
-                    message: result.success ? result.message || "Синхронизация завершена" : result.error || "Ошибка синхронизации",
-                },
-            }));
-        }
-        catch (err) {
-            setSyncStatus((prev) => ({
-                ...prev,
-                [game.name]: { gameName: game.name, status: "error", message: `Ошибка: ${err}` },
-            }));
-        }
-        finally {
-            setSyncing((prev) => ({ ...prev, [game.name]: false }));
-        }
-    };
-    SP_REACT.useEffect(() => {
-        loadGames();
-    }, []);
-    if (loading) {
-        return SP_JSX.jsx(Loading, { text: "\u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0438\u0433\u0440 PortProton..." });
-    }
-    if (error) {
-        return SP_JSX.jsx(ErrorState, { text: error, onRetry: () => loadGames() });
-    }
-    if (games.length === 0) {
-        return SP_JSX.jsx(EmptyState, { text: "\u0418\u0433\u0440\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B" });
-    }
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: `Найденные игры (${games.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaRedo, {}), onClick: () => loadGames(true), children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), games.slice(0, VISIBLE_LIMIT$1).map((game) => {
-                const isSyncing = syncing[game.name];
-                const status = syncStatus[game.name];
-                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%" }, children: [SP_JSX.jsx(DFL.ButtonItem, { icon: isSyncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaGamepad, {}), label: game.name, description: descriptionFor(game), onClick: () => syncGame(game), disabled: isSyncing || !game.hasSaves }), status && (SP_JSX.jsx(StatusMessage, { tone: status.status === "success" ? "success" : status.status === "error" ? "error" : "info", children: status.message || "Синхронизация…" }))] }) }, game.name));
-            }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaFolderOpen, {}), onClick: openPaths, children: games.length > VISIBLE_LIMIT$1 ? `Все игры и пути (${games.length})` : "Настроить пути" }) })] }));
-}
-
-const VISIBLE_LIMIT = 5;
-const formatDate$3 = (isoString) => {
-    try {
-        return new Date(isoString).toLocaleString("ru-RU", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    }
-    catch {
-        return isoString;
-    }
-};
-function SyncedGamesList() {
-    const [syncedGames, setSyncedGames] = SP_REACT.useState([]);
-    const [loading, setLoading] = SP_REACT.useState(true);
-    const [syncing, setSyncing] = SP_REACT.useState({});
-    const [status, setStatus] = SP_REACT.useState(null);
-    const loadSyncedGames = async () => {
-        setLoading(true);
-        try {
-            const result = await call("get_synced_games", {});
-            if (result.success && result.games) {
-                setSyncedGames(result.games);
-            }
-        }
-        catch (error) {
-            console.error("Failed to load synced games", error);
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-    const resyncGame = async (game) => {
-        setSyncing((prev) => ({ ...prev, [game.gameName]: true }));
-        setStatus(null);
-        try {
-            const scanResult = await call("scan_games", {});
-            if (scanResult.success && scanResult.games) {
-                const gameInfo = scanResult.games.find((g) => g.name === game.gameName);
-                if (gameInfo && gameInfo.savePaths && gameInfo.savePaths.length > 0) {
-                    const settings = loadSettings();
-                    const uniquePaths = Array.from(new Set([...settings.defaultSavePaths, ...gameInfo.savePaths]));
-                    const syncResult = await call("sync_game", { game_name: game.gameName, save_paths: uniquePaths });
-                    if (syncResult.success) {
-                        await loadSyncedGames();
-                    }
-                    else {
-                        setStatus(syncResult.error || "Ошибка синхронизации");
-                    }
-                }
-                else {
-                    setStatus(`Для «${game.gameName}» не найдены пути сохранений`);
-                }
-            }
-        }
-        catch (err) {
-            setStatus(`Ошибка: ${err}`);
-        }
-        finally {
-            setSyncing((prev) => ({ ...prev, [game.gameName]: false }));
-        }
-    };
-    SP_REACT.useEffect(() => {
-        loadSyncedGames();
-    }, []);
-    if (loading || syncedGames.length === 0) {
-        return null;
-    }
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: `Синхронизированные игры (${syncedGames.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaRedo, {}), onClick: loadSyncedGames, children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: status }) })), syncedGames.slice(0, VISIBLE_LIMIT).map((game) => {
-                const isSyncing = syncing[game.gameName];
-                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { icon: isSyncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaCloud, {}), label: game.gameName, description: `в облаке · ${formatDate$3(game.lastSync)} · синхронизировать снова`, onClick: () => resyncGame(game), disabled: isSyncing }) }, game.gameName));
-            })] }));
-}
-
-function GameSyncMain() {
-    const [status, setStatus] = SP_REACT.useState("Проверка подключения...");
-    const [connected, setConnected] = SP_REACT.useState(false);
-    const [checking, setChecking] = SP_REACT.useState(true);
-    SP_REACT.useEffect(() => {
-        call("get_test", {})
-            .then((result) => {
-            if (result && result.success) {
-                setConnected(true);
-                setStatus("Плагин готов к работе");
-            }
-            else {
-                setConnected(false);
-                setStatus(result?.error || result?.message || "Неизвестная ошибка");
-            }
-        })
-            .catch((error) => {
-            setConnected(false);
-            setStatus(String(error?.message || error));
-        })
-            .finally(() => setChecking(false));
-    }, []);
-    const openSettings = () => {
-        DFL.Router.CloseSideMenus();
-        DFL.Router.Navigate("/gamesync-settings");
-    };
-    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { icon: SP_JSX.jsx(FaCloud, { style: { color: "#66c0f4" } }), label: "GameSync", description: checking ? "Проверка связи…" : `${connected ? "подключено" : "нет связи"} · ${status}` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaCog, {}), onClick: openSettings, children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0438 \u043F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439" }) })] }), checking && !connected && SP_JSX.jsx(Loading, { text: "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F..." }), connected && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(SyncedGamesList, {}), SP_JSX.jsx(GameList, {})] })), !checking && !connected && (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u0438 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043F\u043B\u0430\u0433\u0438\u043D \u0438\u0437 Decky." }) }) }))] }));
 }
 
 const STORAGE_OPTIONS = [
