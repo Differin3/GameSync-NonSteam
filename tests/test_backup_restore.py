@@ -475,5 +475,28 @@ class NormalizationTest(unittest.TestCase):
 
     def test_base_names_still_normalized(self):
         self.assertEqual(ludusavi._normalize("Factorio"), "factorio")
+class WebDAVAuthPriorityTest(unittest.TestCase):
+    def _provider(self, *args, **kwargs):
+        try:
+            import requests  # noqa: F401
+        except ImportError:
+            self.skipTest("requests не установлен")
+        from webdav_provider import WebDAVProvider
+        return WebDAVProvider(*args, **kwargs)
+
+    def test_basic_wins_over_leftover_oauth(self):
+        provider = self._provider(
+            "https://webdav.cloud.mail.ru",
+            username="user@mail.ru",
+            password="app-password",
+            oauth_token="stale-yandex-token",
+        )
+        self.assertEqual(provider.auth, ("user@mail.ru", "app-password"))
+        self.assertIsNone(provider.auth_header)
+
+    def test_oauth_used_when_no_password(self):
+        provider = self._provider("https://webdav.yandex.ru", oauth_token="token")
+        self.assertIsNone(provider.auth)
+        self.assertEqual(provider.auth_header, "OAuth token")
 if __name__ == "__main__":
     unittest.main(verbosity=2)

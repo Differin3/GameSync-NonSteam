@@ -21,7 +21,7 @@ def find_portproton_processes() -> List[Dict[str, any]]:
         try:
             proc_info = proc.info
             name = proc_info.get('name', '').lower()
-            cmdline = ' '.join(proc_info.get('cmdline', [])).lower()
+            cmdline = ' '.join(proc_info.get('cmdline') or []).lower()
 
             # Проверяем, является ли процесс связанным с PortProton
             if any(pp_proc in name or pp_proc in cmdline for pp_proc in PORTPROTON_PROCESSES):
