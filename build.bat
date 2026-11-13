@@ -37,6 +37,8 @@ echo Copying files...
 mkdir dist-plugin\gamesync-nonsteam\dist
 copy dist\index.js dist-plugin\gamesync-nonsteam\dist\index.js
 xcopy /E /I /Y backend dist-plugin\gamesync-nonsteam\backend
+REM не тащим кэш Python в архив (иначе ZIP раздувается в 2-3 раза)
+for /d /r dist-plugin\gamesync-nonsteam %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
 if exist dist\assets xcopy /E /I /Y dist\assets dist-plugin\gamesync-nonsteam\assets
 copy main.py dist-plugin\gamesync-nonsteam\
 copy plugin.json dist-plugin\gamesync-nonsteam\

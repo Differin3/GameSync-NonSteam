@@ -3,6 +3,28 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.4.1] — 2026-11-14
+
+Исправления по итогам проверки на реальном Steam Deck (SteamOS, Python 3.14).
+
+### Исправлено
+
+- **`No module named 'requests'`**: зависимости больше не ставятся в
+  `<plugin>/py_modules` (папка принадлежит root) — используется
+  `DECKY_PLUGIN_RUNTIME_DIR` (`~/homebrew/data/gamesync-nonsteam/py_modules`),
+  с фолбэком на `~/.local/share/gamesync/py_modules`.
+- **`ensurepip` падает (PEP 668)**: pip распаковывается из wheel, встроенного в
+  `ensurepip`, в каталог зависимостей и запускается с `PYTHONPATH`.
+- **`CERTIFICATE_VERIFY_FAILED`**: плагин выставляет `SSL_CERT_FILE` и
+  `REQUESTS_CA_BUNDLE` на системный CA-бандл SteamOS; Ludusavi скачивает
+  манифест с явным SSL-контекстом.
+- **`build.bat`**: `__pycache__` больше не попадает в ZIP (архив был 200 КБ
+  вместо 81 КБ).
+
+### Добавлено
+
+- `docs/TROUBLESHOOTING.md` — разбор ошибок с реального Deck: зависимости,
+  SSL, `HTTP 401` у Яндекс Диска, отсутствие строки на странице игры.
 ## [0.4.0] — 2026-11-14
 
 ### Добавлено

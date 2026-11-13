@@ -128,7 +128,7 @@ Python‑зависимости (requests, boto3, paramiko, psutil) плагин
 - `plugin.json` - конфигурация плагина
 - `requirements.txt` - Python зависимости
 
-Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md)
+Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ---
 
@@ -255,4 +255,4 @@ Limitations:
 - `plugin.json` - plugin configuration
 - `requirements.txt` - Python dependencies
 
-Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md)
+Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
