@@ -207,6 +207,14 @@ class Plugin:
     async def _main(self):
         """Инициализация плагина"""
         _ensure_ca_bundle()
+
+        # Сбрасываем кэш игр: правила (например, предупреждения об общем
+        # префиксе) могли измениться, а кэш живёт 5 минут.
+        try:
+            from cache_manager import cache_manager
+            cache_manager.invalidate("portproton_games")
+        except Exception as e:
+            logger.warning(f"Failed to invalidate game cache: {e}")
         logger.info("GameSync NonSteam plugin initialized")
         Plugin.auto_sync_enabled = False
         Plugin.game_monitor = None
