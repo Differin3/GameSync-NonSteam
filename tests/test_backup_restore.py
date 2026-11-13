@@ -535,5 +535,22 @@ class BackupPruneTest(unittest.TestCase):
 
     def test_prepare_trim_empty_for_unknown_game(self):
         self.assertEqual(backup_index.prepare_trim("Unknown"), [])
+class BackupKeepSettingTest(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self._old_config = config_manager.CONFIG_DIR
+        config_manager.CONFIG_DIR = self.root / "config"
+        backup_index.clear()
+
+    def tearDown(self):
+        config_manager.CONFIG_DIR = self._old_config
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_custom_keep_trims_to_setting(self):
+        for index in range(4):
+            backup_index.add_entry("Game", f"GameSync/Game/v{index}.tar.gz", size=1, keep=3)
+        self.assertEqual(len(backup_index.list_for("Game")), 3)
+        doomed = backup_index.prepare_trim("Game", 3)
+        self.assertEqual(len(doomed), 1)
 if __name__ == "__main__":
     unittest.main(verbosity=2)
