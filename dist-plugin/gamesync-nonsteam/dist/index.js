@@ -768,7 +768,6 @@ function Settings() {
                             }, children: SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "7px" }, children: [SP_JSX.jsx(FaExclamationTriangle, {}), "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u0432\u0441\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u043F\u043B\u0430\u0433\u0438\u043D\u0430"] }) }) })] })] }));
 }
 
-const icon = (node, label) => (SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }, children: [node, label] }));
 const sourceLabel = (source) => {
     switch (source) {
         case "known":
@@ -866,11 +865,6 @@ function GamePathsTab() {
         const updatedExcludes = Array.from(new Set([...(game.excludePaths || []), path]));
         await persistPaths(game, updatedPaths, updatedExcludes);
     };
-    const startEditingPath = (game, pathIndex) => {
-        setEditingGame(game);
-        setEditingPathIndex(pathIndex);
-        setEditingPathValue(game.savePaths[pathIndex]);
-    };
     const saveEditedPath = async (game, pathIndex) => {
         if (!editingPathValue.trim()) {
             setPathValidationResult("Введите путь");
@@ -896,11 +890,6 @@ function GamePathsTab() {
             setValidating(false);
         }
     };
-    const cancelEditingPath = () => {
-        setEditingPathIndex(null);
-        setEditingPathValue("");
-        setPathValidationResult(null);
-    };
     SP_REACT.useEffect(() => {
         loadGames();
     }, []);
@@ -909,22 +898,22 @@ function GamePathsTab() {
     if (error)
         return SP_JSX.jsx(ErrorState, { text: error, onRetry: loadGames });
     const settings = loadSettings();
-    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsx(DFL.PanelSection, { title: `Управление путями (${games.length})`, children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => loadGames(true), disabled: loading, children: icon(SP_JSX.jsx(FaRedo, {}), loading ? "Сканирование…" : "Обновить список") }) }) }), games.length === 0 && SP_JSX.jsx(EmptyState, { text: "\u0418\u0433\u0440\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B" }), games.map((game, index) => {
-                const isEditing = editingGame?.name === game.name;
+    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", alignItems: "center", gap: "10px", width: "100%" }, children: [SP_JSX.jsx(FaFolderOpen, { style: { color: "#66c0f4", fontSize: "18px" } }), SP_JSX.jsxs("div", { style: { flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: "\u0423\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0443\u0442\u044F\u043C\u0438" }), SP_JSX.jsxs("div", { style: { fontSize: "11px", color: colors.dim, marginTop: "2px" }, children: [games.length, " \u0438\u0433\u0440 \u00B7 \u0433\u043B\u043E\u0431\u0430\u043B\u044C\u043D\u044B\u0445 \u043F\u0443\u0442\u0435\u0439: ", settings.defaultSavePaths.length] })] }), SP_JSX.jsx("div", { style: { minWidth: "160px" }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaRedo, {}), onClick: () => loadGames(true), disabled: loading, children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C" }) })] }) }) }), games.length === 0 && SP_JSX.jsx(EmptyState, { text: "\u0418\u0433\u0440\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B" }), games.map((game) => {
+                const isEditing = editingGame === game.name;
                 const candidates = (game.saveCandidates || []).filter((c) => !game.savePaths.includes(c.path));
-                return (SP_JSX.jsxs(DFL.PanelSection, { title: game.name, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }, children: [SP_JSX.jsx(Badge, { tone: game.hasSaves ? "success" : "warning", children: game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений" }), typeof game.steamAppId === "number" && SP_JSX.jsxs(Badge, { children: ["appid ", game.steamAppId] }), (game.excludePaths?.length || 0) > 0 && SP_JSX.jsxs(Badge, { tone: "error", children: ["\u0438\u0441\u043A\u043B\u044E\u0447\u0435\u043D\u043E ", game.excludePaths.length] })] }), game.sharedPrefix && (SP_JSX.jsxs(StatusMessage, { tone: "warning", children: ["\u041E\u0431\u0449\u0438\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441 \u0441: ", (game.sharedWith || []).join(", ")] })), settings.defaultSavePaths.length > 0 && (SP_JSX.jsxs("div", { style: dimText, children: ["\u0413\u043B\u043E\u0431\u0430\u043B\u044C\u043D\u044B\u0435 \u043F\u0443\u0442\u0438: ", settings.defaultSavePaths.length, " (\u043F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u043A\u043E \u0432\u0441\u0435\u043C \u0438\u0433\u0440\u0430\u043C)"] })), game.savePaths.length === 0 && SP_JSX.jsx("div", { style: dimText, children: "\u041F\u0443\u0442\u0438 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u2014 \u0434\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0432\u0440\u0443\u0447\u043D\u0443\u044E." })] }) }), game.savePaths.map((path, pathIndex) => {
-                            const isEditingThisPath = editingGame?.name === game.name && editingPathIndex === pathIndex;
-                            return (SP_JSX.jsx(DFL.PanelSectionRow, { children: isEditingThisPath ? (SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx(DFL.TextField, { label: "\u041F\u0443\u0442\u044C", value: editingPathValue, onChange: (e) => setEditingPathValue(e.target.value) }), pathValidationResult && (SP_JSX.jsx(StatusMessage, { tone: pathValidationResult.startsWith("✓") ? "success" : "error", children: pathValidationResult })), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => saveEditedPath(game, pathIndex), disabled: validating || !editingPathValue.trim(), children: validating ? "Проверка…" : icon(SP_JSX.jsx(FaCheck, {}), "Сохранить") }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: cancelEditingPath, children: icon(SP_JSX.jsx(FaTimes, {}), "Отмена") }) })] })] })) : (SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx(PathText, { children: path }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => startEditingPath(game, pathIndex), children: icon(SP_JSX.jsx(FaEdit, {}), "Изменить") }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => excludePathFromGame(game, path), children: icon(SP_JSX.jsx(FaBan, {}), "Исключить") }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => removePathFromGame(game, pathIndex), children: icon(SP_JSX.jsx(FaTrash, {}), "Удалить") }) })] })] })) }, pathIndex));
-                        }), candidates.length > 0 && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { ...dimText, fontWeight: 600 }, children: ["\u041D\u0430\u0439\u0434\u0435\u043D\u043D\u044B\u0435 \u043A\u0430\u043D\u0434\u0438\u0434\u0430\u0442\u044B (", candidates.length, ")"] }), candidates.map((candidate, ci) => (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px" }, children: [SP_JSX.jsx(PathText, { children: candidate.path }), SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("span", { style: { fontSize: "10px", color: colors.dim }, children: ["\u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ", sourceLabel(candidate.source), " \u00B7 \u043E\u0446\u0435\u043D\u043A\u0430: ", candidate.score, candidate.fileCount ? ` · файлов: ${candidate.fileCount}` : ""] }), SP_JSX.jsx("div", { style: { minWidth: "130px" }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => addCandidateToGame(game, candidate.path), children: icon(SP_JSX.jsx(FaPlus, {}), "Добавить") }) })] })] }, ci)))] }) })), isEditing && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043F\u0443\u0442\u044C", value: newPath, onChange: (e) => setNewPath(e.target.value) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => addPathToGame(game), disabled: validating || !newPath.trim(), children: validating ? "Проверка…" : icon(SP_JSX.jsx(FaPlus, {}), "Добавить") }) }), pathValidationResult && !editingPathIndex && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: pathValidationResult.startsWith("✓") ? "success" : "error", children: pathValidationResult }) }))] })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => {
-                                    if (isEditing) {
-                                        setEditingGame(null);
-                                        setNewPath("");
-                                        setPathValidationResult(null);
-                                    }
-                                    else {
-                                        setEditingGame(game);
-                                    }
-                                }, children: isEditing ? icon(SP_JSX.jsx(FaTimes, {}), "Готово") : icon(SP_JSX.jsx(FaEdit, {}), "Редактировать пути") }) })] }, index));
+                return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "10px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "flex-start" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 600, color: colors.text }, children: game.name }), SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }, children: [SP_JSX.jsx(Badge, { tone: game.hasSaves ? "success" : "warning", children: game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений" }), typeof game.steamAppId === "number" && SP_JSX.jsxs(Badge, { children: ["appid ", game.steamAppId] }), (game.excludePaths?.length || 0) > 0 && (SP_JSX.jsxs(Badge, { tone: "error", children: ["\u0438\u0441\u043A\u043B\u044E\u0447\u0435\u043D\u043E ", game.excludePaths.length] })), game.sharedPrefix && SP_JSX.jsx(Badge, { tone: "warning", children: "\u043E\u0431\u0449\u0438\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441" })] })] }), SP_JSX.jsx("div", { style: { minWidth: "150px" }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: isEditing ? SP_JSX.jsx(FaTimes, {}) : SP_JSX.jsx(FaEdit, {}), onClick: () => {
+                                                    setEditingGame(isEditing ? null : game.name);
+                                                    setEditingPathIndex(null);
+                                                    setNewPath("");
+                                                    setPathValidationResult(null);
+                                                }, children: isEditing ? "Готово" : "Изменить" }) })] }), game.sharedPrefix && (SP_JSX.jsxs(StatusMessage, { tone: "warning", children: ["\u041E\u0431\u0449\u0438\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441 \u0441: ", (game.sharedWith || []).join(", ")] })), game.savePaths.length === 0 && SP_JSX.jsx("div", { style: dimText, children: "\u041F\u0443\u0442\u0438 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u2014 \u0434\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0432\u0440\u0443\u0447\u043D\u0443\u044E." }), game.savePaths.map((path, pathIndex) => {
+                                    const isEditingThisPath = editingPathIndex === pathIndex && isEditing;
+                                    return isEditingThisPath ? (SP_JSX.jsxs("div", { style: { ...card, background: "rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx(DFL.TextField, { label: "\u041F\u0443\u0442\u044C", value: editingPathValue, onChange: (e) => setEditingPathValue(e.target.value) }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaCheck, {}), onClick: () => saveEditedPath(game, pathIndex), disabled: validating || !editingPathValue.trim(), children: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C" }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaTimes, {}), onClick: () => setEditingPathIndex(null), children: "\u041E\u0442\u043C\u0435\u043D\u0430" }) })] })] }, pathIndex)) : (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px" }, children: [SP_JSX.jsx(PathText, { children: path }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaEdit, {}), onClick: () => {
+                                                                setEditingGame(game.name);
+                                                                setEditingPathIndex(pathIndex);
+                                                                setEditingPathValue(path);
+                                                            }, children: "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C" }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaBan, {}), onClick: () => excludePathFromGame(game, path), children: "\u0418\u0441\u043A\u043B\u044E\u0447\u0438\u0442\u044C" }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaTrash, {}), onClick: () => removePathFromGame(game, pathIndex), children: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C" }) })] })] }, pathIndex));
+                                }), candidates.length > 0 && (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }, children: [SP_JSX.jsxs("div", { style: { ...dimText, fontWeight: 600 }, children: ["\u041D\u0430\u0439\u0434\u0435\u043D\u043D\u044B\u0435 \u043A\u0430\u043D\u0434\u0438\u0434\u0430\u0442\u044B (", candidates.length, ")"] }), candidates.map((candidate, ci) => (SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { flex: 1, minWidth: 0 }, children: [SP_JSX.jsx(PathText, { children: candidate.path }), SP_JSX.jsxs("div", { style: { fontSize: "10px", color: colors.dim, marginTop: "2px" }, children: [sourceLabel(candidate.source), " \u00B7 \u043E\u0446\u0435\u043D\u043A\u0430 ", candidate.score, candidate.fileCount ? ` · файлов: ${candidate.fileCount}` : ""] })] }), SP_JSX.jsx("div", { style: { width: "130px", flex: "0 0 auto" }, children: SP_JSX.jsx(DFL.ButtonItem, { icon: SP_JSX.jsx(FaPlus, {}), onClick: () => addCandidateToGame(game, candidate.path), children: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C" }) })] }, ci)))] })), isEditing && (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }, children: [SP_JSX.jsx(DFL.TextField, { label: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043F\u0443\u0442\u044C", value: newPath, onChange: (e) => setNewPath(e.target.value) }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaPlus, {}), onClick: () => addPathToGame(game), disabled: validating || !newPath.trim(), children: validating ? "Проверка…" : "Добавить путь" })] })), pathValidationResult && (SP_JSX.jsx(StatusMessage, { tone: pathValidationResult.startsWith("✓") ? "success" : "error", children: pathValidationResult }))] }) }) }, game.name));
             })] }));
 }
 
@@ -1026,13 +1015,17 @@ function BackupsTab() {
         return SP_JSX.jsx(ErrorState, { text: error, onRetry: load });
     if (games.length === 0)
         return SP_JSX.jsx(EmptyState, { text: "\u0412 \u043E\u0431\u043B\u0430\u043A\u0435 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u2014 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0439\u0442\u0435 \u0438\u0433\u0440\u0443" });
-    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { title: `Бэкапы (${games.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u041F\u0435\u0440\u0435\u0434 \u044D\u0442\u0438\u043C \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432 \u2014 \u043E\u043D \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u044D\u0442\u043E\u0439 \u0436\u0435 \u0438\u0433\u0440\u044B." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => load(true), disabled: loading || refreshing || restoring, children: SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "7px" }, children: [SP_JSX.jsx(FaRedo, {}), refreshing ? "Обновление…" : "Обновить список"] }) }) }), games.map((item) => {
-                        const last = item.entries[0];
-                        const isSelected = selectedGame?.game === item.game;
-                        return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelected(item.game), disabled: restoring, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600 }, children: item.game }), SP_JSX.jsxs(Badge, { tone: "info", children: [SP_JSX.jsx(FaHistory, { style: { marginRight: "4px" } }), item.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] }), isSelected && SP_JSX.jsx(Badge, { tone: "success", children: "\u0432\u044B\u0431\u0440\u0430\u043D\u043E" }), last?.legacy && SP_JSX.jsx(Badge, { tone: "warning", children: "\u0441\u0442\u0430\u0440\u044B\u0439 \u0431\u044D\u043A\u0430\u043F" })] }), SP_JSX.jsxs("div", { style: dimText, children: [formatDate$2(last?.created), " \u00B7 ", formatBytes$2(last?.size)] })] }) }) }, item.game));
-                    })] }), selectedGame && (SP_JSX.jsxs(DFL.PanelSection, { title: `Версии · ${selectedGame.game}`, children: [selectedGame.entries.map((entry) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "12px", fontWeight: 600 }, children: formatDate$2(entry.created) }), SP_JSX.jsx("span", { style: dimText, children: formatBytes$2(entry.size) })] }), SP_JSX.jsxs("div", { style: dimText, children: [entry.kind === "prerestore"
-                                            ? "автоматическая копия перед восстановлением"
-                                            : "синхронизация", entry.legacy ? " · создан старой версией плагина" : ""] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => askRestore(selectedGame.game, entry), disabled: restoring, children: SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "7px" }, children: [SP_JSX.jsx(FaUndoAlt, {}), restoring ? "Восстановление…" : "Восстановить"] }) })] }) }, entry.id))), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: status.tone, children: status.text }) }))] }))] }));
+    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", alignItems: "center", gap: "10px", width: "100%" }, children: [SP_JSX.jsx(FaCloudDownloadAlt, { style: { color: "#66c0f4", fontSize: "18px" } }), SP_JSX.jsxs("div", { style: { flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439" }), SP_JSX.jsxs("div", { style: { fontSize: "11px", color: colors.dim, marginTop: "2px" }, children: [games.length, " \u0438\u0433\u0440 \u00B7 ", games.reduce((sum, item) => sum + item.entries.length, 0), " \u0431\u044D\u043A\u0430\u043F\u043E\u0432"] })] }), SP_JSX.jsx("div", { style: { minWidth: "160px" }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaRedo, {}), onClick: () => load(true), disabled: refreshing, children: refreshing ? "Обновление…" : "Обновить" }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u041F\u0435\u0440\u0435\u0434 \u044D\u0442\u0438\u043C \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432." }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: status.tone, children: status.text }) }))] }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "14px", alignItems: "flex-start", padding: "0 16px", flexWrap: "wrap" }, children: [SP_JSX.jsx("div", { style: { flex: "1 1 520px", minWidth: "0", display: "flex", flexDirection: "column", gap: "10px" }, children: games.map((item) => {
+                            const last = item.entries[0];
+                            const isSelected = selectedGame?.game === item.game;
+                            return (SP_JSX.jsxs("div", { style: {
+                                    ...card,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "8px",
+                                    borderColor: isSelected ? "rgba(102,192,244,0.45)" : undefined,
+                                }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: item.game }), SP_JSX.jsxs("div", { style: { fontSize: "10.5px", color: colors.dim, marginTop: "2px" }, children: [formatDate$2(last?.created), " \u00B7 ", formatBytes$2(last?.size)] })] }), SP_JSX.jsx("div", { style: { display: "flex", gap: "6px", alignItems: "center" }, children: SP_JSX.jsxs(Badge, { tone: "success", children: [SP_JSX.jsx(FaCloud, { style: { marginRight: "4px" } }), item.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] }) })] }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaHistory, {}), onClick: () => setSelected(item.game), children: "\u0412\u0435\u0440\u0441\u0438\u0438" }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaUndoAlt, {}), onClick: () => last && askRestore(item.game, last), disabled: !last || restoring, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C" }) })] })] }, item.game));
+                        }) }), selectedGame && (SP_JSX.jsxs("div", { style: { ...card, width: "320px", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: selectedGame.game }), SP_JSX.jsxs("div", { style: { fontSize: "10.5px", color: colors.dim }, children: ["\u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0431\u044D\u043A\u0430\u043F: ", formatDate$2(selectedGame.entries[0]?.created)] }), SP_JSX.jsx("div", { style: { fontSize: "22px", fontWeight: 600, color: colors.text }, children: formatBytes$2(selectedGame.entries[0]?.size) }), SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }, children: selectedGame.entries.slice(0, 6).map((entry) => (SP_JSX.jsx(DFL.ButtonItem, { icon: SP_JSX.jsx(FaUndoAlt, {}), label: formatDate$2(entry.created), description: `${formatBytes$2(entry.size)} · восстановить`, onClick: () => askRestore(selectedGame.game, entry), disabled: restoring }, entry.id))) }), SP_JSX.jsx(Hint, { children: "\u0412\u0435\u0440\u0441\u0438\u0438 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u0432 \u043E\u0431\u043B\u0430\u043A\u0435, \u0441\u0442\u0430\u0440\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0438\u0441\u0447\u0435\u0437\u0430\u044E\u0442 \u0438\u0437 \u0441\u043F\u0438\u0441\u043A\u0430 \u043F\u043E\u0441\u043B\u0435 10 \u0448\u0442\u0443\u043A." })] }))] })] }));
 }
 
 const formatBytes$1 = (bytes) => {
@@ -1044,11 +1037,12 @@ const formatBytes$1 = (bytes) => {
     return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
 };
 const formatDate$1 = (isoString) => {
+    if (!isoString)
+        return "—";
     try {
         return new Date(isoString).toLocaleString("ru-RU", {
-            year: "numeric",
-            month: "2-digit",
             day: "2-digit",
+            month: "2-digit",
             hour: "2-digit",
             minute: "2-digit",
         });
@@ -1057,11 +1051,29 @@ const formatDate$1 = (isoString) => {
         return isoString;
     }
 };
-function StatRow({ icon: Icon, label, value }) {
-    return (SP_JSX.jsxs("div", { style: { ...card, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }, children: [SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "12px", color: colors.muted }, children: [SP_JSX.jsx(Icon, { style: { color: "#66c0f4" } }), label] }), SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: value })] }));
+function StatCard({ icon: Icon, label, value, sub }) {
+    return (SP_JSX.jsxs("div", { style: {
+            flex: "1 1 0",
+            minWidth: "150px",
+            background: "rgba(255,255,255,0.035)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: "8px",
+            padding: "12px 14px",
+            boxSizing: "border-box",
+        }, children: [SP_JSX.jsxs("div", { style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "7px",
+                    fontSize: "10px",
+                    letterSpacing: "0.7px",
+                    textTransform: "uppercase",
+                    color: colors.dim,
+                    fontWeight: 600,
+                }, children: [SP_JSX.jsx(Icon, { style: { color: "#66c0f4" } }), label] }), SP_JSX.jsx("div", { style: { fontSize: "24px", fontWeight: 600, marginTop: "8px", color: colors.text }, children: value }), sub && SP_JSX.jsx("div", { style: { fontSize: "10.5px", color: colors.dim, marginTop: "3px" }, children: sub })] }));
 }
 function StatsTab() {
     const [stats, setStats] = SP_REACT.useState(null);
+    const [recent, setRecent] = SP_REACT.useState([]);
     const [loading, setLoading] = SP_REACT.useState(true);
     const [error, setError] = SP_REACT.useState(null);
     const loadStats = async () => {
@@ -1069,11 +1081,24 @@ function StatsTab() {
         setError(null);
         try {
             const result = await call("get_sync_stats", {});
-            if (result.success && result.stats) {
-                setStats(result.stats);
-            }
-            else {
+            if (!result.success || !result.stats) {
                 setError(result.error || "Ошибка загрузки статистики");
+                return;
+            }
+            setStats(result.stats);
+            try {
+                const backups = await call("get_backups", {});
+                const flat = [];
+                for (const group of backups?.games || []) {
+                    for (const entry of group.entries || []) {
+                        flat.push({ game: group.game, created: entry.created, size: entry.size });
+                    }
+                }
+                flat.sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
+                setRecent(flat.slice(0, 4));
+            }
+            catch (err) {
+                console.error("Failed to load recent backups", err);
             }
         }
         catch (err) {
@@ -1092,15 +1117,20 @@ function StatsTab() {
         return SP_JSX.jsx(ErrorState, { text: error, onRetry: loadStats });
     if (!stats)
         return SP_JSX.jsx(EmptyState, { text: "\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u0434\u043B\u044F \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F" });
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "8px", width: "100%" }, children: [SP_JSX.jsx(StatRow, { icon: FaChartBar, label: "\u0412\u0441\u0435\u0433\u043E \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439", value: stats.totalSyncs.toLocaleString() }), SP_JSX.jsx(StatRow, { icon: FaGamepad, label: "\u0418\u0433\u0440 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u043D\u043E", value: stats.gamesCount.toLocaleString() }), stats.lastSync && SP_JSX.jsx(StatRow, { icon: FaClock, label: "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F", value: formatDate$1(stats.lastSync) }), typeof stats.totalSize === "number" && stats.totalSize > 0 && (SP_JSX.jsx(StatRow, { icon: FaCloudDownloadAlt, label: "\u041E\u0431\u0449\u0438\u0439 \u0440\u0430\u0437\u043C\u0435\u0440", value: formatBytes$1(stats.totalSize) }))] }) }), stats.syncsByDate && stats.syncsByDate.length > 0 && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: colors.muted,
-                                marginTop: "6px",
-                            }, children: [SP_JSX.jsx(FaHistory, {}), "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0438 \u043F\u043E \u0434\u0430\u0442\u0430\u043C"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: stats.syncsByDate.slice(0, 10).map((item, index) => (SP_JSX.jsx(StatRow, { icon: FaHistory, label: new Date(item.date).toLocaleDateString("ru-RU"), value: item.count.toLocaleString() }, index))) }) })] }))] }));
+    const maxCount = Math.max(1, ...(stats.syncsByDate || []).map((item) => item.count));
+    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "10px", width: "100%" }, children: [SP_JSX.jsx(StatCard, { icon: FaChartBar, label: "\u0412\u0441\u0435\u0433\u043E \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439", value: String(stats.totalSyncs), sub: "\u0437\u0430 \u0432\u0441\u0451 \u0432\u0440\u0435\u043C\u044F" }), SP_JSX.jsx(StatCard, { icon: FaGamepad, label: "\u0418\u0433\u0440", value: String(stats.gamesCount), sub: "\u0432 \u043E\u0431\u043B\u0430\u043A\u0435" }), SP_JSX.jsx(StatCard, { icon: FaCloudDownloadAlt, label: "\u041E\u0431\u0449\u0438\u0439 \u0440\u0430\u0437\u043C\u0435\u0440", value: formatBytes$1(stats.totalSize || 0), sub: "\u0432 \u043E\u0431\u043B\u0430\u043A\u0435" }), SP_JSX.jsx(StatCard, { icon: FaClock, label: "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F", value: formatDate$1(stats.lastSync).split(",")[1]?.trim() || "—", sub: formatDate$1(stats.lastSync).split(",")[0] })] }) }) }), SP_JSX.jsx(DFL.PanelSection, { title: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0438 \u043F\u043E \u0434\u0430\u0442\u0430\u043C", children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: (stats.syncsByDate || []).slice(0, 7).map((item) => (SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px" }, children: [SP_JSX.jsx("span", { style: { width: "86px", fontSize: "10.5px", color: colors.muted }, children: new Date(item.date).toLocaleDateString("ru-RU") }), SP_JSX.jsx("div", { style: { flex: 1, height: "8px", borderRadius: "4px", background: "rgba(255,255,255,0.06)" }, children: SP_JSX.jsx("div", { style: {
+                                            width: `${Math.max(4, Math.round((item.count / maxCount) * 100))}%`,
+                                            height: "100%",
+                                            borderRadius: "4px",
+                                            background: "linear-gradient(90deg,#1a9fff,#3fb6ff)",
+                                        } }) }), SP_JSX.jsx("span", { style: { fontSize: "10px", color: colors.dim, width: "18px", textAlign: "right" }, children: item.count })] }, item.date))) }) }) }), recent.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0438", children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "6px" }, children: recent.map((entry, index) => (SP_JSX.jsxs("div", { style: {
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "baseline",
+                                gap: "10px",
+                                paddingTop: index > 0 ? "6px" : 0,
+                                borderTop: index > 0 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                            }, children: [SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "7px", fontSize: "12px", color: colors.text }, children: [SP_JSX.jsx(FaHistory, { style: { color: colors.dim } }), entry.game] }), SP_JSX.jsxs("span", { style: { fontSize: "10.5px", color: colors.dim }, children: [formatDate$1(entry.created), entry.size ? ` · ${formatBytes$1(entry.size)}` : ""] })] }, `${entry.game}-${index}`))) }) }) }))] }));
 }
 
 var SettingsTab;
