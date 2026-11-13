@@ -123,6 +123,25 @@ def _resolve_save_paths_for_game(game_name: str) -> List[str]:
     return list(dict.fromkeys(p for p in paths if p))
 
 
+_WEBDAV_PROVIDER_NAMES = {
+    "mail": "Облако Mail.ru",
+    "yandex": "Яндекс Диск",
+    "nextcloud": "Nextcloud",
+    "owncloud": "ownCloud",
+    "fastmail": "Fastmail",
+    "custom": "WebDAV",
+}
+
+
+def storage_display_name(config: Dict[str, Any]) -> str:
+    """Человеческое название настроенного хранилища для интерфейса."""
+    config = config or {}
+    provider = (config.get("provider") or "webdav").lower()
+    if provider == "webdav":
+        return _WEBDAV_PROVIDER_NAMES.get((config.get("webdav_provider") or "").lower(), "WebDAV")
+    return {"s3": "S3", "ftp": "FTP", "sftp": "SFTP"}.get(provider, provider)
+
+
 def _build_provider(config: Dict[str, Any]):
     """Создаёт провайдер хранилища по конфигу.
 
@@ -203,6 +222,19 @@ class Plugin:
     # Классовые переменные для состояния
     auto_sync_enabled = False
     game_monitor = None
+
+    # Прогресс синхронизации для QAM: этапы, проценты, текущая игра.
+    sync_progress: Dict[str, Any] = {
+        "active": False,
+        "stage": "",
+        "percent": 0,
+        "currentGame": "",
+        "index": 0,
+        "total": 0,
+        "ok": 0,
+        "failed": 0,
+    }
+    _storage_status_cache: Dict[str, Any] = {"ts": 0.0, "result": None}
     
     async def _main(self):
         """Инициализация плагина"""
@@ -306,6 +338,50 @@ class Plugin:
             logger.error(f"Error stopping game monitor: {e}")
         logger.info("GameSync NonSteam plugin unloaded")
 
+    def _set_sync_progress(self, **fields) -> None:
+        """Обновить общий прогресс синхронизации (виден в QAM)."""
+        Plugin.sync_progress.update(fields)
+
+    @decky_params
+    async def get_sync_progress(self, *args, **kwargs) -> Dict[str, Any]:
+        """Текущий прогресс синхронизации для прогресс-бара в QAM."""
+        return dict(Plugin.sync_progress)
+
+    @decky_params
+    async def get_storage_status(self, *args, **kwargs) -> Dict[str, Any]:
+        """Доступно ли настроенное хранилище (кэш 60 секунд)."""
+        import time
+
+        now = time.time()
+        cached = Plugin._storage_status_cache
+        if cached.get("result") and now - cached.get("ts", 0) < 60:
+            return dict(cached["result"])
+
+        try:
+            from config_manager import load_storage_config
+            config = load_storage_config() or {}
+        except Exception as e:
+            return {"success": False, "provider": "", "error": str(e)}
+
+        provider_name = storage_display_name(config)
+        try:
+            provider, error = _build_provider(config)
+            if error or provider is None:
+                result = {"success": False, "provider": provider_name, "error": error or "Провайдер не настроен"}
+            else:
+                check = await asyncio.to_thread(provider.test_connection)
+                result = {
+                    "success": bool(check.get("success")),
+                    "provider": provider_name,
+                    "error": check.get("error"),
+                    "url": config.get("url") or config.get("endpoint") or "",
+                }
+        except Exception as e:
+            result = {"success": False, "provider": provider_name, "error": str(e)}
+
+        Plugin._storage_status_cache = {"ts": now, "result": result}
+        return dict(result)
+
     @decky_params
     async def get_test(self, *args, **kwargs) -> Dict[str, Any]:
         """Тестовый метод для проверки связи с фронтендом"""
@@ -388,6 +464,12 @@ class Plugin:
                 sys.path.insert(0, str(backend_path))
                 from sync_engine import create_backup
             
+            self._set_sync_progress(
+                active=True,
+                stage="Архивация сохранений",
+                currentGame=game_name,
+                percent=Plugin.sync_progress.get("percent", 0) if Plugin.sync_progress.get("total", 0) > 1 else 15,
+            )
             # Создаем бэкап
             archive_path = await asyncio.to_thread(create_backup, game_name, save_paths)
             if not archive_path:
@@ -418,6 +500,10 @@ class Plugin:
             if error:
                 return {"success": False, "error": error}
 
+            self._set_sync_progress(
+                stage="Загрузка в облако",
+                percent=Plugin.sync_progress.get("percent", 0) if Plugin.sync_progress.get("total", 0) > 1 else 60,
+            )
             file_id = await asyncio.to_thread(provider.upload_file, archive_path, "GameSync")
 
             if not file_id:
@@ -446,6 +532,10 @@ class Plugin:
             except Exception as e:
                 logger.warning(f"Versioned upload failed for {game_name}: {e}")
             
+            self._set_sync_progress(
+                stage="История версий",
+                percent=Plugin.sync_progress.get("percent", 0) if Plugin.sync_progress.get("total", 0) > 1 else 85,
+            )
             # Удаляем временный архив
             try:
                 os.remove(archive_path)
@@ -472,6 +562,8 @@ class Plugin:
             except Exception as e:
                 logger.warning(f"Failed to record backup entry: {e}")
             
+            if Plugin.sync_progress.get("total", 0) <= 1:
+                self._set_sync_progress(active=False, stage="Готово", percent=100, currentGame="")
             return {
                 "success": True,
                 "file_id": file_id,
@@ -480,6 +572,8 @@ class Plugin:
             }
         except Exception as e:
             logger.error(f"Error syncing game: {e}")
+            if Plugin.sync_progress.get("total", 0) <= 1:
+                self._set_sync_progress(active=False, stage="Ошибка", percent=0)
             return {"success": False, "error": str(e)}
     
     @decky_params
@@ -635,28 +729,60 @@ class Plugin:
     async def sync_all_games(self, *args, **kwargs) -> Dict[str, Any]:
         """Синхронизирует все найденные игры, у которых есть пути сохранений."""
         try:
+            self._set_sync_progress(
+                active=True,
+                stage="Сканирование игр",
+                percent=0,
+                currentGame="",
+                index=0,
+                total=0,
+                ok=0,
+                failed=0,
+            )
             games = await asyncio.to_thread(scan_portproton_games, False)
             targets = [game for game in games if game.get("savePaths")]
+            total = len(targets)
+            self._set_sync_progress(total=total, stage="Синхронизация")
 
             synced: List[str] = []
             failed: List[Dict[str, str]] = []
 
-            for game in targets:
+            for index, game in enumerate(targets, start=1):
                 name = game.get("name") or ""
+                self._set_sync_progress(
+                    index=index,
+                    currentGame=name,
+                    percent=int((index - 1) / total * 100) if total else 0,
+                )
                 result = await self.sync_game(name, game.get("savePaths") or [])
                 if result.get("success"):
                     synced.append(name)
                 else:
                     failed.append({"game": name, "error": str(result.get("error") or "unknown error")})
+                self._set_sync_progress(
+                    ok=len(synced),
+                    failed=len(failed),
+                    percent=int(index / total * 100) if total else 100,
+                )
 
+            self._set_sync_progress(
+                active=False,
+                stage="Готово",
+                percent=100,
+                currentGame="",
+                index=total,
+                ok=len(synced),
+                failed=len(failed),
+            )
             return {
                 "success": True,
-                "total": len(targets),
+                "total": total,
                 "synced": synced,
                 "failed": failed,
             }
         except Exception as e:
             logger.error(f"Error syncing all games: {e}")
+            self._set_sync_progress(active=False, stage="Ошибка", currentGame="")
             return {"success": False, "error": str(e), "synced": [], "failed": []}
 
     @decky_params
