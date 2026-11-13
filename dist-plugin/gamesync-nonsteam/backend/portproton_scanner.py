@@ -439,7 +439,51 @@ def _resolve_known_rel(drive_c: Path, rel: str, users: List[str]) -> Optional[Pa
     return None
 
 
-def _known_save_paths(game_name: str) -> List[str]:
+
+def _extract_exe_path(exec_cmd: str) -> str:
+    """Путь к .exe из строки Exec (в кавычках или без)."""
+    if not exec_cmd:
+        return ""
+    import re
+    quoted = re.findall(r'"([^"]+?\.exe)"', exec_cmd, re.IGNORECASE)
+    if quoted:
+        return quoted[-1]
+    match = re.search(r'(\S+?\.exe)', exec_cmd, re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def detect_real_steam_appid(exec_cmd: str) -> Optional[int]:
+    """Настоящий Steam App ID из steam_appid.txt рядом с игрой (Goldberg).
+
+    В отличие от App ID ярлыка (≈3.3 млрд) это реальный идентификатор игры,
+    по которому Ludusavi и OpenCloudSaves находят точные пути сохранений.
+    """
+    exe = _extract_exe_path(exec_cmd)
+    if not exe:
+        return None
+    exe_path = Path(exe)
+    search_dirs = [exe_path.parent]
+    parent = exe_path.parent
+    for _ in range(2):
+        parent = parent.parent
+        search_dirs.append(parent)
+
+    for directory in search_dirs:
+        for candidate in (directory / "steam_appid.txt", directory / "steam_settings" / "steam_appid.txt"):
+            try:
+                if not candidate.is_file():
+                    continue
+                raw = candidate.read_text(encoding="utf-8", errors="ignore").strip()
+                value = int(raw.split()[0])
+            except (OSError, ValueError, IndexError):
+                continue
+            # Реальные App ID < 3 000 000; у ярлыков Steam они ~3.3e9
+            if 0 < value < 3_000_000:
+                return value
+    return None
+
+
+def _known_save_paths(game_name: str, steam_appid=None) -> List[str]:
     try:
         from game_definitions import get_known_save_paths_for_game
     except ImportError:
@@ -447,13 +491,13 @@ def _known_save_paths(game_name: str) -> List[str]:
     if not game_name:
         return []
     try:
-        return get_known_save_paths_for_game(game_name)
+        return get_known_save_paths_for_game(game_name, steam_appid)
     except Exception as e:
         logger.warning(f"Error in game_definitions for '{game_name}': {e}")
         return []
 
 
-def detect_save_candidates(game_prefix_path: Path, game_name: str = "") -> List[Dict[str, Any]]:
+def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_appid=None) -> List[Dict[str, Any]]:
     """Вернуть отсортированные кандидаты путей сохранений с оценкой.
 
     Каждый кандидат: {path, score, source, reason, fileCount, saveFileCount, size}.
@@ -483,7 +527,7 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "") -> List[
             }
 
     # 1. Известные пути из базы (самый надёжный источник)
-    for rel in _known_save_paths(game_name):
+    for rel in _known_save_paths(game_name, steam_appid):
         resolved = _resolve_known_rel(drive_c, rel, users)
         if resolved is not None:
             add(resolved, 100, "known", 0, f"известный путь: {rel}")
@@ -512,9 +556,9 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "") -> List[
     return filtered[:5]
 
 
-def detect_save_paths(game_prefix_path: Path, game_name: str = "") -> List[str]:
+def detect_save_paths(game_prefix_path: Path, game_name: str = "", steam_appid=None) -> List[str]:
     """Автоопределение путей сохранений (список, отсортированный по уверенности)."""
-    return [c["path"] for c in detect_save_candidates(game_prefix_path, game_name)]
+    return [c["path"] for c in detect_save_candidates(game_prefix_path, game_name, steam_appid)]
 
 
 def find_game_folders(base_path: Path, game_name: str) -> List[Path]:
@@ -628,7 +672,9 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
             continue
 
         used_prefixes.add(str(prefix_path.resolve()))
-        candidates = detect_save_candidates(prefix_path, game_name)
+        real_appid = detect_real_steam_appid(info.get("exec", ""))
+        lookup_appid = real_appid or (shortcut.get("appid") if shortcut else None)
+        candidates = detect_save_candidates(prefix_path, game_name, lookup_appid)
 
         game: Dict[str, Any] = {
             "name": game_name,
@@ -639,8 +685,12 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
             "saveCandidates": candidates,
             "hasSaves": len(candidates) > 0,
         }
-        if shortcut:
-            game["steamAppId"] = shortcut.get("appid")
+        if lookup_appid:
+            game["steamAppId"] = lookup_appid
+        if real_appid:
+            game["realSteamAppId"] = real_appid
+            if shortcut and shortcut.get("appid") != real_appid:
+                game["shortcutAppId"] = shortcut.get("appid")
         games.append(game)
 
     # 2. Префиксы без .desktop
@@ -649,7 +699,7 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
         if shortcut:
             game["steamAppId"] = shortcut.get("appid")
 
-        candidates = detect_save_candidates(Path(game["prefixPath"]), game["name"])
+        candidates = detect_save_candidates(Path(game["prefixPath"]), game["name"], game.get("steamAppId"))
         game["savePaths"] = [c["path"] for c in candidates]
         game["saveCandidates"] = candidates
         game["hasSaves"] = len(candidates) > 0
