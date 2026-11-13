@@ -62,7 +62,7 @@ IGNORED_FOLDER_NAMES = {
 IGNORED_DESKTOP_FILES = {"portproton.desktop", "readme.desktop"}
 
 # Общие имена, которые не являются названиями игр
-GENERIC_GAME_NAMES = {"portproton", "wine", "proton", "readme", "game", "launcher"}
+GENERIC_GAME_NAMES = {"portproton", "wine", "proton", "readme", "game", "launcher", "default"}
 
 # Финальные «издания», которые не входят в имя папки сохранений.
 _EDITION_SUFFIXES = [
