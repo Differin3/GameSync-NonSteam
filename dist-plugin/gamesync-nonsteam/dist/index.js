@@ -624,6 +624,23 @@ function Settings() {
             catch (error) {
                 console.error("Error loading storage config:", error);
             }
+            // Автосинхронизация и глобальные пути живут на бэкенде: иначе тумблер
+            // показывал бы «включено» после перезапуска Decky, пока монитор выключен.
+            try {
+                const app = await call("get_app_settings", {});
+                if (app?.success) {
+                    setSettings((prev) => ({
+                        ...prev,
+                        autoSync: typeof app.auto_sync === "boolean" ? app.auto_sync : prev.autoSync,
+                        defaultSavePaths: Array.isArray(app.default_save_paths) && app.default_save_paths.length > 0
+                            ? app.default_save_paths
+                            : prev.defaultSavePaths,
+                    }));
+                }
+            }
+            catch (error) {
+                console.error("Error loading app settings:", error);
+            }
         };
         loadStorageConfig();
     }, []);
@@ -749,6 +766,14 @@ function Settings() {
             update({ webdavUrl: value });
         }
     };
+    const persistDefaultPaths = async (paths) => {
+        try {
+            await call("set_default_save_paths", { default_save_paths: paths });
+        }
+        catch (error) {
+            console.error("Error saving default save paths:", error);
+        }
+    };
     const addDefaultPath = async () => {
         if (!newPath.trim()) {
             setPathValidationResult("Введите путь");
@@ -763,7 +788,9 @@ function Settings() {
                     setPathValidationResult("Этот путь уже добавлен");
                 }
                 else {
-                    update({ defaultSavePaths: [...settings.defaultSavePaths, response.path] });
+                    const nextPaths = [...settings.defaultSavePaths, response.path];
+                    update({ defaultSavePaths: nextPaths });
+                    void persistDefaultPaths(nextPaths);
                     setNewPath("");
                 }
             }
@@ -779,7 +806,9 @@ function Settings() {
         }
     };
     const removeDefaultPath = (index) => {
-        update({ defaultSavePaths: settings.defaultSavePaths.filter((_, i) => i !== index) });
+        const nextPaths = settings.defaultSavePaths.filter((_, i) => i !== index);
+        update({ defaultSavePaths: nextPaths });
+        void persistDefaultPaths(nextPaths);
     };
     return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "\u041A\u0443\u0434\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0442\u044C", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Dropdown, { menuLabel: "\u0422\u0438\u043F \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430", rgOptions: STORAGE_OPTIONS, selectedOption: settings.storageProvider, onChange: (option) => update({ storageProvider: option.data }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041E\u0431\u043B\u0430\u043A\u043E (WebDAV) \u2014 \u0441\u0430\u043C\u044B\u0439 \u043F\u0440\u043E\u0441\u0442\u043E\u0439 \u0432\u0430\u0440\u0438\u0430\u043D\u0442: \u0434\u0432\u0430 \u043F\u043E\u043B\u044F \u0438 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u044B\u0439 \u0442\u0430\u0440\u0438\u0444. \u0421\u0432\u043E\u0439 \u0441\u0435\u0440\u0432\u0435\u0440 \u043D\u0443\u0436\u0435\u043D, \u0435\u0441\u043B\u0438 \u0443 \u0432\u0430\u0441 NAS \u0438\u043B\u0438 VPS. S3 \u2014 \u0434\u043B\u044F \u0442\u0435\u0445, \u043A\u0442\u043E \u0443\u0436\u0435 \u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043E\u0431\u044A\u0435\u043A\u0442\u043D\u044B\u043C \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435\u043C." }) })] }), settings.storageProvider === "webdav" && (SP_JSX.jsxs(DFL.PanelSection, { title: "\u041E\u0431\u043B\u0430\u043A\u043E (WebDAV)", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Dropdown, { menuLabel: "\u0421\u0435\u0440\u0432\u0438\u0441", rgOptions: PROVIDER_OPTIONS, selectedOption: settings.webdavProvider, onChange: (option) => handleProviderChange(option.data) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "6px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: colors.muted, lineHeight: 1.4 }, children: preset.description }), SP_JSX.jsx("div", { style: dimText, children: preset.credentials })] }) }), preset.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "warning", children: preset.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "URL", value: settings.webdavUrl || "", onChange: (e) => handleUrlChange(e.target.value), description: "\u041F\u043E\u0434\u0441\u0442\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438; \u043C\u043E\u0436\u043D\u043E \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430 \u0441\u0432\u043E\u0439 \u0430\u0434\u0440\u0435\u0441" }) }), settings.webdavProvider === "yandex" && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "OAuth \u0442\u043E\u043A\u0435\u043D (\u043E\u043F\u0446\u0438\u043E\u043D\u0430\u043B\u044C\u043D\u043E)", value: settings.webdavOAuthToken || "", onChange: (e) => update({ webdavOAuthToken: e.target.value }), description: "\u041E\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043F\u0443\u0441\u0442\u044B\u043C, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043B\u043E\u0433\u0438\u043D \u0438 \u043F\u0430\u0440\u043E\u043B\u044C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F" }) })), !settings.webdavOAuthToken && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u041B\u043E\u0433\u0438\u043D", value: settings.webdavUsername || "", onChange: (e) => update({ webdavUsername: e.target.value }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u041F\u0430\u0440\u043E\u043B\u044C", value: settings.webdavPassword || "", onChange: (e) => update({ webdavPassword: e.target.value }), bIsPassword: true }) })] })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0424\u0430\u0439\u043B\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u044E\u0442\u0441\u044F \u0432 \u043F\u0430\u043F\u043A\u0443 GameSync \u0432\u0430\u0448\u0435\u0433\u043E \u043E\u0431\u043B\u0430\u043A\u0430 \u2014 \u0438\u0445 \u043C\u043E\u0436\u043D\u043E \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0432 \u0432\u0435\u0431-\u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0435 \u0441\u0435\u0440\u0432\u0438\u0441\u0430. \u041F\u0430\u0440\u043E\u043B\u0438 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0439 \u0438 \u0442\u043E\u043A\u0435\u043D\u044B \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0441\u0430\u043C\u043E\u043C Steam Deck." }) })] })), settings.storageProvider === "s3" && (SP_JSX.jsxs(DFL.PanelSection, { title: "S3 / Object Storage", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Dropdown, { menuLabel: "\u041F\u0440\u043E\u0432\u0430\u0439\u0434\u0435\u0440 S3", rgOptions: Object.entries(S3_PROVIDERS).map(([key, provider]) => ({
                                 data: key,
@@ -801,7 +830,7 @@ function Settings() {
                                 catch (error) {
                                     console.error("Error enabling auto-sync:", error);
                                 }
-                            } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u043E\u0441\u043B\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u043A\u0430 Decky \u0430\u0432\u0442\u043E\u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044E \u043D\u0443\u0436\u043D\u043E \u0432\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0437\u0430\u043D\u043E\u0432\u043E \u2014 \u0441\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u0441\u044F \u043D\u0430 \u0431\u044D\u043A\u0435\u043D\u0434\u0435." }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u0413\u043B\u043E\u0431\u0430\u043B\u044C\u043D\u044B\u0435 \u043F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u043A\u043E \u0432\u0441\u0435\u043C \u0438\u0433\u0440\u0430\u043C \u0432 \u0434\u043E\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u043A \u0438\u043D\u0434\u0438\u0432\u0438\u0434\u0443\u0430\u043B\u044C\u043D\u044B\u043C \u043F\u0443\u0442\u044F\u043C." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043F\u0443\u0442\u044C", value: newPath, onChange: (e) => setNewPath(e.target.value) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: addDefaultPath, disabled: validating || !newPath.trim(), children: validating ? "Проверка…" : "Добавить путь" }) }), pathValidationResult && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: pathValidationResult.startsWith("✓") ? "success" : "error", children: pathValidationResult }) })), settings.defaultSavePaths.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: colors.dim, fontSize: "12px", fontStyle: "italic" }, children: "\u041D\u0435\u0442 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0445 \u043F\u0443\u0442\u0435\u0439" }) })) : (settings.defaultSavePaths.map((path, index) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#c7ccd1", wordBreak: "break-all", fontFamily: "monospace" }, children: path }), SP_JSX.jsx("div", { style: actionRow, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => removeDefaultPath(index), children: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C" }) })] }) }, index))))] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u041E\u043F\u0430\u0441\u043D\u0430\u044F \u0437\u043E\u043D\u0430", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0423\u0434\u0430\u043B\u044F\u0435\u0442 \u0432\u0441\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438, \u043A\u044D\u0448, \u0438\u0437\u0443\u0447\u0435\u043D\u043D\u044B\u0435 \u043F\u0443\u0442\u0438 \u0438 \u043A\u043E\u043D\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u044E \u043F\u043B\u0430\u0433\u0438\u043D\u0430." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: async () => {
+                            } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430 \u0445\u0440\u0430\u043D\u0438\u0442\u0441\u044F \u043D\u0430 \u0431\u044D\u043A\u0435\u043D\u0434\u0435 \u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u0430\u0432\u043B\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u043A\u0430 Decky." }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u0413\u043B\u043E\u0431\u0430\u043B\u044C\u043D\u044B\u0435 \u043F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u043A\u043E \u0432\u0441\u0435\u043C \u0438\u0433\u0440\u0430\u043C \u0432 \u0434\u043E\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 \u043A \u0438\u043D\u0434\u0438\u0432\u0438\u0434\u0443\u0430\u043B\u044C\u043D\u044B\u043C \u043F\u0443\u0442\u044F\u043C." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043F\u0443\u0442\u044C", value: newPath, onChange: (e) => setNewPath(e.target.value) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: addDefaultPath, disabled: validating || !newPath.trim(), children: validating ? "Проверка…" : "Добавить путь" }) }), pathValidationResult && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: pathValidationResult.startsWith("✓") ? "success" : "error", children: pathValidationResult }) })), settings.defaultSavePaths.length === 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: colors.dim, fontSize: "12px", fontStyle: "italic" }, children: "\u041D\u0435\u0442 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0445 \u043F\u0443\u0442\u0435\u0439" }) })) : (settings.defaultSavePaths.map((path, index) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#c7ccd1", wordBreak: "break-all", fontFamily: "monospace" }, children: path }), SP_JSX.jsx("div", { style: actionRow, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => removeDefaultPath(index), children: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C" }) })] }) }, index))))] }), SP_JSX.jsxs(DFL.PanelSection, { title: "\u041E\u043F\u0430\u0441\u043D\u0430\u044F \u0437\u043E\u043D\u0430", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0423\u0434\u0430\u043B\u044F\u0435\u0442 \u0432\u0441\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438, \u043A\u044D\u0448, \u0438\u0437\u0443\u0447\u0435\u043D\u043D\u044B\u0435 \u043F\u0443\u0442\u0438 \u0438 \u043A\u043E\u043D\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u044E \u043F\u043B\u0430\u0433\u0438\u043D\u0430." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: async () => {
                                 if (!confirm("Удалить все данные плагина? Действие необратимо."))
                                     return;
                                 try {
@@ -1003,12 +1032,18 @@ const formatDate$1 = (value) => {
 function BackupsTab() {
     const [games, setGames] = SP_REACT.useState([]);
     const [loading, setLoading] = SP_REACT.useState(true);
+    const [refreshing, setRefreshing] = SP_REACT.useState(false);
     const [error, setError] = SP_REACT.useState(null);
     const [selected, setSelected] = SP_REACT.useState(null);
     const [restoring, setRestoring] = SP_REACT.useState(false);
     const [status, setStatus] = SP_REACT.useState(null);
-    const load = async () => {
-        setLoading(true);
+    const load = async (silent = false) => {
+        if (silent) {
+            setRefreshing(true);
+        }
+        else {
+            setLoading(true);
+        }
         setError(null);
         try {
             const response = await call("get_backups", {});
@@ -1023,7 +1058,12 @@ function BackupsTab() {
             setError(`Ошибка: ${err}`);
         }
         finally {
-            setLoading(false);
+            if (silent) {
+                setRefreshing(false);
+            }
+            else {
+                setLoading(false);
+            }
         }
     };
     SP_REACT.useEffect(() => {
@@ -1038,7 +1078,7 @@ function BackupsTab() {
             if (response?.success) {
                 const suffix = response.safety_backup ? " · текущие сейвы сохранены в резерв" : "";
                 setStatus({ tone: "success", text: `${response.message || "Восстановлено"}${suffix}` });
-                await load();
+                await load(true);
             }
             else {
                 setStatus({ tone: "error", text: response?.error || "Ошибка восстановления" });
@@ -1064,7 +1104,7 @@ function BackupsTab() {
         return SP_JSX.jsx(ErrorState, { text: error, onRetry: load });
     if (games.length === 0)
         return SP_JSX.jsx(EmptyState, { text: "\u0412 \u043E\u0431\u043B\u0430\u043A\u0435 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u2014 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0439\u0442\u0435 \u0438\u0433\u0440\u0443" });
-    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { title: `Бэкапы (${games.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u041F\u0435\u0440\u0435\u0434 \u044D\u0442\u0438\u043C \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432 \u2014 \u043E\u043D \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u044D\u0442\u043E\u0439 \u0436\u0435 \u0438\u0433\u0440\u044B." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: load, disabled: loading || restoring, children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), games.map((item) => {
+    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { title: `Бэкапы (${games.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u041F\u0435\u0440\u0435\u0434 \u044D\u0442\u0438\u043C \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432 \u2014 \u043E\u043D \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u044D\u0442\u043E\u0439 \u0436\u0435 \u0438\u0433\u0440\u044B." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => load(true), disabled: loading || refreshing || restoring, children: refreshing ? "Обновление…" : "Обновить список" }) }), games.map((item) => {
                         const last = item.entries[0];
                         const isSelected = selectedGame?.game === item.game;
                         return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelected(item.game), disabled: restoring, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600 }, children: item.game }), SP_JSX.jsxs(Badge, { tone: "info", children: [item.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] }), isSelected && SP_JSX.jsx(Badge, { tone: "success", children: "\u0432\u044B\u0431\u0440\u0430\u043D\u043E" }), last?.legacy && SP_JSX.jsx(Badge, { tone: "warning", children: "\u0441\u0442\u0430\u0440\u044B\u0439 \u0431\u044D\u043A\u0430\u043F" })] }), SP_JSX.jsxs("div", { style: dimText, children: [formatDate$1(last?.created), " \u00B7 ", formatBytes$1(last?.size)] })] }) }) }, item.game));

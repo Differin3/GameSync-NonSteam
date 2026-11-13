@@ -41,14 +41,25 @@ class WebDAVProvider(StorageProvider):
         return headers
     
     def _ensure_folder(self, folder_path: str) -> bool:
-        """Создание папки если не существует"""
+        """Создаёт папку и все её родительские папки.
+
+        Версионированные бэкапы лежат в GameSync/<Игра>/, поэтому MKCOL
+        по вложенному пути без предварительного создания GameSync вернул бы
+        409 Conflict.
+        """
+        parts = [part for part in folder_path.strip("/").split("/") if part]
+        current = ""
         try:
-            full_path = self._get_full_path(folder_path)
             headers = self._get_headers()
-            response = requests.request('MKCOL', full_path, auth=self.auth, headers=headers, timeout=10)
-            if response.status_code in [201, 405]:  # 405 = уже существует
-                return True
-            return False
+            for part in parts:
+                current = f"{current}/{part}" if current else part
+                full_path = self._get_full_path(current)
+                response = requests.request('MKCOL', full_path, auth=self.auth, headers=headers, timeout=10)
+                # 201 — создана, 405 — уже существует, 301 — редирект на существующую
+                if response.status_code not in (201, 301, 302, 405):
+                    logger.warning(f"MKCOL {current}: HTTP {response.status_code}")
+                    return False
+            return True
         except Exception as e:
             logger.warning(f"Error ensuring folder {folder_path}: {e}")
             return False
@@ -66,7 +77,7 @@ class WebDAVProvider(StorageProvider):
             headers = self._get_headers()
             
             with open(file_path, 'rb') as f:
-                response = requests.put(full_path, data=f, auth=self.auth, headers=headers, timeout=60)
+                response = requests.put(full_path, data=f, auth=self.auth, headers=headers, timeout=300)
             
             if response.status_code in [201, 204]:
                 logger.info(f"Uploaded file: {remote_file_path}")
@@ -85,7 +96,7 @@ class WebDAVProvider(StorageProvider):
             full_path = self._get_full_path(file_id)
             headers = self._get_headers()
             
-            response = requests.get(full_path, auth=self.auth, headers=headers, timeout=60, stream=True)
+            response = requests.get(full_path, auth=self.auth, headers=headers, timeout=300, stream=True)
             
             if response.status_code == 200:
                 Path(save_path).parent.mkdir(parents=True, exist_ok=True)

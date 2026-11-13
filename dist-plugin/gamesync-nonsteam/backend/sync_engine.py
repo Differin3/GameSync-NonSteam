@@ -117,6 +117,13 @@ def create_backup(
         return str(archive_path)
     except Exception as e:
         logger.error(f"Error creating backup: {e}")
+        # Не оставляем недописанный архив: иначе следующий аплоад может
+        # отправить в облако битый файл.
+        try:
+            if archive_path.exists():
+                archive_path.unlink()
+        except OSError:
+            pass
         return None
 
 

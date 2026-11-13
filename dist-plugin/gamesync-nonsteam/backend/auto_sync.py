@@ -1,7 +1,7 @@
 import psutil
 import logging
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -9,16 +9,20 @@ logger = logging.getLogger(__name__)
 # Процессы PortProton
 PORTPROTON_PROCESSES = ["portproton", "wine", "proton"]
 
+# Служебные префиксы, для которых не имеет смысла искать игру
+IGNORED_PREFIXES = {"DEFAULT"}
+
+
 def find_portproton_processes() -> List[Dict[str, any]]:
     """Поиск запущенных процессов PortProton"""
     processes = []
-    
+
     for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cwd']):
         try:
             proc_info = proc.info
             name = proc_info.get('name', '').lower()
             cmdline = ' '.join(proc_info.get('cmdline', [])).lower()
-            
+
             # Проверяем, является ли процесс связанным с PortProton
             if any(pp_proc in name or pp_proc in cmdline for pp_proc in PORTPROTON_PROCESSES):
                 processes.append({
@@ -29,8 +33,9 @@ def find_portproton_processes() -> List[Dict[str, any]]:
                 })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
-    
+
     return processes
+
 
 def get_game_name_from_process(process: Dict) -> Optional[str]:
     """Определение имени игры из процесса"""
@@ -44,7 +49,7 @@ def get_game_name_from_process(process: Dict) -> Optional[str]:
             idx = parts.index('prefixes')
             if idx + 1 < len(parts):
                 return parts[idx + 1]
-    
+
     # Альтернативно, пытаемся определить по cmdline
     cmdline = process.get('cmdline', [])
     for arg in cmdline:
@@ -54,50 +59,65 @@ def get_game_name_from_process(process: Dict) -> Optional[str]:
                 idx = parts.index('prefixes')
                 if idx + 1 < len(parts):
                     return parts[idx + 1]
-    
+
     return None
+
+
+def collect_running_games(processes: List[Dict]) -> Dict[str, Set[int]]:
+    """Сгруппировать процессы по игре: имя префикса -> набор PID.
+
+    У одной игры может быть несколько Wine-процессов, поэтому синхронизация
+    должна срабатывать только когда завершился последний из них.
+    """
+    running: Dict[str, Set[int]] = {}
+    for process in processes:
+        game_name = get_game_name_from_process(process)
+        if not game_name or game_name.upper() in IGNORED_PREFIXES:
+            continue
+        running.setdefault(game_name, set()).add(process.get("pid"))
+    return running
+
+
+def finished_games(previous: Dict[str, Set[int]], current: Dict[str, Set[int]]) -> List[str]:
+    """Игры, которые работали в прошлом опросе и больше не запущены."""
+    finished: List[str] = []
+    for game_name, pids in previous.items():
+        current_pids = current.get(game_name) or set()
+        if not (pids & current_pids):
+            finished.append(game_name)
+    return finished
+
 
 class GameMonitor:
     def __init__(self, sync_callback):
         self.sync_callback = sync_callback
-        self.monitored_processes = {}
+        self.running_games: Dict[str, Set[int]] = {}
         self.running = False
-    
+
     async def start_monitoring(self):
         """Запуск мониторинга процессов"""
         self.running = True
         logger.info("Started game process monitoring")
-        
+
         while self.running:
             try:
-                current_processes = find_portproton_processes()
-                current_pids = {p['pid']: p for p in current_processes}
-                
-                # Проверяем завершенные процессы
-                for pid, process in list(self.monitored_processes.items()):
-                    if pid not in current_pids:
-                        # Процесс завершился
-                        game_name = process.get('game_name')
-                        if game_name:
-                            logger.info(f"Game process ended: {game_name}")
-                            await self.sync_callback(game_name, process.get('save_paths', []))
-                        del self.monitored_processes[pid]
-                
-                # Добавляем новые процессы
-                for pid, process in current_pids.items():
-                    if pid not in self.monitored_processes:
-                        game_name = get_game_name_from_process(process)
-                        if game_name:
-                            process['game_name'] = game_name
-                            self.monitored_processes[pid] = process
-                            logger.info(f"Started monitoring process: {game_name} (PID: {pid})")
-                
+                current = collect_running_games(find_portproton_processes())
+
+                for game_name in finished_games(self.running_games, current):
+                    logger.info(f"Game process ended: {game_name}")
+                    try:
+                        await self.sync_callback(game_name, [])
+                    except Exception as e:
+                        logger.error(f"Auto-sync callback failed for {game_name}: {e}")
+
+                self.running_games = current
                 await asyncio.sleep(5)  # Проверяем каждые 5 секунд
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
                 await asyncio.sleep(5)
-    
+
     def stop_monitoring(self):
         """Остановка мониторинга"""
         self.running = False
+        self.running_games = {}
         logger.info("Stopped game process monitoring")
