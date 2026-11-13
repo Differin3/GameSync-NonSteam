@@ -97,6 +97,18 @@ Decky передаёт аргументы позиционно, поэтому `
 Без `backup_id` берётся последняя версия. Архивы без манифеста (до 0.3.0) не
 восстанавливаются — вернётся ошибка с предложением пересинхронизировать игру.
 
+### `get_game_sync_status`
+
+```json
+{ "appid": 1234567890, "game_name": "Cyberpunk 2077" }
+```
+
+→ `{ "success": true, "found": true, "game": "Cyberpunk 2077", "appid": 1234567890, "last_sync": "2026-11-14T00:10:00", "size": 44302336, "versions": 3, "provider": "webdav", "save_paths": 3, "shared_prefix": false }`
+
+Используется строкой GameSync на странице игры. `found: false` — игра не
+относится к PortProton (или плагин её не нашёл), и строка не показывается.
+Сопоставление: сначала по `steamAppId` ярлыка, затем по названию («Baldurs Gate 3»
+находит «Baldur's Gate 3»).
 ## Автосинхронизация
 
 ### `enable_auto_sync`

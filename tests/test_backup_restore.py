@@ -298,5 +298,58 @@ class AutoSyncTest(unittest.TestCase):
         self.assertCountEqual(finished_all, ["GameA", "GameB"])
 
 
+import game_status  # noqa: E402
+
+
+class GameStatusTest(unittest.TestCase):
+    GAMES = [
+        {"name": "Cyberpunk 2077", "steamAppId": 1234567890, "savePaths": ["/a", "/b"]},
+        {"name": "Baldur's Gate 3", "steamAppId": 987654321, "savePaths": ["/c"]},
+        {"name": "Demo_Game", "steamAppId": None, "prefixPath": "/prefixes/Demo Game", "savePaths": []},
+    ]
+
+    def test_match_by_appid(self):
+        game = game_status.find_game_for_app(self.GAMES, appid=1234567890)
+        self.assertIsNotNone(game)
+        self.assertEqual(game["name"], "Cyberpunk 2077")
+
+    def test_match_by_appid_as_string(self):
+        game = game_status.find_game_for_app(self.GAMES, appid="987654321")
+        self.assertIsNotNone(game)
+        self.assertEqual(game["name"], "Baldur's Gate 3")
+
+    def test_match_by_name_ignores_punctuation(self):
+        game = game_status.find_game_for_app(self.GAMES, game_name="Baldurs Gate 3")
+        self.assertIsNotNone(game)
+        self.assertEqual(game["name"], "Baldur's Gate 3")
+
+    def test_match_by_prefix_name(self):
+        game = game_status.find_game_for_app(self.GAMES, game_name="Demo Game")
+        self.assertIsNotNone(game)
+        self.assertEqual(game["name"], "Demo_Game")
+
+    def test_unknown_game_returns_none(self):
+        self.assertIsNone(game_status.find_game_for_app(self.GAMES, appid=1, game_name="Unknown"))
+
+    def test_status_prefers_backup_history(self):
+        game = self.GAMES[0]
+        synced = {"lastSync": "2026-11-01T10:00:00", "fileSize": 100}
+        entries = [{"created": "2026-11-14T00:10:00", "size": 5000}]
+        status = game_status.build_game_status(game, synced, entries, "webdav")
+        self.assertEqual(status["game"], "Cyberpunk 2077")
+        self.assertEqual(status["last_sync"], "2026-11-14T00:10:00")
+        self.assertEqual(status["size"], 5000)
+        self.assertEqual(status["versions"], 1)
+        self.assertEqual(status["save_paths"], 2)
+        self.assertEqual(status["provider"], "webdav")
+
+    def test_status_falls_back_to_synced_games(self):
+        game = self.GAMES[1]
+        synced = {"lastSync": "2026-11-01T10:00:00", "fileSize": 100}
+        status = game_status.build_game_status(game, synced, [], "s3")
+        self.assertEqual(status["last_sync"], "2026-11-01T10:00:00")
+        self.assertEqual(status["size"], 100)
+        self.assertEqual(status["versions"], 0)
+        self.assertEqual(status["provider"], "s3")
 if __name__ == "__main__":
     unittest.main(verbosity=2)

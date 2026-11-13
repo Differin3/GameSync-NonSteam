@@ -13,7 +13,7 @@
 | `shots/04-settings-stats.png` | Настройки → Статистика |
 | `shots/06-settings-backups.png` | Настройки → Бэкапы |
 | `shots/07-restore-confirm.png` | Подтверждение восстановления |
-| `shots/05-game-page.png` | Концепт: страница non-Steam игры со значком и блоком GameSync |
+| `shots/05-game-page.png` | Страница non-Steam игры: строка GameSync со статусом и кнопками |
 
 ## Исходники
 
@@ -68,3 +68,5 @@ $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 История версий раскладывается по папкам `GameSync/<Игра>/backup-<дата>.tar.gz`;
 индекс — `~/.config/gamesync/backups.json`. Подробности — в `docs/ARCHITECTURE.md`.
+
+Строка на странице игры реализована в 0.4.0 (`src/patches/appDetailsPatch.tsx`). Значок на плитке библиотеки остаётся отдельной задачей.
