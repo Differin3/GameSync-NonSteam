@@ -9,8 +9,9 @@ import {
   getWebDAVPreset,
   normalizeWebDAVProviderId,
 } from "../utils/storagePresets";
-import { FaCheck, FaExclamationTriangle, FaPlus, FaSave, FaTrash } from "react-icons/fa";
-import { Hint, StatusMessage } from "./ui";
+import { FaCheck, FaCloud, FaCloudUploadAlt, FaDatabase, FaExclamationTriangle, FaFolderOpen, FaPlus, FaSave, FaServer, FaSyncAlt, FaTrash } from "react-icons/fa";
+import type { ReactNode } from "react";
+import { Hint, Icon, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
 import { colors, actionRow, card, dimText } from "../utils/theme";
 
@@ -26,6 +27,25 @@ const PROVIDER_OPTIONS = WEBDAV_PRESETS.map((preset) => ({
   label: `${preset.name} · ${preset.status}`,
 }));
 
+
+const SectionHeader = ({ icon, title }: { icon: ReactNode; title: string }) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      width: "100%",
+      fontSize: "11px",
+      letterSpacing: "0.9px",
+      textTransform: "uppercase",
+      fontWeight: 700,
+      color: colors.muted,
+    }}
+  >
+    <Icon>{icon}</Icon>
+    {title}
+  </div>
+);
 export function Settings() {
   const [settings, setSettings] = useState<Settings>(loadSettings());
   const [busy, setBusy] = useState<"test" | "save" | null>(null);
@@ -275,7 +295,10 @@ export function Settings() {
 
   return (
     <div>
-      <PanelSection title="Куда сохранять">
+      <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaCloudUploadAlt />} title="Куда сохранять" />
+        </PanelSectionRow>
         <PanelSectionRow>
           <Dropdown
             menuLabel="Тип хранилища"
@@ -293,7 +316,10 @@ export function Settings() {
       </PanelSection>
 
       {settings.storageProvider === "webdav" && (
-        <PanelSection title="Облако (WebDAV)">
+        <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaCloud />} title="Облако (WebDAV)" />
+        </PanelSectionRow>
           <PanelSectionRow>
             <Dropdown
               menuLabel="Сервис"
@@ -360,7 +386,10 @@ export function Settings() {
       )}
 
       {settings.storageProvider === "s3" && (
-        <PanelSection title="S3 / Object Storage">
+        <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaDatabase />} title="S3 / Object Storage" />
+        </PanelSectionRow>
           <PanelSectionRow>
             <Dropdown
               menuLabel="Провайдер S3"
@@ -411,7 +440,10 @@ export function Settings() {
       )}
 
       {settings.storageProvider === "ftp" && (
-        <PanelSection title="FTP / FTPS">
+        <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaServer />} title="FTP / FTPS" />
+        </PanelSectionRow>
           <PanelSectionRow>
             <Hint>Для домашнего сервера или NAS. FTP без TLS передаёт пароль открытым текстом — включайте TLS, если сервер умеет.</Hint>
           </PanelSectionRow>
@@ -437,7 +469,10 @@ export function Settings() {
       )}
 
       {settings.storageProvider === "sftp" && (
-        <PanelSection title="SFTP">
+        <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaServer />} title="SFTP" />
+        </PanelSectionRow>
           <PanelSectionRow>
             <Hint>SSH-доступ к NAS, VPS или домашнему серверу. Пароль или приватный ключ.</Hint>
           </PanelSectionRow>
@@ -499,7 +534,10 @@ export function Settings() {
         )}
       </PanelSection>
 
-      <PanelSection title="Автосинхронизация">
+      <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaSyncAlt />} title="Автосинхронизация" />
+        </PanelSectionRow>
         <PanelSectionRow>
           <ToggleField
             label="Синхронизировать при выходе из игры"
@@ -519,7 +557,10 @@ export function Settings() {
         </PanelSectionRow>
       </PanelSection>
 
-      <PanelSection title="Глобальные пути сохранений">
+      <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaFolderOpen />} title="Глобальные пути сохранений" />
+        </PanelSectionRow>
         <PanelSectionRow>
           <Hint>Применяются ко всем играм в дополнение к индивидуальным путям.</Hint>
         </PanelSectionRow>
@@ -558,7 +599,10 @@ export function Settings() {
         )}
       </PanelSection>
 
-      <PanelSection title="Опасная зона">
+      <PanelSection>
+        <PanelSectionRow>
+          <SectionHeader icon={<FaExclamationTriangle />} title="Опасная зона" />
+        </PanelSectionRow>
         <PanelSectionRow>
           <Hint>Удаляет все настройки, кэш, изученные пути и конфигурацию плагина.</Hint>
         </PanelSectionRow>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { call } from "@decky/api";
 import { ButtonItem, Field, PanelSection, PanelSectionRow, Router, Spinner } from "@decky/ui";
 import { FaCloud, FaCloudDownloadAlt, FaCog, FaSyncAlt } from "react-icons/fa";
-import { Hint, StatusMessage } from "./ui";
+import { Hint, Icon, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
 
 interface Summary {
@@ -88,7 +88,7 @@ export function GameSyncMain() {
   return (
     <PanelSection>
       <PanelSectionRow>
-        <Field icon={<FaCloud style={{ color: "#66c0f4" }} />} label="GameSync" description={description} />
+        <Field icon={<Icon><FaCloud style={{ color: "#66c0f4" }} /></Icon>} label="GameSync" description={description} />
       </PanelSectionRow>
 
       <PanelSectionRow>
@@ -103,13 +103,13 @@ export function GameSyncMain() {
       </PanelSectionRow>
 
       <PanelSectionRow>
-        <ButtonItem layout="below" icon={<FaCloudDownloadAlt />} onClick={() => openSettings("backups")}>
+        <ButtonItem layout="below" icon={<Icon><FaCloudDownloadAlt /></Icon>} onClick={() => openSettings("backups")}>
           Бэкапы и восстановление
         </ButtonItem>
       </PanelSectionRow>
 
       <PanelSectionRow>
-        <ButtonItem layout="below" icon={<FaCog />} onClick={() => openSettings("main")}>
+        <ButtonItem layout="below" icon={<Icon><FaCog /></Icon>} onClick={() => openSettings("main")}>
           Настройки
         </ButtonItem>
       </PanelSectionRow>

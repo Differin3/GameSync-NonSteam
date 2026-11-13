@@ -1,4 +1,5 @@
 import logging
+import re
 import configparser
 import time
 from difflib import SequenceMatcher
@@ -653,6 +654,34 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
         game["saveCandidates"] = candidates
         game["hasSaves"] = len(candidates) > 0
         games.append(game)
+
+    # Склеиваем дубли: одна игра может прийти из .desktop файла, из префикса
+    # и из второго каталога .desktop. Ключ — нормализованное имя.
+    merged: Dict[str, Dict[str, Any]] = {}
+    for game in games:
+        key = (game.get("name") or "").strip().lower()
+        if not key:
+            continue
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = game
+            continue
+        for path in game.get("savePaths") or []:
+            if path not in existing["savePaths"]:
+                existing["savePaths"].append(path)
+        for candidate in game.get("saveCandidates") or []:
+            if all(c.get("path") != candidate.get("path") for c in existing.get("saveCandidates") or []):
+                existing.setdefault("saveCandidates", []).append(candidate)
+        existing["hasSaves"] = len(existing["savePaths"]) > 0
+    games = list(merged.values())
+
+    # Отбрасываем служебные «игры» вроде DEFAULT/DOTNET, которые иногда
+    # приходят из .desktop или из имён префиксов.
+    def _is_generic(name: str) -> bool:
+        words = [w for w in re.split(r"\s+", (name or "").lower()) if w]
+        return not words or all(w in GENERIC_GAME_NAMES for w in words)
+
+    games = [game for game in games if not _is_generic(game.get("name") or "")]
 
     # 3. Общий префикс: несколько игр на один префикс.
     # DEFAULT — штатный общий префикс PortProton, предупреждение про него
