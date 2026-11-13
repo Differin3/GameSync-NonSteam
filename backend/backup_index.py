@@ -12,6 +12,7 @@
 import json
 import logging
 import os
+import threading
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 INDEX_NAME = "backups.json"
 MAX_PER_GAME = 10
+
+# Синхронизация и восстановление работают в отдельных потоках: без блокировки
+# два одновременных add_entry могли перезаписать друг друга.
+_lock = threading.Lock()
 
 
 def _index_path():
@@ -80,11 +85,12 @@ def add_entry(
         "kind": kind,
     }
 
-    data = _load()
-    entries = data.setdefault(game_name, [])
-    entries.insert(0, entry)
-    del entries[MAX_PER_GAME:]
-    _save(data)
+    with _lock:
+        data = _load()
+        entries = data.setdefault(game_name, [])
+        entries.insert(0, entry)
+        del entries[MAX_PER_GAME:]
+        _save(data)
     return entry
 
 
@@ -113,9 +119,10 @@ def count() -> int:
 
 
 def clear() -> None:
-    try:
-        path = _index_path()
-        if path.exists():
-            path.unlink()
-    except OSError:
-        pass
+    with _lock:
+        try:
+            path = _index_path()
+            if path.exists():
+                path.unlink()
+        except OSError:
+            pass

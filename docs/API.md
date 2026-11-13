@@ -51,7 +51,7 @@ Decky передаёт аргументы позиционно, поэтому `
 ```
 → `{ "success": true, "file_id": "GameSync/<Игра>.tar.gz", "version_id": "GameSync/<Игра>/backup-....tar.gz", "message": "Синхронизация завершена" }`
 
-Создаёт архив с манифестом, загружает стабильную и версионированную копии,
+Если `save_paths` не переданы, пути определяются автоматически. Создаёт архив с манифестом, загружает стабильную и версионированную копии,
 пишет записи в `synced_games.json` и `backups.json`.
 
 ### `get_synced_games`
@@ -61,6 +61,8 @@ Decky передаёт аргументы позиционно, поэтому `
 ### `get_sync_stats`
 
 → `{ "success": true, "stats": { "totalSyncs", "gamesCount", "lastSync", "totalSize", "syncsByDate": [{ "date", "count" }] } }`
+
+`totalSyncs` и `syncsByDate` считаются по истории бэкапов (`backups.json`), а не по числу игр.
 
 ## Бэкапы и восстановление
 
@@ -102,9 +104,23 @@ Decky передаёт аргументы позиционно, поэтому `
 ```json
 { "enabled": true }
 ```
-Запускает/останавливает монитор процессов (`auto_sync.py`). После перезапуска Decky
-состояние сбрасывается — известное ограничение.
+Запускает/останавливает монитор процессов (`auto_sync.py`) и сохраняет флаг в `settings.json` — после перезапуска Decky монитор поднимается сам.
 
+### `get_app_settings`
+
+→ `{ "success": true, "auto_sync": false, "default_save_paths": ["..."] }`
+
+Состояние, которое живёт на бэкенде и переживает перезапуск.
+
+### `set_default_save_paths`
+
+```json
+{ "default_save_paths": ["/home/deck/..."] }
+```
+
+→ `{ "success": true, "default_save_paths": [...] }`
+
+Глобальные пути применяются и к ручной, и к автосинхронизации.
 ## Настройки хранилища
 
 ### `save_storage_config`

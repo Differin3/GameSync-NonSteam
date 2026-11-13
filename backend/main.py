@@ -93,6 +93,14 @@ def _resolve_save_paths_for_game(game_name: str) -> List[str]:
     except Exception as e:
         logger.warning(f"Failed to load config while resolving paths for '{game_name}': {e}")
 
+    # Глобальные пути из настроек плагина — их ждёт пользователь, включивший
+    # «применять ко всем играм»; раньше автосинхронизация их игнорировала.
+    try:
+        from config_manager import load_app_settings
+        paths.extend(load_app_settings().get("default_save_paths") or [])
+    except Exception as e:
+        logger.warning(f"Failed to load default save paths: {e}")
+
     return list(dict.fromkeys(p for p in paths if p))
 
 
@@ -192,6 +200,53 @@ class Plugin:
         except Exception as e:
             logger.warning(f"Dependency bootstrap failed: {e}")
 
+        # Восстанавливаем автосинхронизацию, если она была включена до перезапуска.
+        try:
+            from config_manager import load_app_settings
+            if load_app_settings().get("auto_sync"):
+                await Plugin()._start_auto_sync()
+                logger.info("Auto-sync restored from settings")
+        except Exception as e:
+            logger.warning(f"Failed to restore auto-sync: {e}")
+
+    async def _start_auto_sync(self) -> bool:
+        """Создаёт и запускает монитор процессов (идемпотентно)."""
+        if Plugin.game_monitor is not None:
+            return True
+
+        try:
+            import dependencies
+            await dependencies.ensure_dependencies_async("auto_sync")
+        except Exception as e:
+            logger.warning(f"Dependency check failed for auto-sync: {e}")
+
+        from auto_sync import GameMonitor
+
+        async def sync_callback(game_name: str, save_paths: List[str]):
+            """Callback для автосинхронизации"""
+            logger.info(f"Auto-syncing game: {game_name}")
+            resolved_paths = save_paths or _resolve_save_paths_for_game(game_name)
+            if not resolved_paths:
+                logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
+                return
+            plugin_instance = Plugin()
+            result = await plugin_instance.sync_game(game_name, resolved_paths)
+            if result.get("success"):
+                logger.info(f"Auto-sync completed for {game_name}")
+            else:
+                logger.error(f"Auto-sync failed for {game_name}: {result.get('error')}")
+
+        Plugin.game_monitor = GameMonitor(sync_callback)
+        asyncio.create_task(Plugin.game_monitor.start_monitoring())
+        Plugin.auto_sync_enabled = True
+        return True
+
+    def _stop_auto_sync(self) -> None:
+        if Plugin.game_monitor:
+            Plugin.game_monitor.stop_monitoring()
+            Plugin.game_monitor = None
+        Plugin.auto_sync_enabled = False
+
     @decky_params
     async def install_dependencies(self, *args, **kwargs) -> Dict[str, Any]:
         """Ручной повторный запуск установки зависимостей (на случай сбоя сети)."""
@@ -207,6 +262,8 @@ class Plugin:
         try:
             if Plugin.game_monitor:
                 Plugin.game_monitor.stop_monitoring()
+                Plugin.game_monitor = None
+            Plugin.auto_sync_enabled = False
         except Exception as e:
             logger.error(f"Error stopping game monitor: {e}")
         logger.info("GameSync NonSteam plugin unloaded")
@@ -227,8 +284,10 @@ class Plugin:
             # Проверяем параметр force_refresh из kwargs
             if force_refresh is False:
                 force_refresh = kwargs.get('force_refresh', False)
-            
-            games = scan_portproton_games(force_refresh=force_refresh)
+
+            # Обход drive_c и разбор .desktop — блокирующая работа, уводим из
+            # event loop, иначе плагин перестаёт отвечать на другие вызовы.
+            games = await asyncio.to_thread(scan_portproton_games, force_refresh)
 
             # Подмешиваем пути, сохранённые пользователем вручную, чтобы они
             # не терялись при повторном сканировании.
@@ -257,8 +316,15 @@ class Plugin:
             if save_paths is None:
                 save_paths = kwargs.get('save_paths', [])
             
-            if not game_name or not save_paths:
-                return {"success": False, "error": "Не указаны game_name или save_paths"}
+            if not game_name:
+                return {"success": False, "error": "Не указан game_name"}
+
+            # Если пути не переданы (автосинхронизация, внешний вызов) —
+            # определяем их сами, иначе метод бесполезно падал с ошибкой.
+            if not save_paths:
+                save_paths = _resolve_save_paths_for_game(game_name)
+            if not save_paths:
+                return {"success": False, "error": "Не найдены пути сохранений — настройте их в «Пути игр»"}
 
             # Убираем исключённые пользователем пути
             try:
@@ -285,7 +351,7 @@ class Plugin:
                 from sync_engine import create_backup
             
             # Создаем бэкап
-            archive_path = create_backup(game_name, save_paths)
+            archive_path = await asyncio.to_thread(create_backup, game_name, save_paths)
             if not archive_path:
                 return {"success": False, "error": "Не удалось создать архив"}
             
@@ -314,7 +380,7 @@ class Plugin:
             if error:
                 return {"success": False, "error": error}
 
-            file_id = provider.upload_file(archive_path, "GameSync")
+            file_id = await asyncio.to_thread(provider.upload_file, archive_path, "GameSync")
 
             if not file_id:
                 return {"success": False, "error": "Не удалось загрузить архив в хранилище"}
@@ -322,7 +388,7 @@ class Plugin:
             # Получаем размер загруженного файла для статистики
             file_size = None
             try:
-                file_info = provider.get_file_info(file_id)
+                file_info = await asyncio.to_thread(provider.get_file_info, file_id)
                 if file_info and file_info.get('size'):
                     file_size = file_info.get('size')
                     logger.info(f"File size for {game_name}: {file_size} bytes")
@@ -336,8 +402,8 @@ class Plugin:
                 from sync_engine import sanitize_name
                 version_name = f"backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
                 version_folder = f"GameSync/{sanitize_name(game_name)}"
-                version_remote = provider.upload_file(
-                    archive_path, version_folder, remote_name=version_name
+                version_remote = await asyncio.to_thread(
+                    provider.upload_file, archive_path, version_folder, version_name
                 )
             except Exception as e:
                 logger.warning(f"Versioned upload failed for {game_name}: {e}")
@@ -481,51 +547,50 @@ class Plugin:
     
     @decky_params
     async def enable_auto_sync(self, enabled: bool = False, *args, **kwargs) -> Dict[str, Any]:
-        """Включение/выключение автосинхронизации"""
+        """Включение/выключение автосинхронизации. Настройка переживает перезапуск."""
         try:
-            Plugin.auto_sync_enabled = enabled
-            
             if enabled:
-                # auto_sync требует psutil
-                try:
-                    import dependencies
-                    await dependencies.ensure_dependencies_async("auto_sync")
-                except Exception as e:
-                    logger.warning(f"Dependency check failed for auto-sync: {e}")
-
-                try:
-                    from auto_sync import GameMonitor
-                except ImportError:
-                    import sys
-                    import pathlib
-                    backend_path = pathlib.Path(__file__).parent
-                    sys.path.insert(0, str(backend_path))
-                    from auto_sync import GameMonitor
-                
-                async def sync_callback(game_name: str, save_paths: List[str]):
-                    """Callback для автосинхронизации"""
-                    logger.info(f"Auto-syncing game: {game_name}")
-                    resolved_paths = save_paths or _resolve_save_paths_for_game(game_name)
-                    if not resolved_paths:
-                        logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
-                        return
-                    plugin_instance = Plugin()
-                    result = await plugin_instance.sync_game(game_name, resolved_paths)
-                    if result.get("success"):
-                        logger.info(f"Auto-sync completed for {game_name}")
-                    else:
-                        logger.error(f"Auto-sync failed for {game_name}: {result.get('error')}")
-                
-                Plugin.game_monitor = GameMonitor(sync_callback)
-                asyncio.create_task(Plugin.game_monitor.start_monitoring())
+                await self._start_auto_sync()
             else:
-                if Plugin.game_monitor:
-                    Plugin.game_monitor.stop_monitoring()
-                    Plugin.game_monitor = None
-            
-            return {"success": True, "auto_sync_enabled": enabled}
+                self._stop_auto_sync()
+
+            try:
+                from config_manager import save_app_settings
+                save_app_settings(auto_sync=bool(enabled))
+            except Exception as e:
+                logger.warning(f"Failed to persist auto-sync setting: {e}")
+
+            return {"success": True, "auto_sync_enabled": bool(enabled)}
         except Exception as e:
             logger.error(f"Error enabling auto-sync: {e}")
+            return {"success": False, "error": str(e)}
+
+    @decky_params
+    async def get_app_settings(self, *args, **kwargs) -> Dict[str, Any]:
+        """Настройки плагина, которые хранятся на бэкенде."""
+        try:
+            from config_manager import load_app_settings
+            settings = load_app_settings()
+            return {
+                "success": True,
+                "auto_sync": bool(settings.get("auto_sync")),
+                "default_save_paths": settings.get("default_save_paths") or [],
+            }
+        except Exception as e:
+            logger.error(f"Error loading app settings: {e}")
+            return {"success": False, "error": str(e), "auto_sync": False, "default_save_paths": []}
+
+    @decky_params
+    async def set_default_save_paths(self, default_save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:
+        """Сохраняет глобальные пути сохранений (применяются ко всем играм)."""
+        try:
+            from config_manager import save_app_settings
+            if default_save_paths is None:
+                default_save_paths = kwargs.get("default_save_paths") or []
+            settings = save_app_settings(default_save_paths=list(default_save_paths))
+            return {"success": True, "default_save_paths": settings.get("default_save_paths") or []}
+        except Exception as e:
+            logger.error(f"Error saving default save paths: {e}")
             return {"success": False, "error": str(e)}
     
     @decky_params
@@ -695,24 +760,46 @@ class Plugin:
                 from config_manager import load_synced_games
             
             synced_games = load_synced_games()
-            total_syncs = len(synced_games)
-            
+
+            # synced_games хранит только последнюю синхронизацию каждой игры,
+            # поэтому реальное число записей берём из истории бэкапов.
+            try:
+                from backup_index import list_all as list_all_backups
+                backup_entries = [
+                    entry
+                    for entries in (list_all_backups() or {}).values()
+                    for entry in (entries or [])
+                ]
+            except Exception as e:
+                logger.warning(f"Failed to load backup index for stats: {e}")
+                backup_entries = []
+
+            total_syncs = len(backup_entries) or len(synced_games)
+
             # Получаем даты синхронизаций
             syncs_by_date = {}
             last_sync = None
             total_size = 0
-            
-            for game_name, game_data in synced_games.items():
-                sync_date = game_data.get('lastSync', '')
-                if sync_date:
-                    date_key = sync_date[:10]  # YYYY-MM-DD
+
+            for entry in backup_entries:
+                created = str(entry.get("created") or "")
+                if created:
+                    date_key = created[:10]
                     syncs_by_date[date_key] = syncs_by_date.get(date_key, 0) + 1
-                    
-                    if not last_sync or sync_date > last_sync:
-                        last_sync = sync_date
-                
-                # Используем локально сохраненный размер файла
-                file_size = game_data.get('fileSize', 0)
+                    if not last_sync or created > last_sync:
+                        last_sync = created
+
+            if not backup_entries:
+                for game_name, game_data in synced_games.items():
+                    sync_date = game_data.get("lastSync", "")
+                    if sync_date:
+                        date_key = sync_date[:10]  # YYYY-MM-DD
+                        syncs_by_date[date_key] = syncs_by_date.get(date_key, 0) + 1
+                        if not last_sync or sync_date > last_sync:
+                            last_sync = sync_date
+
+            for game_name, game_data in synced_games.items():
+                file_size = game_data.get("fileSize", 0)
                 if file_size and isinstance(file_size, (int, float)):
                     total_size += int(file_size)
             

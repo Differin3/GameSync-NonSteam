@@ -49,8 +49,32 @@ def read_manifest(archive_path: str) -> Optional[Dict[str, Any]]:
     return data
 
 
-def plan_targets(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+def _is_safe_target(path: Path, allowed_root: Path) -> bool:
+    """Разрешаем восстановление только внутрь домашней папки пользователя.
+
+    Архив приходит из облака: если облако скомпрометировано, подменённый
+    манифест не должен дать записать файлы в /etc или /usr.
+    """
+    try:
+        normalized = Path(os.path.normpath(str(path)))
+    except (TypeError, ValueError):
+        return False
+    if ".." in normalized.parts:
+        return False
+    if normalized == allowed_root:
+        return False
+    try:
+        normalized.relative_to(allowed_root)
+    except ValueError:
+        return False
+    return True
+
+
+def plan_targets(
+    manifest: Dict[str, Any], allowed_root: Optional[Path] = None
+) -> Dict[str, Dict[str, Any]]:
     """Сопоставление корень архива -> {path, is_dir}."""
+    root_dir = Path(allowed_root) if allowed_root is not None else Path.home()
     targets: Dict[str, Dict[str, Any]] = {}
     for item in manifest.get("paths") or []:
         if not isinstance(item, dict):
@@ -59,7 +83,11 @@ def plan_targets(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         path = item.get("path")
         if not root or not path:
             continue
-        targets[str(root)] = {"path": Path(str(path)), "is_dir": bool(item.get("is_dir"))}
+        target_path = Path(str(path))
+        if not _is_safe_target(target_path, root_dir):
+            logger.warning(f"Restore target outside {root_dir}: {path}")
+            continue
+        targets[str(root)] = {"path": target_path, "is_dir": bool(item.get("is_dir"))}
     return targets
 
 
@@ -158,9 +186,11 @@ def safe_extract(archive_path: str, targets: Dict[str, Dict[str, Any]]) -> Dict[
     return {"files": files, "bytes": total_bytes, "skipped": skipped}
 
 
-def restore_archive(archive_path: str, manifest: Dict[str, Any]) -> Dict[str, Any]:
+def restore_archive(
+    archive_path: str, manifest: Dict[str, Any], allowed_root: Optional[Path] = None
+) -> Dict[str, Any]:
     """Полный цикл: манифест -> целевые пути -> безопасная распаковка."""
-    targets = plan_targets(manifest)
+    targets = plan_targets(manifest, allowed_root)
     if not targets:
-        raise ValueError("В архиве нет путей сохранений")
+        raise ValueError("В архиве нет путей сохранений внутри домашней папки")
     return safe_extract(archive_path, targets)

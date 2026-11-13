@@ -80,6 +80,24 @@ export function Settings() {
       } catch (error) {
         console.error("Error loading storage config:", error);
       }
+
+      // Автосинхронизация и глобальные пути живут на бэкенде: иначе тумблер
+      // показывал бы «включено» после перезапуска Decky, пока монитор выключен.
+      try {
+        const app: any = await call("get_app_settings", {});
+        if (app?.success) {
+          setSettings((prev) => ({
+            ...prev,
+            autoSync: typeof app.auto_sync === "boolean" ? app.auto_sync : prev.autoSync,
+            defaultSavePaths:
+              Array.isArray(app.default_save_paths) && app.default_save_paths.length > 0
+                ? app.default_save_paths
+                : prev.defaultSavePaths,
+          }));
+        }
+      } catch (error) {
+        console.error("Error loading app settings:", error);
+      }
     };
     loadStorageConfig();
   }, []);
@@ -212,6 +230,14 @@ export function Settings() {
     }
   };
 
+  const persistDefaultPaths = async (paths: string[]) => {
+    try {
+      await call("set_default_save_paths", { default_save_paths: paths });
+    } catch (error) {
+      console.error("Error saving default save paths:", error);
+    }
+  };
+
   const addDefaultPath = async () => {
     if (!newPath.trim()) {
       setPathValidationResult("Введите путь");
@@ -225,7 +251,9 @@ export function Settings() {
         if (settings.defaultSavePaths.includes(response.path)) {
           setPathValidationResult("Этот путь уже добавлен");
         } else {
-          update({ defaultSavePaths: [...settings.defaultSavePaths, response.path] });
+          const nextPaths = [...settings.defaultSavePaths, response.path];
+          update({ defaultSavePaths: nextPaths });
+          void persistDefaultPaths(nextPaths);
           setNewPath("");
         }
       } else {
@@ -239,7 +267,9 @@ export function Settings() {
   };
 
   const removeDefaultPath = (index: number) => {
-    update({ defaultSavePaths: settings.defaultSavePaths.filter((_, i) => i !== index) });
+    const nextPaths = settings.defaultSavePaths.filter((_, i) => i !== index);
+    update({ defaultSavePaths: nextPaths });
+    void persistDefaultPaths(nextPaths);
   };
 
   return (
@@ -484,7 +514,7 @@ export function Settings() {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <Hint>После перезапуска Decky автосинхронизацию нужно включить заново — состояние хранится на бэкенде.</Hint>
+          <Hint>Настройка хранится на бэкенде и восстанавливается после перезапуска Decky.</Hint>
         </PanelSectionRow>
       </PanelSection>
 

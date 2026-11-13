@@ -53,13 +53,16 @@ class FTPProvider(StorageProvider):
                 pass
 
     def _ensure_folder(self, ftp: ftplib.FTP, folder: str) -> None:
-        """Создаёт папку, если её ещё нет."""
-        try:
-            ftp.mkd(folder)
-        except ftplib.error_perm as e:
-            # 550 обычно означает, что папка уже существует
-            if not str(e).startswith("550"):
-                raise
+        """Создаёт папку и всех её родителей, если их ещё нет."""
+        current = ""
+        for part in [p for p in folder.strip("/").split("/") if p]:
+            current = f"{current}/{part}" if current else part
+            try:
+                ftp.mkd(current)
+            except ftplib.error_perm as e:
+                # 550 обычно означает, что папка уже существует
+                if not str(e).startswith("550"):
+                    raise
 
     def upload_file(self, file_path: str, remote_dir: str = None, remote_name: str = None) -> Optional[str]:
         directory = (remote_dir or self.folder_name).strip("/")
