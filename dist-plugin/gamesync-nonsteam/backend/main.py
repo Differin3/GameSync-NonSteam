@@ -576,15 +576,18 @@ class Plugin:
             # История бэкапов — по ней работает вкладка «Бэкапы» и восстановление
             try:
                 from backup_index import add_entry, prepare_trim
+                from config_manager import load_app_settings
+                keep_versions = int(load_app_settings().get("max_backup_versions", 10) or 10)
                 # Записи, которые выпадут из истории (лимит 10 на игру),
                 # удаляем и из облака — иначе файлы копятся бесконечно.
-                to_prune = prepare_trim(game_name)
+                to_prune = prepare_trim(game_name, keep_versions)
                 add_entry(
                     game_name,
                     remote=version_remote or file_id,
                     size=file_size,
                     paths=save_paths,
                     kind="sync",
+                    keep=keep_versions,
                 )
                 for old_entry in to_prune:
                     old_remote = old_entry.get("remote")
@@ -737,6 +740,46 @@ class Plugin:
             return {"success": False, "error": str(e)}
 
     @decky_params
+    async def set_max_backup_versions(self, count: int = 10, *args, **kwargs) -> Dict[str, Any]:
+        """Сколько версий бэкапа хранить на игру (1–100)."""
+        try:
+            value = max(1, min(100, int(count)))
+            from config_manager import save_app_settings
+            save_app_settings(max_backup_versions=value)
+            return {"success": True, "max_backup_versions": value}
+        except Exception as e:
+            logger.error(f"Error saving max backup versions: {e}")
+            return {"success": False, "error": str(e)}
+
+    @decky_params
+    async def download_backup(self, game_name: str = None, backup_id: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Скачать архив бэкапа в ~/Downloads (для ручного хранения)."""
+        try:
+            from pathlib import Path as _Path
+            from backup_index import get_entry
+            from config_manager import load_storage_config
+
+            entry = get_entry(game_name, backup_id)
+            if not entry or not entry.get("remote"):
+                return {"success": False, "error": "Бэкап не найден"}
+
+            provider, error = _build_provider(load_storage_config())
+            if error or provider is None:
+                return {"success": False, "error": error or "Хранилище не настроено"}
+
+            downloads = _Path.home() / "Downloads"
+            downloads.mkdir(parents=True, exist_ok=True)
+            safe_name = (game_name or "game").replace("/", "_").replace("\\", "_")
+            target = downloads / f"{safe_name}-{entry.get('id')}.tar.gz"
+            ok = await asyncio.to_thread(provider.download_file, entry["remote"], str(target))
+            if not ok:
+                return {"success": False, "error": "Не удалось скачать архив"}
+            return {"success": True, "path": str(target)}
+        except Exception as e:
+            logger.error(f"Error downloading backup: {e}")
+            return {"success": False, "error": str(e)}
+
+    @decky_params
     async def get_app_settings(self, *args, **kwargs) -> Dict[str, Any]:
         """Настройки плагина, которые хранятся на бэкенде."""
         try:
@@ -745,11 +788,12 @@ class Plugin:
             return {
                 "success": True,
                 "auto_sync": bool(settings.get("auto_sync")),
+                "max_backup_versions": int(settings.get("max_backup_versions", 10) or 10),
                 "default_save_paths": settings.get("default_save_paths") or [],
             }
         except Exception as e:
             logger.error(f"Error loading app settings: {e}")
-            return {"success": False, "error": str(e), "auto_sync": False, "default_save_paths": []}
+            return {"success": False, "error": str(e), "auto_sync": False, "max_backup_versions": 10, "default_save_paths": []}
 
     @decky_params
     async def set_default_save_paths(self, default_save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:

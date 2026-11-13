@@ -99,6 +99,8 @@ function FaBan (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"},"child":[]}]})(props);
 }function FaDatabase (props) {
   return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M448 73.143v45.714C448 159.143 347.667 192 224 192S0 159.143 0 118.857V73.143C0 32.857 100.333 0 224 0s224 32.857 224 73.143zM448 176v102.857C448 319.143 347.667 352 224 352S0 319.143 0 278.857V176c48.125 33.143 136.208 48.572 224 48.572S399.874 209.143 448 176zm0 160v102.857C448 479.143 347.667 512 224 512S0 479.143 0 438.857V336c48.125 33.143 136.208 48.572 224 48.572S399.874 369.143 448 336z"},"child":[]}]})(props);
+}function FaDownload (props) {
+  return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M216 0h80c13.3 0 24 10.7 24 24v168h87.7c17.8 0 26.7 21.5 14.1 34.1L269.7 378.3c-7.5 7.5-19.8 7.5-27.3 0L90.1 226.1c-12.6-12.6-3.7-34.1 14.1-34.1H192V24c0-13.3 10.7-24 24-24zm296 376v112c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V376c0-13.3 10.7-24 24-24h146.7l49 49c20.1 20.1 52.5 20.1 72.6 0l49-49H488c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z"},"child":[]}]})(props);
 }function FaEdit (props) {
   return GenIcon({"attr":{"viewBox":"0 0 576 512"},"child":[{"tag":"path","attr":{"d":"M402.6 83.2l90.2 90.2c3.8 3.8 3.8 10 0 13.8L274.4 405.6l-92.8 10.3c-12.4 1.4-22.9-9.1-21.5-21.5l10.3-92.8L388.8 83.2c3.8-3.8 10-3.8 13.8 0zm162-22.9l-48.8-48.8c-15.2-15.2-39.9-15.2-55.2 0l-35.4 35.4c-3.8 3.8-3.8 10 0 13.8l90.2 90.2c3.8 3.8 10 3.8 13.8 0l35.4-35.4c15.2-15.3 15.2-40 0-55.2zM384 346.2V448H64V128h229.8c3.2 0 6.2-1.3 8.5-3.5l40-40c7.6-7.6 2.2-20.5-8.5-20.5H48C21.5 64 0 85.5 0 112v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V306.2c0-10.7-12.9-16-20.5-8.5l-40 40c-2.2 2.3-3.5 5.3-3.5 8.5z"},"child":[]}]})(props);
 }function FaExclamationTriangle (props) {
@@ -1035,6 +1037,7 @@ const formatDate$2 = (value) => {
         return value;
     }
 };
+const VERSION_OPTIONS = [3, 5, 10, 20, 50].map((value) => ({ data: value, label: `${value} версий` }));
 function BackupsTab() {
     const [games, setGames] = SP_REACT.useState([]);
     const [loading, setLoading] = SP_REACT.useState(true);
@@ -1042,6 +1045,9 @@ function BackupsTab() {
     const [error, setError] = SP_REACT.useState(null);
     const [selected, setSelected] = SP_REACT.useState(null);
     const [restoring, setRestoring] = SP_REACT.useState(false);
+    const [downloading, setDownloading] = SP_REACT.useState(false);
+    const [maxVersions, setMaxVersions] = SP_REACT.useState(10);
+    const [providerName, setProviderName] = SP_REACT.useState("хранилище");
     const [status, setStatus] = SP_REACT.useState(null);
     const load = async (silent = false) => {
         if (silent) {
@@ -1052,13 +1058,19 @@ function BackupsTab() {
         }
         setError(null);
         try {
-            const response = await call("get_backups", {});
+            const [response, appSettings, storage] = await Promise.all([
+                call("get_backups", {}),
+                call("get_app_settings", {}),
+                call("get_storage_status", {}),
+            ]);
             if (response?.success) {
                 setGames(response.games || []);
             }
             else {
                 setError(response?.error || "Не удалось загрузить список бэкапов");
             }
+            setMaxVersions(Number(appSettings?.max_backup_versions || 10));
+            setProviderName(storage?.provider || "хранилище");
         }
         catch (err) {
             setError(`Ошибка: ${err}`);
@@ -1076,6 +1088,21 @@ function BackupsTab() {
         load();
     }, []);
     const selectedGame = games.find((item) => item.game === selected) || games[0] || null;
+    const changeMaxVersions = async (value) => {
+        setMaxVersions(value);
+        try {
+            const result = await call("set_max_backup_versions", { count: value });
+            if (result?.success) {
+                setStatus({ tone: "success", text: `Будем хранить до ${value} версий на игру` });
+            }
+            else {
+                setStatus({ tone: "error", text: result?.error || "Не удалось сохранить настройку" });
+            }
+        }
+        catch (err) {
+            setStatus({ tone: "error", text: err?.message || String(err) });
+        }
+    };
     const doRestore = async (gameName, entry) => {
         setRestoring(true);
         setStatus(null);
@@ -1104,23 +1131,54 @@ function BackupsTab() {
                 doRestore(gameName, entry);
             }, onCancel: () => modal?.Close() }));
     };
+    const download = async (gameName, entry) => {
+        setDownloading(true);
+        setStatus(null);
+        try {
+            const result = await call("download_backup", { game_name: gameName, backup_id: entry.id });
+            if (result?.success) {
+                setStatus({ tone: "success", text: `Скачано в ${result.path}` });
+            }
+            else {
+                setStatus({ tone: "error", text: result?.error || "Не удалось скачать архив" });
+            }
+        }
+        catch (err) {
+            setStatus({ tone: "error", text: err?.message || String(err) });
+        }
+        finally {
+            setDownloading(false);
+        }
+    };
     if (loading)
         return SP_JSX.jsx(Loading, { text: "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0431\u044D\u043A\u0430\u043F\u043E\u0432..." });
     if (error)
         return SP_JSX.jsx(ErrorState, { text: error, onRetry: load });
     if (games.length === 0)
         return SP_JSX.jsx(EmptyState, { text: "\u0412 \u043E\u0431\u043B\u0430\u043A\u0435 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u2014 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0439\u0442\u0435 \u0438\u0433\u0440\u0443" });
-    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", alignItems: "center", gap: "10px", width: "100%" }, children: [SP_JSX.jsx(FaCloudDownloadAlt, { style: { color: "#66c0f4", fontSize: "18px" } }), SP_JSX.jsxs("div", { style: { flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439" }), SP_JSX.jsxs("div", { style: { fontSize: "11px", color: colors.dim, marginTop: "2px" }, children: [games.length, " \u0438\u0433\u0440 \u00B7 ", games.reduce((sum, item) => sum + item.entries.length, 0), " \u0431\u044D\u043A\u0430\u043F\u043E\u0432"] })] }), SP_JSX.jsx("div", { style: { width: "176px", flex: "0 0 auto" }, children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaRedo, {}), onClick: () => load(true), disabled: refreshing, children: refreshing ? "Обновление…" : "Обновить" }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u041F\u0435\u0440\u0435\u0434 \u044D\u0442\u0438\u043C \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432." }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: status.tone, children: status.text }) }))] }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "14px", alignItems: "flex-start", padding: "0 16px", flexWrap: "wrap" }, children: [SP_JSX.jsx("div", { style: { flex: "1 1 520px", minWidth: "0", display: "flex", flexDirection: "column", gap: "10px" }, children: games.map((item) => {
+    const totalBackups = games.reduce((sum, item) => sum + item.entries.length, 0);
+    const totalSize = games.reduce((sum, item) => sum + item.entries.reduce((acc, entry) => acc + (entry.size || 0), 0), 0);
+    const latest = selectedGame?.entries[0];
+    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", alignItems: "center", gap: "10px" }, children: [SP_JSX.jsx(FaCloudDownloadAlt, { style: { color: "#66c0f4", fontSize: "18px", flex: "0 0 auto" } }), SP_JSX.jsxs("div", { style: { flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439" }), SP_JSX.jsxs("div", { style: { fontSize: "11px", color: colors.dim, marginTop: "2px" }, children: [providerName, " \u00B7 ", games.length, " \u0438\u0433\u0440 \u00B7 ", totalBackups, " \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u00B7 ", formatBytes$2(totalSize)] })] }), SP_JSX.jsx("div", { style: { width: "176px", flex: "0 0 auto" }, children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaRedo, {}), onClick: () => load(true), disabled: refreshing, children: refreshing ? "Обновление…" : "Обновить список" }) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Dropdown, { menuLabel: "\u0425\u0440\u0430\u043D\u0438\u0442\u044C \u0432\u0435\u0440\u0441\u0438\u0439 \u043D\u0430 \u0438\u0433\u0440\u0443", rgOptions: VERSION_OPTIONS, selectedOption: maxVersions, onChange: (option) => changeMaxVersions(Number(option.data)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(Hint, { children: ["\u041F\u043B\u0430\u0433\u0438\u043D \u0445\u0440\u0430\u043D\u0438\u0442 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u044E\u044E \u0432\u0435\u0440\u0441\u0438\u044E \u0438 \u0434\u043E ", Math.max(0, maxVersions - 1), " \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0438\u0445. \u041F\u0435\u0440\u0435\u0434 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435\u043C \u0442\u0435\u043A\u0443\u0449\u0438\u0435 \u0441\u0435\u0439\u0432\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u044E\u0442\u0441\u044F \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432."] }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: status.tone, children: status.text }) }))] }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "14px", alignItems: "flex-start", padding: "0 16px", flexWrap: "wrap" }, children: [SP_JSX.jsx("div", { style: { flex: "1 1 520px", minWidth: "0", display: "flex", flexDirection: "column", gap: "10px" }, children: games.map((item) => {
                             const last = item.entries[0];
                             const isSelected = selectedGame?.game === item.game;
-                            return (SP_JSX.jsxs("div", { style: {
+                            return (SP_JSX.jsxs("div", { onClick: () => setSelected(item.game), style: {
                                     ...card,
                                     display: "flex",
                                     flexDirection: "column",
                                     gap: "8px",
+                                    cursor: "pointer",
                                     borderColor: isSelected ? "rgba(102,192,244,0.45)" : undefined,
-                                }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: item.game }), SP_JSX.jsxs("div", { style: { fontSize: "10.5px", color: colors.dim, marginTop: "2px" }, children: [formatDate$2(last?.created), " \u00B7 ", formatBytes$2(last?.size)] })] }), SP_JSX.jsx("div", { style: { display: "flex", gap: "6px", alignItems: "center" }, children: SP_JSX.jsxs(Badge, { tone: "success", children: [SP_JSX.jsx(FaCloud, { style: { marginRight: "4px" } }), item.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] }) })] }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaHistory, {}), onClick: () => setSelected(item.game), children: "\u0412\u0435\u0440\u0441\u0438\u0438" }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaUndoAlt, {}), onClick: () => last && askRestore(item.game, last), disabled: !last || restoring, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C" }) })] })] }, item.game));
-                        }) }), selectedGame && (SP_JSX.jsxs("div", { style: { ...card, width: "320px", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: selectedGame.game }), SP_JSX.jsxs("div", { style: { fontSize: "10.5px", color: colors.dim }, children: ["\u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0431\u044D\u043A\u0430\u043F: ", formatDate$2(selectedGame.entries[0]?.created)] }), SP_JSX.jsx("div", { style: { fontSize: "22px", fontWeight: 600, color: colors.text }, children: formatBytes$2(selectedGame.entries[0]?.size) }), SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }, children: selectedGame.entries.slice(0, 6).map((entry) => (SP_JSX.jsx(DFL.ButtonItem, { icon: SP_JSX.jsx(Icon, { children: SP_JSX.jsx(FaUndoAlt, {}) }), label: formatDate$2(entry.created), description: `${formatBytes$2(entry.size)} · восстановить`, onClick: () => askRestore(selectedGame.game, entry), disabled: restoring }, entry.id))) }), SP_JSX.jsx(Hint, { children: "\u0412\u0435\u0440\u0441\u0438\u0438 \u0445\u0440\u0430\u043D\u044F\u0442\u0441\u044F \u0432 \u043E\u0431\u043B\u0430\u043A\u0435, \u0441\u0442\u0430\u0440\u044B\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u0438\u0441\u0447\u0435\u0437\u0430\u044E\u0442 \u0438\u0437 \u0441\u043F\u0438\u0441\u043A\u0430 \u043F\u043E\u0441\u043B\u0435 10 \u0448\u0442\u0443\u043A." })] }))] })] }));
+                                }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center" }, children: [SP_JSX.jsxs("div", { style: { minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: item.game }), SP_JSX.jsxs("div", { style: { fontSize: "10.5px", color: colors.dim, marginTop: "2px" }, children: [formatDate$2(last?.created), " \u00B7 ", formatBytes$2(last?.size), " \u00B7 ", (last?.paths || []).length, " \u043F\u0443\u0442\u0435\u0439"] })] }), SP_JSX.jsxs(Badge, { tone: "success", children: [SP_JSX.jsx(FaCloud, { style: { marginRight: "4px" } }), "\u0432 \u043E\u0431\u043B\u0430\u043A\u0435"] })] }), SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaUndoAlt, {}), onClick: () => last && askRestore(item.game, last), disabled: !last || restoring, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C" })] }, item.game));
+                        }) }), selectedGame && latest && (SP_JSX.jsxs("aside", { style: { ...card, width: "320px", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 600, color: colors.text }, children: selectedGame.game }), SP_JSX.jsxs("div", { style: dimText, children: ["\u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0431\u044D\u043A\u0430\u043F: ", formatDate$2(latest.created)] }), SP_JSX.jsxs("div", { style: { fontSize: "24px", fontWeight: 600, color: colors.text }, children: [formatBytes$2(latest.size), " ", SP_JSX.jsxs("span", { style: { fontSize: "11px", fontWeight: 400, color: colors.dim }, children: ["\u00B7 ", selectedGame.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] })] }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "4px", fontSize: "11px", color: colors.muted }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px" }, children: [SP_JSX.jsx("span", { children: "\u041F\u0443\u0442\u0435\u0439 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439" }), SP_JSX.jsx("span", { style: { color: colors.text }, children: (latest.paths || []).length })] }), SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", minWidth: 0 }, children: [SP_JSX.jsx("span", { children: "\u0412 \u043E\u0431\u043B\u0430\u043A\u0435" }), SP_JSX.jsx("span", { style: { color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: String(latest.remote || "").split("/").slice(-2).join("/") })] })] }), SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }, children: selectedGame.entries.slice(0, 6).map((entry) => (SP_JSX.jsxs("div", { style: {
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        gap: "8px",
+                                        fontSize: "10.5px",
+                                        color: colors.dim,
+                                        padding: "3px 0",
+                                        borderTop: "1px solid rgba(255,255,255,0.05)",
+                                    }, children: [SP_JSX.jsx("span", { children: formatDate$2(entry.created) }), SP_JSX.jsx("span", { children: formatBytes$2(entry.size) })] }, entry.id))) }), SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaUndoAlt, {}), onClick: () => askRestore(selectedGame.game, latest), disabled: restoring, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u0437 \u043E\u0431\u043B\u0430\u043A\u0430" }), SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaDownload, {}), onClick: () => download(selectedGame.game, latest), disabled: downloading, children: downloading ? "Скачивание…" : "Скачать .tar.gz" }), SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u0422\u0435\u043A\u0443\u0449\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0431\u0443\u0434\u0435\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u043A\u0430\u043A \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u0430\u044F." })] }))] })] }));
 }
 
 const formatBytes$1 = (bytes) => {
