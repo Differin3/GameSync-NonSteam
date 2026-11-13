@@ -129,7 +129,7 @@ export function BackupsTab() {
                 {games.length} игр · {games.reduce((sum, item) => sum + item.entries.length, 0)} бэкапов
               </div>
             </div>
-            <div style={{ minWidth: "160px" }}>
+            <div style={{ width: "176px", flex: "0 0 auto" }}>
               <ActionButton   icon={<FaRedo />} onClick={() => load(true)} disabled={refreshing}>
                 {refreshing ? "Обновление…" : "Обновить"}
               </ActionButton>
