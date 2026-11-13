@@ -113,8 +113,6 @@ function FaBan (props) {
   return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"},"child":[]}]})(props);
 }function FaSlidersH (props) {
   return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M496 384H160v-16c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v16H16c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h80v16c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-16h336c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zm0-160h-80v-16c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v16H16c-8.8 0-16 7.2-16 16v32c0 8.8 7.2 16 16 16h336v16c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-16h80c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zm0-160H288V48c0-8.8-7.2-16-16-16h-32c-8.8 0-16 7.2-16 16v16H16C7.2 64 0 71.2 0 80v32c0 8.8 7.2 16 16 16h208v16c0 8.8 7.2 16 16 16h32c8.8 0 16-7.2 16-16v-16h208c8.8 0 16-7.2 16-16V80c0-8.8-7.2-16-16-16z"},"child":[]}]})(props);
-}function FaSyncAlt (props) {
-  return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M370.72 133.28C339.458 104.008 298.888 87.962 255.848 88c-77.458.068-144.328 53.178-162.791 126.85-1.344 5.363-6.122 9.15-11.651 9.15H24.103c-7.498 0-13.194-6.807-11.807-14.176C33.933 94.924 134.813 8 256 8c66.448 0 126.791 26.136 171.315 68.685L463.03 40.97C478.149 25.851 504 36.559 504 57.941V192c0 13.255-10.745 24-24 24H345.941c-21.382 0-32.09-25.851-16.971-40.971l41.75-41.749zM32 296h134.059c21.382 0 32.09 25.851 16.971 40.971l-41.75 41.75c31.262 29.273 71.835 45.319 114.876 45.28 77.418-.07 144.315-53.144 162.787-126.849 1.344-5.363 6.122-9.15 11.651-9.15h57.304c7.498 0 13.194 6.807 11.807 14.176C478.067 417.076 377.187 504 256 504c-66.448 0-126.791-26.136-171.315-68.685L48.97 471.03C33.851 486.149 8 475.441 8 454.059V320c0-13.255 10.745-24 24-24z"},"child":[]}]})(props);
 }function FaTimes (props) {
   return GenIcon({"attr":{"viewBox":"0 0 352 512"},"child":[{"tag":"path","attr":{"d":"M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"},"child":[]}]})(props);
 }function FaTrash (props) {
@@ -408,7 +406,16 @@ function ErrorState({ text, onRetry }) {
     return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: text }) }), onRetry && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: onRetry, children: "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C" }) }))] }));
 }
 
-const actionButton = (children) => (SP_JSX.jsx("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "7px" }, children: children }));
+const VISIBLE_LIMIT$1 = 8;
+const descriptionFor = (game) => {
+    const parts = [game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"];
+    if (typeof game.steamAppId === "number")
+        parts.push(`appid ${game.steamAppId}`);
+    if (game.sharedPrefix)
+        parts.push(`общий префикс: ${(game.sharedWith || []).slice(0, 2).join(", ")}`);
+    parts.push("синхронизировать");
+    return parts.join(" · ");
+};
 function GameList() {
     const [games, setGames] = SP_REACT.useState([]);
     const [loading, setLoading] = SP_REACT.useState(true);
@@ -475,14 +482,23 @@ function GameList() {
     SP_REACT.useEffect(() => {
         loadGames();
     }, []);
-    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsx(DFL.PanelSection, { title: `Найденные игры (${games.length})`, children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => loadGames(true), disabled: loading, children: actionButton(SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(FaRedo, {}), loading ? "Сканирование…" : "Обновить"] })) }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: openPaths, children: actionButton(SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(FaFolderOpen, {}), "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u043F\u0443\u0442\u0438"] })) }) })] }) }) }), loading && SP_JSX.jsx(Loading, { text: "\u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0438\u0433\u0440 PortProton..." }), error && !loading && SP_JSX.jsx(ErrorState, { text: error, onRetry: () => loadGames() }), games.length === 0 && !loading && !error && SP_JSX.jsx(EmptyState, { text: "\u0418\u0433\u0440\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B" }), !loading &&
-                games.map((game, index) => {
-                    const isSyncing = syncing[game.name];
-                    const status = syncStatus[game.name];
-                    return (SP_JSX.jsxs(DFL.PanelSection, { title: game.name, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }, children: [SP_JSX.jsx(Badge, { tone: game.hasSaves ? "success" : "warning", children: game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений" }), typeof game.steamAppId === "number" && SP_JSX.jsxs(Badge, { children: ["appid ", game.steamAppId] }), game.sharedPrefix && SP_JSX.jsx(Badge, { tone: "warning", children: "\u043E\u0431\u0449\u0438\u0439 \u043F\u0440\u0435\u0444\u0438\u043A\u0441" })] }), game.savePaths.length > 0 ? (SP_JSX.jsx(PathText, { children: game.savePaths[0] })) : (SP_JSX.jsx("div", { style: dimText, children: "\u041F\u0443\u0442\u0438 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u2014 \u0434\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u0438\u0445 \u0432\u0440\u0443\u0447\u043D\u0443\u044E." })), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", width: "100%" }, children: [SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: openPaths, children: actionButton(SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(FaFolderOpen, {}), "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0443\u0442\u0438"] })) }) }), SP_JSX.jsx("div", { style: { flex: 1 }, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => syncGame(game), disabled: isSyncing || !game.hasSaves, children: isSyncing ? (SP_JSX.jsxs("span", { style: { display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F\u2026" })] })) : (actionButton(SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(FaSyncAlt, {}), "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C"] }))) }) })] })] }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: status.status === "success" ? "success" : status.status === "error" ? "error" : "info", children: status.message || "Синхронизация…" }) }))] }, index));
-                }), !loading && games.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { ...dimText, textAlign: "center", width: "100%", color: colors.dim }, children: "\u0418\u0433\u0440\u044B \u043D\u0430\u0445\u043E\u0434\u044F\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u043F\u043E \u043F\u0440\u0435\u0444\u0438\u043A\u0441\u0430\u043C PortProton \u0438 \u044F\u0440\u043B\u044B\u043A\u0430\u043C Steam" }) }) }))] }));
+    if (loading) {
+        return SP_JSX.jsx(Loading, { text: "\u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0438\u0433\u0440 PortProton..." });
+    }
+    if (error) {
+        return SP_JSX.jsx(ErrorState, { text: error, onRetry: () => loadGames() });
+    }
+    if (games.length === 0) {
+        return SP_JSX.jsx(EmptyState, { text: "\u0418\u0433\u0440\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B" });
+    }
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: `Найденные игры (${games.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaRedo, {}), onClick: () => loadGames(true), children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), games.slice(0, VISIBLE_LIMIT$1).map((game) => {
+                const isSyncing = syncing[game.name];
+                const status = syncStatus[game.name];
+                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%" }, children: [SP_JSX.jsx(DFL.ButtonItem, { icon: isSyncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaGamepad, {}), label: game.name, description: descriptionFor(game), onClick: () => syncGame(game), disabled: isSyncing || !game.hasSaves }), status && (SP_JSX.jsx(StatusMessage, { tone: status.status === "success" ? "success" : status.status === "error" ? "error" : "info", children: status.message || "Синхронизация…" }))] }) }, game.name));
+            }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaFolderOpen, {}), onClick: openPaths, children: games.length > VISIBLE_LIMIT$1 ? `Все игры и пути (${games.length})` : "Настроить пути" }) })] }));
 }
 
+const VISIBLE_LIMIT = 5;
 const formatDate$3 = (isoString) => {
     try {
         return new Date(isoString).toLocaleString("ru-RU", {
@@ -500,23 +516,18 @@ const formatDate$3 = (isoString) => {
 function SyncedGamesList() {
     const [syncedGames, setSyncedGames] = SP_REACT.useState([]);
     const [loading, setLoading] = SP_REACT.useState(true);
-    const [error, setError] = SP_REACT.useState(null);
     const [syncing, setSyncing] = SP_REACT.useState({});
     const [status, setStatus] = SP_REACT.useState(null);
     const loadSyncedGames = async () => {
         setLoading(true);
-        setError(null);
         try {
             const result = await call("get_synced_games", {});
             if (result.success && result.games) {
                 setSyncedGames(result.games);
             }
-            else {
-                setError(result.error || "Ошибка загрузки списка");
-            }
         }
-        catch (err) {
-            setError(`Ошибка: ${err}`);
+        catch (error) {
+            console.error("Failed to load synced games", error);
         }
         finally {
             setLoading(false);
@@ -555,44 +566,15 @@ function SyncedGamesList() {
     SP_REACT.useEffect(() => {
         loadSyncedGames();
     }, []);
-    if (loading) {
-        return SP_JSX.jsx(Loading, { text: "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0441\u043F\u0438\u0441\u043A\u0430 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439..." });
+    if (loading || syncedGames.length === 0) {
+        return null;
     }
-    if (error) {
-        return SP_JSX.jsx(ErrorState, { text: error, onRetry: loadSyncedGames });
-    }
-    if (syncedGames.length === 0) {
-        return SP_JSX.jsx(EmptyState, { text: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0445 \u0438\u0433\u0440 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442" });
-    }
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: `Синхронизированные игры (${syncedGames.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: loadSyncedGames, disabled: loading, children: SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "7px" }, children: [SP_JSX.jsx(FaRedo, {}), "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A"] }) }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: status }) })), syncedGames.map((game, index) => {
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: `Синхронизированные игры (${syncedGames.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaRedo, {}), onClick: loadSyncedGames, children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: status }) })), syncedGames.slice(0, VISIBLE_LIMIT).map((game) => {
                 const isSyncing = syncing[game.gameName];
-                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: game.gameName }), SP_JSX.jsx("span", { style: { fontSize: "11px", color: colors.dim }, children: formatDate$3(game.lastSync) })] }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "6px" }, children: [SP_JSX.jsxs(Badge, { tone: "success", children: [SP_JSX.jsx(FaCloud, { style: { marginRight: "4px" } }), "\u0432 \u043E\u0431\u043B\u0430\u043A\u0435"] }), SP_JSX.jsx("span", { style: dimText, children: game.fileId ? "GameSync" : "" })] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => resyncGame(game), disabled: isSyncing, children: isSyncing ? (SP_JSX.jsxs("span", { style: { display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F\u2026" })] })) : (SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "7px" }, children: [SP_JSX.jsx(FaSyncAlt, {}), "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u043D\u043E\u0432\u0430"] })) })] }) }, index));
+                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { icon: isSyncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaCloud, {}), label: game.gameName, description: `в облаке · ${formatDate$3(game.lastSync)} · синхронизировать снова`, onClick: () => resyncGame(game), disabled: isSyncing }) }, game.gameName));
             })] }));
 }
 
-const heroCard = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "12px",
-    borderRadius: "10px",
-    background: "linear-gradient(135deg, rgba(30, 48, 62, 0.9), rgba(18, 26, 33, 0.9))",
-    border: "1px solid rgba(102, 192, 244, 0.18)",
-};
-const iconBubble = {
-    width: "34px",
-    height: "34px",
-    borderRadius: "9px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    background: "linear-gradient(145deg, #1a9fff, #0b5fa5)",
-    boxShadow: "0 4px 14px rgba(26, 159, 255, 0.35)",
-    flex: "0 0 auto",
-};
 function GameSyncMain() {
     const [status, setStatus] = SP_REACT.useState("Проверка подключения...");
     const [connected, setConnected] = SP_REACT.useState(false);
@@ -619,7 +601,7 @@ function GameSyncMain() {
         DFL.Router.CloseSideMenus();
         DFL.Router.Navigate("/gamesync-settings");
     };
-    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: heroCard, children: [SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "10px" }, children: [SP_JSX.jsx("div", { style: iconBubble, children: SP_JSX.jsx(FaCloud, { size: 16 }) }), SP_JSX.jsxs("div", { style: { flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "14px", fontWeight: 600, color: colors.text }, children: "GameSync" }), SP_JSX.jsx("div", { style: { fontSize: "11px", color: colors.muted, marginTop: "2px" }, children: checking ? "Проверка связи…" : status })] }), SP_JSX.jsx(Badge, { tone: connected ? "success" : "error", children: connected ? "подключено" : "нет связи" })] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: openSettings, children: SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsx(FaCog, {}), "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0438 \u043F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439"] }) })] }) }) }), checking && !connected && SP_JSX.jsx(Loading, { text: "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F..." }), connected && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(SyncedGamesList, {}), SP_JSX.jsx(GameList, {})] })), !checking && !connected && (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u0438 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043F\u043B\u0430\u0433\u0438\u043D \u0438\u0437 Decky." }) }) }))] }));
+    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { icon: SP_JSX.jsx(FaCloud, { style: { color: "#66c0f4" } }), label: "GameSync", description: checking ? "Проверка связи…" : `${connected ? "подключено" : "нет связи"} · ${status}` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: SP_JSX.jsx(FaCog, {}), onClick: openSettings, children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0438 \u043F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439" }) })] }), checking && !connected && SP_JSX.jsx(Loading, { text: "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F..." }), connected && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(SyncedGamesList, {}), SP_JSX.jsx(GameList, {})] })), !checking && !connected && (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u0438 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043F\u043B\u0430\u0433\u0438\u043D \u0438\u0437 Decky." }) }) }))] }));
 }
 
 const STORAGE_OPTIONS = [
