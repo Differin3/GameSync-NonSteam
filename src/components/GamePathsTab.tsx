@@ -161,7 +161,7 @@ export function GamePathsTab() {
                 {games.length} игр · глобальных путей: {settings.defaultSavePaths.length}
               </div>
             </div>
-            <div style={{ width: "150px", flex: "0 0 auto" }}>
+            <div style={{ width: "176px", flex: "0 0 auto" }}>
               <ActionButton icon={<FaRedo />} onClick={() => loadGames(true)} disabled={loading}>
                 Обновить
               </ActionButton>
@@ -194,7 +194,7 @@ export function GamePathsTab() {
                       {game.sharedPrefix && <Badge tone="warning">общий префикс</Badge>}
                     </div>
                   </div>
-                  <div style={{ width: "140px", flex: "0 0 auto" }}>
+                  <div style={{ width: "176px", flex: "0 0 auto" }}>
                     <ActionButton
                       icon={isEditing ? <FaTimes /> : <FaEdit />}
                       onClick={() => {
@@ -281,7 +281,7 @@ export function GamePathsTab() {
                             {candidate.fileCount ? ` · файлов: ${candidate.fileCount}` : ""}
                           </div>
                         </div>
-                        <div style={{ width: "120px", flex: "0 0 auto" }}>
+                        <div style={{ width: "176px", flex: "0 0 auto" }}>
                           <ActionButton icon={<FaPlus />} onClick={() => addCandidateToGame(game, candidate.path)}>
                             Добавить
                           </ActionButton>
