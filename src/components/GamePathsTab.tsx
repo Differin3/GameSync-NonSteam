@@ -244,28 +244,22 @@ export function GamePathsTab() {
                           {path}
                         </div>
                         {isEditing && (
-                          <div style={{ display: "flex", gap: "6px", flex: "0 0 auto" }}>
-                            <div style={{ width: "104px" }}>
-                              <ActionButton
-                                icon={<FaEdit />}
-                                onClick={() => {
-                                  setEditingPathIndex(pathIndex);
-                                  setEditingPathValue(path);
-                                }}
-                              >
-                                Изменить
-                              </ActionButton>
-                            </div>
-                            <div style={{ width: "104px" }}>
-                              <ActionButton icon={<FaBan />} onClick={() => excludePathFromGame(game, path)}>
-                                Исключить
-                              </ActionButton>
-                            </div>
-                            <div style={{ width: "96px" }}>
-                              <ActionButton icon={<FaTrash />} onClick={() => removePathFromGame(game, pathIndex)}>
-                                Удалить
-                              </ActionButton>
-                            </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%", marginTop: "2px" }}>
+                            <ActionButton
+                              icon={<FaEdit />}
+                              onClick={() => {
+                                setEditingPathIndex(pathIndex);
+                                setEditingPathValue(path);
+                              }}
+                            >
+                              Изменить путь
+                            </ActionButton>
+                            <ActionButton icon={<FaBan />} onClick={() => excludePathFromGame(game, path)}>
+                              Исключить из синхронизации
+                            </ActionButton>
+                            <ActionButton icon={<FaTrash />} onClick={() => removePathFromGame(game, pathIndex)}>
+                              Удалить путь
+                            </ActionButton>
                           </div>
                         )}
                       </div>
