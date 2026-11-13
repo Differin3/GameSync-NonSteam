@@ -71,6 +71,7 @@ def add_entry(
     paths: Optional[List[str]] = None,
     kind: str = "sync",
     created: Optional[str] = None,
+    keep: int = MAX_PER_GAME,
 ) -> Optional[Dict[str, Any]]:
     """Записывает бэкап в историю. ``kind``: sync | prerestore."""
     if not game_name or not remote:
@@ -89,7 +90,8 @@ def add_entry(
         data = _load()
         entries = data.setdefault(game_name, [])
         entries.insert(0, entry)
-        del entries[MAX_PER_GAME:]
+        limit = max(1, int(keep))
+        del entries[limit:]
         _save(data)
     return entry
 

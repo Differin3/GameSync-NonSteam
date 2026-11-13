@@ -168,6 +168,7 @@ def _app_settings_file() -> Path:
 
 DEFAULT_APP_SETTINGS: Dict[str, Any] = {
     "auto_sync": False,
+    "max_backup_versions": 10,
     "default_save_paths": [],
 }
 

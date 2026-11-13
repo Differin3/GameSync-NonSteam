@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
-import { ButtonItem, ConfirmModal, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
-import { FaCloud, FaCloudDownloadAlt, FaHistory, FaRedo, FaUndoAlt } from "react-icons/fa";
+import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
+import { FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
-import { ActionButton, Badge, EmptyState, ErrorState, Hint, Icon, Loading, StatusMessage } from "./ui";
+import { ActionButton, Badge, EmptyState, ErrorState, Hint, Loading, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
-import { card, colors } from "../utils/theme";
+import { card, colors, dimText } from "../utils/theme";
 
 const formatBytes = (bytes?: number): string => {
   if (!bytes || bytes <= 0) return "—";
@@ -29,6 +29,8 @@ const formatDate = (value?: string): string => {
   }
 };
 
+const VERSION_OPTIONS = [3, 5, 10, 20, 50].map((value) => ({ data: value, label: `${value} версий` }));
+
 export function BackupsTab() {
   const [games, setGames] = useState<GameBackups[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -36,6 +38,9 @@ export function BackupsTab() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [restoring, setRestoring] = useState<boolean>(false);
+  const [downloading, setDownloading] = useState<boolean>(false);
+  const [maxVersions, setMaxVersions] = useState<number>(10);
+  const [providerName, setProviderName] = useState<string>("хранилище");
   const [status, setStatus] = useState<{ tone: Tone; text: string } | null>(null);
 
   const load = async (silent: boolean = false) => {
@@ -46,12 +51,18 @@ export function BackupsTab() {
     }
     setError(null);
     try {
-      const response: any = await call("get_backups", {});
+      const [response, appSettings, storage]: any[] = await Promise.all([
+        call("get_backups", {}),
+        call("get_app_settings", {}),
+        call("get_storage_status", {}),
+      ]);
       if (response?.success) {
         setGames(response.games || []);
       } else {
         setError(response?.error || "Не удалось загрузить список бэкапов");
       }
+      setMaxVersions(Number(appSettings?.max_backup_versions || 10));
+      setProviderName(storage?.provider || "хранилище");
     } catch (err) {
       setError(`Ошибка: ${err}`);
     } finally {
@@ -68,6 +79,20 @@ export function BackupsTab() {
   }, []);
 
   const selectedGame = games.find((item) => item.game === selected) || games[0] || null;
+
+  const changeMaxVersions = async (value: number) => {
+    setMaxVersions(value);
+    try {
+      const result: any = await call("set_max_backup_versions", { count: value });
+      if (result?.success) {
+        setStatus({ tone: "success", text: `Будем хранить до ${value} версий на игру` });
+      } else {
+        setStatus({ tone: "error", text: result?.error || "Не удалось сохранить настройку" });
+      }
+    } catch (err: any) {
+      setStatus({ tone: "error", text: err?.message || String(err) });
+    }
+  };
 
   const doRestore = async (gameName: string, entry: BackupEntry) => {
     setRestoring(true);
@@ -113,32 +138,67 @@ export function BackupsTab() {
     );
   };
 
+  const download = async (gameName: string, entry: BackupEntry) => {
+    setDownloading(true);
+    setStatus(null);
+    try {
+      const result: any = await call("download_backup", { game_name: gameName, backup_id: entry.id });
+      if (result?.success) {
+        setStatus({ tone: "success", text: `Скачано в ${result.path}` });
+      } else {
+        setStatus({ tone: "error", text: result?.error || "Не удалось скачать архив" });
+      }
+    } catch (err: any) {
+      setStatus({ tone: "error", text: err?.message || String(err) });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading) return <Loading text="Загрузка бэкапов..." />;
   if (error) return <ErrorState text={error} onRetry={load} />;
   if (games.length === 0) return <EmptyState text="В облаке пока нет бэкапов — синхронизируйте игру" />;
+
+  const totalBackups = games.reduce((sum, item) => sum + item.entries.length, 0);
+  const totalSize = games.reduce((sum, item) => sum + item.entries.reduce((acc, entry) => acc + (entry.size || 0), 0), 0);
+  const latest = selectedGame?.entries[0];
 
   return (
     <div>
       <PanelSection>
         <PanelSectionRow>
-          <div style={{ ...card, display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
-            <FaCloudDownloadAlt style={{ color: "#66c0f4", fontSize: "18px" }} />
+          <div style={{ ...card, display: "flex", alignItems: "center", gap: "10px" }}>
+            <FaCloudDownloadAlt style={{ color: "#66c0f4", fontSize: "18px", flex: "0 0 auto" }} />
             <div style={{ flex: "1 1 auto", minWidth: 0 }}>
               <div style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>Восстановление сохранений</div>
               <div style={{ fontSize: "11px", color: colors.dim, marginTop: "2px" }}>
-                {games.length} игр · {games.reduce((sum, item) => sum + item.entries.length, 0)} бэкапов
+                {providerName} · {games.length} игр · {totalBackups} бэкапов · {formatBytes(totalSize)}
               </div>
             </div>
             <div style={{ width: "176px", flex: "0 0 auto" }}>
-              <ActionButton   icon={<FaRedo />} onClick={() => load(true)} disabled={refreshing}>
-                {refreshing ? "Обновление…" : "Обновить"}
+              <ActionButton icon={<FaRedo />} onClick={() => load(true)} disabled={refreshing}>
+                {refreshing ? "Обновление…" : "Обновить список"}
               </ActionButton>
             </div>
           </div>
         </PanelSectionRow>
+
         <PanelSectionRow>
-          <Hint>Восстановление перезапишет локальные сейвы. Перед этим плагин сохранит их в резервный архив.</Hint>
+          <Dropdown
+            menuLabel="Хранить версий на игру"
+            rgOptions={VERSION_OPTIONS}
+            selectedOption={maxVersions}
+            onChange={(option) => changeMaxVersions(Number(option.data))}
+          />
         </PanelSectionRow>
+
+        <PanelSectionRow>
+          <Hint>
+            Плагин хранит последнюю версию и до {Math.max(0, maxVersions - 1)} предыдущих. Перед восстановлением
+            текущие сейвы сохраняются в резервный архив.
+          </Hint>
+        </PanelSectionRow>
+
         {status && (
           <PanelSectionRow>
             <StatusMessage tone={status.tone}>{status.text}</StatusMessage>
@@ -154,11 +214,13 @@ export function BackupsTab() {
             return (
               <div
                 key={item.game}
+                onClick={() => setSelected(item.game)}
                 style={{
                   ...card,
                   display: "flex",
                   flexDirection: "column",
                   gap: "8px",
+                  cursor: "pointer",
                   borderColor: isSelected ? "rgba(102,192,244,0.45)" : undefined,
                 }}
               >
@@ -166,63 +228,73 @@ export function BackupsTab() {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>{item.game}</div>
                     <div style={{ fontSize: "10.5px", color: colors.dim, marginTop: "2px" }}>
-                      {formatDate(last?.created)} · {formatBytes(last?.size)}
+                      {formatDate(last?.created)} · {formatBytes(last?.size)} · {(last?.paths || []).length} путей
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                    <Badge tone="success">
-                      <FaCloud style={{ marginRight: "4px" }} />
-                      {item.entries.length} версий
-                    </Badge>
-                  </div>
+                  <Badge tone="success">
+                    <FaCloud style={{ marginRight: "4px" }} />в облаке
+                  </Badge>
                 </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <div style={{ flex: 1 }}>
-                    <ActionButton   icon={<FaHistory />} onClick={() => setSelected(item.game)}>
-                      Версии
-                    </ActionButton>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <ActionButton
-                      
-                       icon={<FaUndoAlt />}
-                      onClick={() => last && askRestore(item.game, last)}
-                      disabled={!last || restoring}
-                    >
-                      Восстановить
-                    </ActionButton>
-                  </div>
-                </div>
+                <ActionButton icon={<FaUndoAlt />} onClick={() => last && askRestore(item.game, last)} disabled={!last || restoring}>
+                  Восстановить
+                </ActionButton>
               </div>
             );
           })}
         </div>
 
-        {selectedGame && (
-          <div style={{ ...card, width: "320px", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>{selectedGame.game}</div>
-            <div style={{ fontSize: "10.5px", color: colors.dim }}>
-              последний бэкап: {formatDate(selectedGame.entries[0]?.created)}
-            </div>
-            <div style={{ fontSize: "22px", fontWeight: 600, color: colors.text }}>
-              {formatBytes(selectedGame.entries[0]?.size)}
+        {selectedGame && latest && (
+          <aside style={{ ...card, width: "320px", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: colors.text }}>{selectedGame.game}</div>
+            <div style={dimText}>последний бэкап: {formatDate(latest.created)}</div>
+
+            <div style={{ fontSize: "24px", fontWeight: 600, color: colors.text }}>
+              {formatBytes(latest.size)}{" "}
+              <span style={{ fontSize: "11px", fontWeight: 400, color: colors.dim }}>· {selectedGame.entries.length} версий</span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "11px", color: colors.muted }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+                <span>Путей сохранений</span>
+                <span style={{ color: colors.text }}>{(latest.paths || []).length}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
+                <span>В облаке</span>
+                <span style={{ color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {String(latest.remote || "").split("/").slice(-2).join("/")}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
               {selectedGame.entries.slice(0, 6).map((entry) => (
-                <ButtonItem
+                <div
                   key={entry.id}
-                  icon={<Icon><FaUndoAlt /></Icon>}
-                  label={formatDate(entry.created)}
-                  description={`${formatBytes(entry.size)} · восстановить`}
-                  onClick={() => askRestore(selectedGame.game, entry)}
-                  disabled={restoring}
-                />
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "8px",
+                    fontSize: "10.5px",
+                    color: colors.dim,
+                    padding: "3px 0",
+                    borderTop: "1px solid rgba(255,255,255,0.05)",
+                  }}
+                >
+                  <span>{formatDate(entry.created)}</span>
+                  <span>{formatBytes(entry.size)}</span>
+                </div>
               ))}
             </div>
 
-            <Hint>Версии хранятся в облаке, старые записи исчезают из списка после 10 штук.</Hint>
-          </div>
+            <ActionButton icon={<FaUndoAlt />} onClick={() => askRestore(selectedGame.game, latest)} disabled={restoring}>
+              Восстановить из облака
+            </ActionButton>
+            <ActionButton icon={<FaDownload />} onClick={() => download(selectedGame.game, latest)} disabled={downloading}>
+              {downloading ? "Скачивание…" : "Скачать .tar.gz"}
+            </ActionButton>
+
+            <Hint>Восстановление перезапишет локальные сейвы. Текущая версия будет сохранена как резервная.</Hint>
+          </aside>
         )}
       </div>
     </div>
