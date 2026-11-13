@@ -7,6 +7,24 @@ from base_provider import StorageProvider
 
 logger = logging.getLogger(__name__)
 
+_FRIENDLY_HTTP = {
+    401: "неверный логин или пароль приложения",
+    402: "WebDAV недоступен на бесплатном тарифе — для Яндекса нужен Яндекс 360",
+    403: "доступ запрещён: проверьте пароль приложения или отключите лишний OAuth-токен",
+    404: "папка не найдена",
+    405: "метод не разрешён сервером",
+    507: "недостаточно места в облаке",
+}
+
+
+def explain_http_error(status_code: int, body: str = "") -> str:
+    """Понятное описание HTTP-ошибки WebDAV для интерфейса."""
+    hint = _FRIENDLY_HTTP.get(int(status_code))
+    if hint:
+        return f"HTTP {status_code}: {hint}"
+    snippet = (body or "").strip().replace("\n", " ")[:120]
+    return f"HTTP {status_code}" + (f": {snippet}" if snippet else "")
+
 class WebDAVProvider(StorageProvider):
     """Провайдер для WebDAV хранилища"""
     
@@ -51,6 +69,7 @@ class WebDAVProvider(StorageProvider):
         по вложенному пути без предварительного создания GameSync вернул бы
         409 Conflict.
         """
+        self.last_error_status = None
         parts = [part for part in folder_path.strip("/").split("/") if part]
         current = ""
         try:
@@ -61,7 +80,8 @@ class WebDAVProvider(StorageProvider):
                 response = requests.request('MKCOL', full_path, auth=self.auth, headers=headers, timeout=10)
                 # 201 — создана, 405 — уже существует, 301 — редирект на существующую
                 if response.status_code not in (201, 301, 302, 405):
-                    logger.warning(f"MKCOL {current}: HTTP {response.status_code}")
+                    self.last_error_status = response.status_code
+                    logger.warning(f"MKCOL {current}: {explain_http_error(response.status_code, response.text)}")
                     return False
             return True
         except Exception as e:
@@ -188,18 +208,28 @@ class WebDAVProvider(StorageProvider):
             if "Depth" not in headers:
                 headers["Depth"] = "0"
             response = requests.request('PROPFIND', self.base_url, auth=self.auth, headers=headers, timeout=10)
-            
-            if response.status_code in [207, 200, 301, 302]:
-                return {
-                    "success": True,
-                    "message": "Подключение успешно"
-                }
-            else:
+
+            if response.status_code not in (207, 200, 301, 302):
                 return {
                     "success": False,
-                    "error": f"HTTP {response.status_code}",
-                    "message": "Ошибка подключения"
+                    "error": explain_http_error(response.status_code, response.text),
+                    "message": "Ошибка подключения",
                 }
+
+            # Чтения мало: бесплатный Яндекс отвечает 207 на корень, но любую
+            # запись (MKCOL/PUT) закрывает 402. Проверяем, что папка создаётся.
+            if not self._ensure_folder(self.folder_name):
+                status = getattr(self, "last_error_status", None)
+                return {
+                    "success": False,
+                    "error": explain_http_error(status) if status else "Не удалось создать папку в облаке",
+                    "message": "Облако доступно только для чтения",
+                }
+
+            return {
+                "success": True,
+                "message": "Подключение успешно"
+            }
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return {

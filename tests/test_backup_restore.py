@@ -498,5 +498,19 @@ class WebDAVAuthPriorityTest(unittest.TestCase):
         provider = self._provider("https://webdav.yandex.ru", oauth_token="token")
         self.assertIsNone(provider.auth)
         self.assertEqual(provider.auth_header, "OAuth token")
+class WebDAVErrorTest(unittest.TestCase):
+    def _explain(self, code):
+        try:
+            import requests  # noqa: F401
+        except ImportError:
+            self.skipTest("requests не установлен")
+        from webdav_provider import explain_http_error
+        return explain_http_error(code)
+
+    def test_free_tariff_hint(self):
+        self.assertIn("360", self._explain(402))
+
+    def test_auth_hint(self):
+        self.assertIn("пароль", self._explain(401).lower())
 if __name__ == "__main__":
     unittest.main(verbosity=2)
