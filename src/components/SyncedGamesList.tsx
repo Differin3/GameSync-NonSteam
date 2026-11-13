@@ -4,7 +4,7 @@ import { ButtonItem, PanelSection, PanelSectionRow, Spinner } from "@decky/ui";
 import { FaCloud, FaRedo } from "react-icons/fa";
 import { SyncedGame } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
-import { Icon, StatusMessage } from "./ui";
+import { ActionButton, StatusMessage } from "./ui";
 
 const VISIBLE_LIMIT = 5;
 
@@ -80,9 +80,9 @@ export function SyncedGamesList() {
   return (
     <PanelSection title={`Синхронизированные игры (${syncedGames.length})`}>
       <PanelSectionRow>
-        <ButtonItem layout="below" icon={<Icon><FaRedo /></Icon>} onClick={loadSyncedGames}>
+        <ActionButton   icon={<FaRedo />} onClick={loadSyncedGames}>
           Обновить список
-        </ButtonItem>
+        </ActionButton>
       </PanelSectionRow>
 
       {status && (

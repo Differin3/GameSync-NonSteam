@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { PanelSection, PanelSectionRow, Spinner, ButtonItem } from "@decky/ui";
 import { colors, radius, pathText } from "../utils/theme";
 
@@ -127,5 +127,24 @@ export function Icon({ children }: { children: ReactNode }) {
     >
       {children}
     </span>
+  );
+}
+/** Кнопка с иконкой в одной строке: icon-проп у ButtonItem с layout=below
+ *  ставит иконку над текстом, поэтому иконку кладём внутрь children. */
+export function ActionButton({
+  icon,
+  children,
+  ...rest
+}: {
+  icon?: ReactNode;
+  children?: ReactNode;
+} & Omit<ComponentProps<typeof ButtonItem>, "layout" | "icon" | "children">) {
+  return (
+    <ButtonItem layout="below" {...rest}>
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+        {icon ? <Icon>{icon}</Icon> : null}
+        {children}
+      </span>
+    </ButtonItem>
   );
 }

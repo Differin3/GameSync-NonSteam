@@ -4,7 +4,7 @@ import { ButtonItem, PanelSection, PanelSectionRow, Router, Spinner } from "@dec
 import { FaFolderOpen, FaGamepad, FaRedo } from "react-icons/fa";
 import { GameInfo, SyncStatus } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
-import { EmptyState, ErrorState, Icon, Loading, StatusMessage } from "./ui";
+import { ActionButton, EmptyState, ErrorState, Loading, StatusMessage } from "./ui";
 
 const VISIBLE_LIMIT = 8;
 
@@ -100,9 +100,9 @@ export function GameList() {
   return (
     <PanelSection title={`Найденные игры (${games.length})`}>
       <PanelSectionRow>
-        <ButtonItem layout="below" icon={<Icon><FaRedo /></Icon>} onClick={() => loadGames(true)}>
+        <ActionButton   icon={<FaRedo />} onClick={() => loadGames(true)}>
           Обновить список
-        </ButtonItem>
+        </ActionButton>
       </PanelSectionRow>
 
       {games.slice(0, VISIBLE_LIMIT).map((game) => {
@@ -129,9 +129,9 @@ export function GameList() {
       })}
 
       <PanelSectionRow>
-        <ButtonItem layout="below" icon={<Icon><FaFolderOpen /></Icon>} onClick={openPaths}>
+        <ActionButton   icon={<FaFolderOpen />} onClick={openPaths}>
           {games.length > VISIBLE_LIMIT ? `Все игры и пути (${games.length})` : "Настроить пути"}
-        </ButtonItem>
+        </ActionButton>
       </PanelSectionRow>
     </PanelSection>
   );
