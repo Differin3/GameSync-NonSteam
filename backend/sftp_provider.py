@@ -178,3 +178,24 @@ class SFTPProvider(StorageProvider):
             return {"success": False, "error": str(e), "message": "Ошибка подключения"}
         finally:
             self._close(client)
+
+    def delete_file(self, file_id: str) -> bool:
+        """Удалить файл на SFTP (для ротации старых версий)."""
+        if not file_id:
+            return False
+        client = None
+        try:
+            client = self._connect()
+            sftp = client.open_sftp()
+            sftp.remove(file_id)
+            sftp.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting SFTP file {file_id}: {e}")
+            return False
+        finally:
+            try:
+                if client:
+                    client.close()
+            except Exception:
+                pass

@@ -177,3 +177,13 @@ class S3Provider(StorageProvider):
                 "message": str(e),
             }
 
+    def delete_file(self, file_id: str) -> bool:
+        """Удалить объект из бакета (для ротации старых версий)."""
+        if not file_id:
+            return False
+        try:
+            self.client.delete_object(Bucket=self.bucket, Key=file_id)
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting S3 object {file_id}: {e}")
+            return False

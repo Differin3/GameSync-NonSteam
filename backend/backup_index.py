@@ -94,6 +94,18 @@ def add_entry(
     return entry
 
 
+def prepare_trim(game_name: str, keep: int = MAX_PER_GAME) -> List[Dict[str, Any]]:
+    """Записи, которые выпадут из истории после добавления новой.
+
+    Нужны, чтобы удалить их файлы из облака — иначе версии копятся вечно.
+    """
+    if not game_name:
+        return []
+    entries = _load().get(game_name) or []
+    keep = max(1, int(keep))
+    return list(entries[keep - 1:])
+
+
 def list_all() -> Dict[str, List[Dict[str, Any]]]:
     return _load()
 

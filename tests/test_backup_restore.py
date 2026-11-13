@@ -512,5 +512,28 @@ class WebDAVErrorTest(unittest.TestCase):
 
     def test_auth_hint(self):
         self.assertIn("пароль", self._explain(401).lower())
+class BackupPruneTest(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self._old_config = config_manager.CONFIG_DIR
+        config_manager.CONFIG_DIR = self.root / "config"
+        backup_index.clear()
+
+    def tearDown(self):
+        config_manager.CONFIG_DIR = self._old_config
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_prepare_trim_returns_doomed_entry(self):
+        for index in range(backup_index.MAX_PER_GAME):
+            backup_index.add_entry("Game", f"GameSync/Game/backup-{index}.tar.gz", size=1)
+        doomed = backup_index.prepare_trim("Game")
+        self.assertEqual(len(doomed), 1)
+        self.assertIn("backup-0", doomed[0]["remote"])
+
+        backup_index.add_entry("Game", "GameSync/Game/backup-new.tar.gz", size=1)
+        self.assertEqual(len(backup_index.list_for("Game")), backup_index.MAX_PER_GAME)
+
+    def test_prepare_trim_empty_for_unknown_game(self):
+        self.assertEqual(backup_index.prepare_trim("Unknown"), [])
 if __name__ == "__main__":
     unittest.main(verbosity=2)
