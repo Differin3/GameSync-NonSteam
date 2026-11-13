@@ -1,13 +1,24 @@
 import { useEffect, useState } from "react";
-
+import type { CSSProperties } from "react";
 import { call } from "@decky/api";
-import { ButtonItem, PanelSection, PanelSectionRow, TextField } from "@decky/ui";
+import { PanelSection, PanelSectionRow, TextField } from "@decky/ui";
 import { FaBan, FaCheck, FaEdit, FaFolderOpen, FaPlus, FaRedo, FaTimes, FaTrash } from "react-icons/fa";
 import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
-import { ActionButton, Badge, EmptyState, ErrorState, Loading, PathText, StatusMessage } from "./ui";
+import { Badge, EmptyState, ErrorState, Loading, StatusMessage } from "./ui";
+import { ActionButton } from "./ui";
 import { card, colors, dimText } from "../utils/theme";
 
+const pathLine: CSSProperties = {
+  fontFamily: "Consolas, 'Cascadia Mono', monospace",
+  fontSize: "11px",
+  color: "#a9bcc7",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  flex: "1 1 auto",
+  minWidth: 0,
+};
 
 const sourceLabel = (source: string): string => {
   switch (source) {
@@ -142,16 +153,16 @@ export function GamePathsTab() {
     <div>
       <PanelSection>
         <PanelSectionRow>
-          <div style={{ ...card, display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
-            <FaFolderOpen style={{ color: "#66c0f4", fontSize: "18px" }} />
+          <div style={{ ...card, display: "flex", alignItems: "center", gap: "10px" }}>
+            <FaFolderOpen style={{ color: "#66c0f4", fontSize: "18px", flex: "0 0 auto" }} />
             <div style={{ flex: "1 1 auto", minWidth: 0 }}>
               <div style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>Управление путями</div>
               <div style={{ fontSize: "11px", color: colors.dim, marginTop: "2px" }}>
                 {games.length} игр · глобальных путей: {settings.defaultSavePaths.length}
               </div>
             </div>
-            <div style={{ minWidth: "160px" }}>
-              <ActionButton   icon={<FaRedo />} onClick={() => loadGames(true)} disabled={loading}>
+            <div style={{ width: "150px", flex: "0 0 auto" }}>
+              <ActionButton icon={<FaRedo />} onClick={() => loadGames(true)} disabled={loading}>
                 Обновить
               </ActionButton>
             </div>
@@ -168,11 +179,11 @@ export function GamePathsTab() {
         return (
           <PanelSection key={game.name}>
             <PanelSectionRow>
-              <div style={{ ...card, display: "flex", flexDirection: "column", gap: "10px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "flex-start" }}>
-                  <div style={{ minWidth: 0 }}>
+              <div style={{ ...card, display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                  <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: colors.text }}>{game.name}</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
                       <Badge tone={game.hasSaves ? "success" : "warning"}>
                         {game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"}
                       </Badge>
@@ -183,9 +194,8 @@ export function GamePathsTab() {
                       {game.sharedPrefix && <Badge tone="warning">общий префикс</Badge>}
                     </div>
                   </div>
-                  <div style={{ minWidth: "150px" }}>
-                    <ButtonItem
-                      layout="below"
+                  <div style={{ width: "140px", flex: "0 0 auto" }}>
+                    <ActionButton
                       icon={isEditing ? <FaTimes /> : <FaEdit />}
                       onClick={() => {
                         setEditingGame(isEditing ? null : game.name);
@@ -195,87 +205,90 @@ export function GamePathsTab() {
                       }}
                     >
                       {isEditing ? "Готово" : "Изменить"}
-                    </ButtonItem>
+                    </ActionButton>
                   </div>
                 </div>
-
-                {game.sharedPrefix && (
-                  <StatusMessage tone="warning">
-                    Общий префикс с: {(game.sharedWith || []).join(", ")}
-                  </StatusMessage>
-                )}
 
                 {game.savePaths.length === 0 && <div style={dimText}>Пути не найдены — добавьте вручную.</div>}
 
                 {game.savePaths.map((path, pathIndex) => {
-                  const isEditingThisPath = editingPathIndex === pathIndex && isEditing;
-                  return isEditingThisPath ? (
-                    <div key={pathIndex} style={{ ...card, background: "rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <TextField label="Путь" value={editingPathValue} onChange={(e) => setEditingPathValue(e.target.value)} />
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <div style={{ flex: 1 }}>
-                          <ActionButton
-                            
-                             icon={<FaCheck />}
-                            onClick={() => saveEditedPath(game, pathIndex)}
-                            disabled={validating || !editingPathValue.trim()}
-                          >
-                            Сохранить
-                          </ActionButton>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <ActionButton   icon={<FaTimes />} onClick={() => setEditingPathIndex(null)}>
-                            Отмена
-                          </ActionButton>
+                  const isEditingThisPath = isEditing && editingPathIndex === pathIndex;
+                  if (isEditingThisPath) {
+                    return (
+                      <div key={pathIndex} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <TextField label="Путь" value={editingPathValue} onChange={(e) => setEditingPathValue(e.target.value)} />
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <div style={{ flex: 1 }}>
+                            <ActionButton
+                              icon={<FaCheck />}
+                              onClick={() => saveEditedPath(game, pathIndex)}
+                              disabled={validating || !editingPathValue.trim()}
+                            >
+                              Сохранить
+                            </ActionButton>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <ActionButton icon={<FaTimes />} onClick={() => setEditingPathIndex(null)}>
+                              Отмена
+                            </ActionButton>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div key={pathIndex} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <PathText>{path}</PathText>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        <div style={{ flex: 1 }}>
-                          <ActionButton
-                            
-                             icon={<FaEdit />}
-                            onClick={() => {
-                              setEditingGame(game.name);
-                              setEditingPathIndex(pathIndex);
-                              setEditingPathValue(path);
-                            }}
-                          >
-                            Изменить
-                          </ActionButton>
+                    );
+                  }
+
+                  return (
+                    <div key={pathIndex} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={pathLine} title={path}>
+                          {path}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <ActionButton   icon={<FaBan />} onClick={() => excludePathFromGame(game, path)}>
-                            Исключить
-                          </ActionButton>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <ActionButton   icon={<FaTrash />} onClick={() => removePathFromGame(game, pathIndex)}>
-                            Удалить
-                          </ActionButton>
-                        </div>
+                        {isEditing && (
+                          <div style={{ display: "flex", gap: "6px", flex: "0 0 auto" }}>
+                            <div style={{ width: "104px" }}>
+                              <ActionButton
+                                icon={<FaEdit />}
+                                onClick={() => {
+                                  setEditingPathIndex(pathIndex);
+                                  setEditingPathValue(path);
+                                }}
+                              >
+                                Изменить
+                              </ActionButton>
+                            </div>
+                            <div style={{ width: "104px" }}>
+                              <ActionButton icon={<FaBan />} onClick={() => excludePathFromGame(game, path)}>
+                                Исключить
+                              </ActionButton>
+                            </div>
+                            <div style={{ width: "96px" }}>
+                              <ActionButton icon={<FaTrash />} onClick={() => removePathFromGame(game, pathIndex)}>
+                                Удалить
+                              </ActionButton>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
 
-                {candidates.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div style={{ ...dimText, fontWeight: 600 }}>Найденные кандидаты ({candidates.length})</div>
+                {isEditing && candidates.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", paddingTop: "6px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ ...dimText, fontWeight: 600 }}>Кандидаты ({candidates.length})</div>
                     {candidates.map((candidate, ci) => (
                       <div key={ci} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <PathText>{candidate.path}</PathText>
-                          <div style={{ fontSize: "10px", color: colors.dim, marginTop: "2px" }}>
+                          <div style={pathLine} title={candidate.path}>
+                            {candidate.path}
+                          </div>
+                          <div style={{ fontSize: "10px", color: colors.dim }}>
                             {sourceLabel(candidate.source)} · оценка {candidate.score}
                             {candidate.fileCount ? ` · файлов: ${candidate.fileCount}` : ""}
                           </div>
                         </div>
-                        <div style={{ width: "130px", flex: "0 0 auto" }}>
-                          <ActionButton  icon={<FaPlus />} onClick={() => addCandidateToGame(game, candidate.path)}>
+                        <div style={{ width: "120px", flex: "0 0 auto" }}>
+                          <ActionButton icon={<FaPlus />} onClick={() => addCandidateToGame(game, candidate.path)}>
                             Добавить
                           </ActionButton>
                         </div>
@@ -285,11 +298,10 @@ export function GamePathsTab() {
                 )}
 
                 {isEditing && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "6px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                     <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
                     <ActionButton
-                      
-                       icon={<FaPlus />}
+                      icon={<FaPlus />}
                       onClick={() => addPathToGame(game)}
                       disabled={validating || !newPath.trim()}
                     >
