@@ -3,7 +3,7 @@ import { call } from "@decky/api";
 import { ButtonItem, ConfirmModal, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
 import { FaCloud, FaCloudDownloadAlt, FaHistory, FaRedo, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
-import { Badge, EmptyState, ErrorState, Hint, Loading, StatusMessage } from "./ui";
+import { Badge, EmptyState, ErrorState, Hint, Icon, Loading, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
 import { card, colors } from "../utils/theme";
 
@@ -130,7 +130,7 @@ export function BackupsTab() {
               </div>
             </div>
             <div style={{ minWidth: "160px" }}>
-              <ButtonItem layout="below" icon={<FaRedo />} onClick={() => load(true)} disabled={refreshing}>
+              <ButtonItem layout="below" icon={<Icon><FaRedo /></Icon>} onClick={() => load(true)} disabled={refreshing}>
                 {refreshing ? "Обновление…" : "Обновить"}
               </ButtonItem>
             </div>
@@ -178,14 +178,14 @@ export function BackupsTab() {
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <div style={{ flex: 1 }}>
-                    <ButtonItem layout="below" icon={<FaHistory />} onClick={() => setSelected(item.game)}>
+                    <ButtonItem layout="below" icon={<Icon><FaHistory /></Icon>} onClick={() => setSelected(item.game)}>
                       Версии
                     </ButtonItem>
                   </div>
                   <div style={{ flex: 1 }}>
                     <ButtonItem
                       layout="below"
-                      icon={<FaUndoAlt />}
+                      icon={<Icon><FaUndoAlt /></Icon>}
                       onClick={() => last && askRestore(item.game, last)}
                       disabled={!last || restoring}
                     >
@@ -212,7 +212,7 @@ export function BackupsTab() {
               {selectedGame.entries.slice(0, 6).map((entry) => (
                 <ButtonItem
                   key={entry.id}
-                  icon={<FaUndoAlt />}
+                  icon={<Icon><FaUndoAlt /></Icon>}
                   label={formatDate(entry.created)}
                   description={`${formatBytes(entry.size)} · восстановить`}
                   onClick={() => askRestore(selectedGame.game, entry)}

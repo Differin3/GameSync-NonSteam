@@ -5,7 +5,7 @@ import { ButtonItem, PanelSection, PanelSectionRow, TextField } from "@decky/ui"
 import { FaBan, FaCheck, FaEdit, FaFolderOpen, FaPlus, FaRedo, FaTimes, FaTrash } from "react-icons/fa";
 import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
-import { Badge, EmptyState, ErrorState, Loading, PathText, StatusMessage } from "./ui";
+import { Badge, EmptyState, ErrorState, Icon, Loading, PathText, StatusMessage } from "./ui";
 import { card, colors, dimText } from "../utils/theme";
 
 
@@ -151,7 +151,7 @@ export function GamePathsTab() {
               </div>
             </div>
             <div style={{ minWidth: "160px" }}>
-              <ButtonItem layout="below" icon={<FaRedo />} onClick={() => loadGames(true)} disabled={loading}>
+              <ButtonItem layout="below" icon={<Icon><FaRedo /></Icon>} onClick={() => loadGames(true)} disabled={loading}>
                 Обновить
               </ButtonItem>
             </div>
@@ -216,7 +216,7 @@ export function GamePathsTab() {
                         <div style={{ flex: 1 }}>
                           <ButtonItem
                             layout="below"
-                            icon={<FaCheck />}
+                            icon={<Icon><FaCheck /></Icon>}
                             onClick={() => saveEditedPath(game, pathIndex)}
                             disabled={validating || !editingPathValue.trim()}
                           >
@@ -224,7 +224,7 @@ export function GamePathsTab() {
                           </ButtonItem>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <ButtonItem layout="below" icon={<FaTimes />} onClick={() => setEditingPathIndex(null)}>
+                          <ButtonItem layout="below" icon={<Icon><FaTimes /></Icon>} onClick={() => setEditingPathIndex(null)}>
                             Отмена
                           </ButtonItem>
                         </div>
@@ -237,7 +237,7 @@ export function GamePathsTab() {
                         <div style={{ flex: 1 }}>
                           <ButtonItem
                             layout="below"
-                            icon={<FaEdit />}
+                            icon={<Icon><FaEdit /></Icon>}
                             onClick={() => {
                               setEditingGame(game.name);
                               setEditingPathIndex(pathIndex);
@@ -248,12 +248,12 @@ export function GamePathsTab() {
                           </ButtonItem>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <ButtonItem layout="below" icon={<FaBan />} onClick={() => excludePathFromGame(game, path)}>
+                          <ButtonItem layout="below" icon={<Icon><FaBan /></Icon>} onClick={() => excludePathFromGame(game, path)}>
                             Исключить
                           </ButtonItem>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <ButtonItem layout="below" icon={<FaTrash />} onClick={() => removePathFromGame(game, pathIndex)}>
+                          <ButtonItem layout="below" icon={<Icon><FaTrash /></Icon>} onClick={() => removePathFromGame(game, pathIndex)}>
                             Удалить
                           </ButtonItem>
                         </div>
@@ -275,7 +275,7 @@ export function GamePathsTab() {
                           </div>
                         </div>
                         <div style={{ width: "130px", flex: "0 0 auto" }}>
-                          <ButtonItem icon={<FaPlus />} onClick={() => addCandidateToGame(game, candidate.path)}>
+                          <ButtonItem icon={<Icon><FaPlus /></Icon>} onClick={() => addCandidateToGame(game, candidate.path)}>
                             Добавить
                           </ButtonItem>
                         </div>
@@ -289,7 +289,7 @@ export function GamePathsTab() {
                     <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
                     <ButtonItem
                       layout="below"
-                      icon={<FaPlus />}
+                      icon={<Icon><FaPlus /></Icon>}
                       onClick={() => addPathToGame(game)}
                       disabled={validating || !newPath.trim()}
                     >

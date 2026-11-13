@@ -112,3 +112,20 @@ export function ErrorState({ text, onRetry }: { text: string; onRetry?: () => vo
     </PanelSection>
   );
 }
+/** Обёртка для иконок: фиксированный слот, чтобы иконки не «съезжали» */
+export function Icon({ children }: { children: ReactNode }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "20px",
+        height: "20px",
+        flex: "0 0 auto",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
