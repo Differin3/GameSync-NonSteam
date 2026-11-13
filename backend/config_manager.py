@@ -162,3 +162,52 @@ def load_storage_config() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error loading storage config: {e}")
         return {"provider": "webdav"}
+def _app_settings_file() -> Path:
+    """Путь считается на каждом вызове, чтобы тесты могли подменить CONFIG_DIR."""
+    return CONFIG_DIR / "settings.json"
+
+DEFAULT_APP_SETTINGS: Dict[str, Any] = {
+    "auto_sync": False,
+    "default_save_paths": [],
+}
+
+
+def load_app_settings() -> Dict[str, Any]:
+    """Настройки плагина, которые должны переживать перезапуск Decky."""
+    data: Dict[str, Any] = dict(DEFAULT_APP_SETTINGS)
+    data["default_save_paths"] = list(DEFAULT_APP_SETTINGS["default_save_paths"])
+
+    settings_file = _app_settings_file()
+    if settings_file.exists():
+        try:
+            with open(settings_file, "r", encoding="utf-8") as f:
+                parsed = json.load(f)
+            if isinstance(parsed, dict):
+                data.update(parsed)
+        except Exception as e:
+            logger.error(f"Error loading app settings: {e}")
+
+    data["auto_sync"] = bool(data.get("auto_sync"))
+    paths = data.get("default_save_paths") or []
+    data["default_save_paths"] = [p for p in paths if isinstance(p, str) and p.strip()]
+    return data
+
+
+def save_app_settings(**kwargs) -> Dict[str, Any]:
+    """Сохраняет переданные поля поверх текущих настроек."""
+    data = load_app_settings()
+    if "auto_sync" in kwargs:
+        data["auto_sync"] = bool(kwargs["auto_sync"])
+    if "default_save_paths" in kwargs:
+        paths = kwargs.get("default_save_paths") or []
+        data["default_save_paths"] = [p for p in paths if isinstance(p, str) and p.strip()]
+
+    _ensure_config_dir()
+    try:
+        with open(_app_settings_file(), "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        _restrict_permissions(_app_settings_file())
+    except Exception as e:
+        logger.error(f"Error saving app settings: {e}")
+        raise
+    return data

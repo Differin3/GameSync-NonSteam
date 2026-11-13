@@ -77,10 +77,14 @@ class SFTPProvider(StorageProvider):
 
     @staticmethod
     def _ensure_folder(sftp, folder: str) -> None:
-        try:
-            sftp.stat(folder)
-        except IOError:
-            sftp.mkdir(folder)
+        """Создаёт папку и всех её родителей, если их ещё нет."""
+        current = ""
+        for part in [p for p in folder.strip("/").split("/") if p]:
+            current = f"{current}/{part}" if current else part
+            try:
+                sftp.stat(current)
+            except IOError:
+                sftp.mkdir(current)
 
     def upload_file(self, file_path: str, remote_dir: str = None, remote_name: str = None) -> Optional[str]:
         directory = (remote_dir or self.folder_name).strip("/")

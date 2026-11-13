@@ -31,13 +31,18 @@ const formatDate = (value?: string): string => {
 export function BackupsTab() {
   const [games, setGames] = useState<GameBackups[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [restoring, setRestoring] = useState<boolean>(false);
   const [status, setStatus] = useState<{ tone: Tone; text: string } | null>(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent: boolean = false) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const response: any = await call("get_backups", {});
@@ -49,7 +54,11 @@ export function BackupsTab() {
     } catch (err) {
       setError(`Ошибка: ${err}`);
     } finally {
-      setLoading(false);
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -67,7 +76,7 @@ export function BackupsTab() {
       if (response?.success) {
         const suffix = response.safety_backup ? " · текущие сейвы сохранены в резерв" : "";
         setStatus({ tone: "success", text: `${response.message || "Восстановлено"}${suffix}` });
-        await load();
+        await load(true);
       } else {
         setStatus({ tone: "error", text: response?.error || "Ошибка восстановления" });
       }
@@ -117,8 +126,8 @@ export function BackupsTab() {
           </Hint>
         </PanelSectionRow>
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={load} disabled={loading || restoring}>
-            Обновить список
+          <ButtonItem layout="below" onClick={() => load(true)} disabled={loading || refreshing || restoring}>
+            {refreshing ? "Обновление…" : "Обновить список"}
           </ButtonItem>
         </PanelSectionRow>
 

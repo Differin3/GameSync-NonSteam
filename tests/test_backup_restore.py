@@ -1,4 +1,4 @@
-"""Тесты бэкапа, индекса и безопасного восстановления.
+"""Тесты бэкапа, индекса, безопасного восстановления и автосинхронизации.
 
 Запуск (из корня репозитория):
 
@@ -10,6 +10,7 @@ import shutil
 import sys
 import tarfile
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -20,6 +21,19 @@ import backup_index  # noqa: E402
 import config_manager  # noqa: E402
 import restore_engine  # noqa: E402
 import sync_engine  # noqa: E402
+
+# psutil нужен auto_sync только во время работы; для тестов модуль не нужен.
+if "psutil" not in sys.modules:
+    try:
+        import psutil  # noqa: F401
+    except ImportError:
+        _fake = types.ModuleType("psutil")
+        _fake.NoSuchProcess = type("NoSuchProcess", (Exception,), {})
+        _fake.AccessDenied = type("AccessDenied", (Exception,), {})
+        _fake.process_iter = lambda attrs=None: []
+        sys.modules["psutil"] = _fake
+
+import auto_sync  # noqa: E402
 
 
 class SyncEngineTest(unittest.TestCase):
@@ -55,10 +69,24 @@ class SyncEngineTest(unittest.TestCase):
         shutil.rmtree(self.game_dir)
         self.assertFalse(self.game_dir.exists())
 
-        result = restore_engine.restore_archive(archive, manifest)
+        result = restore_engine.restore_archive(archive, manifest, allowed_root=self.root)
         self.assertEqual(result["files"], 2)
         self.assertEqual((self.game_dir / "slot1.sav").read_bytes(), b"SAVE-1")
         self.assertEqual((self.game_dir / "nested" / "slot2.sav").read_bytes(), b"SAVE-2")
+
+    def test_single_file_roundtrip(self):
+        save_file = self.root / "configs" / "settings.sav"
+        save_file.parent.mkdir(parents=True)
+        save_file.write_bytes(b"CONFIG")
+
+        archive = sync_engine.create_backup("Demo", [str(save_file)])
+        manifest = restore_engine.read_manifest(archive)
+        self.assertEqual(manifest["paths"][0]["is_dir"], False)
+
+        save_file.unlink()
+        result = restore_engine.restore_archive(archive, manifest, allowed_root=self.root)
+        self.assertEqual(result["files"], 1)
+        self.assertEqual(save_file.read_bytes(), b"CONFIG")
 
     def test_old_archive_without_manifest(self):
         archive = self.root / "old.tar.gz"
@@ -115,7 +143,9 @@ class RestoreSafetyTest(unittest.TestCase):
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))
 
-        result = restore_engine.restore_archive(str(archive), self._manifest(self.dest))
+        result = restore_engine.restore_archive(
+            str(archive), self._manifest(self.dest), allowed_root=self.root
+        )
         self.assertEqual(result["files"], 0)
         self.assertFalse((self.root / "evil.txt").exists())
         self.assertFalse((self.root.parent / "evil.txt").exists())
@@ -128,7 +158,9 @@ class RestoreSafetyTest(unittest.TestCase):
             info.linkname = "/etc/passwd"
             tar.addfile(info)
 
-        result = restore_engine.restore_archive(str(archive), self._manifest(self.dest))
+        result = restore_engine.restore_archive(
+            str(archive), self._manifest(self.dest), allowed_root=self.root
+        )
         self.assertEqual(result["files"], 0)
         self.assertFalse((self.dest / "link").exists())
 
@@ -140,9 +172,27 @@ class RestoreSafetyTest(unittest.TestCase):
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))
 
-        result = restore_engine.restore_archive(str(archive), self._manifest(self.dest))
+        result = restore_engine.restore_archive(
+            str(archive), self._manifest(self.dest), allowed_root=self.root
+        )
         self.assertEqual(result["files"], 0)
         self.assertFalse((self.dest / "file.txt").exists())
+
+    def test_target_outside_allowed_root_is_rejected(self):
+        manifest = {
+            "version": sync_engine.MANIFEST_VERSION,
+            "paths": [{"path": str(self.root / "outside" / "saves"), "root": "Game", "is_dir": True}],
+        }
+        targets = restore_engine.plan_targets(manifest, allowed_root=self.dest)
+        self.assertEqual(targets, {})
+
+    def test_target_with_dotdot_is_rejected(self):
+        manifest = {
+            "version": sync_engine.MANIFEST_VERSION,
+            "paths": [{"path": str(self.root / ".." / "escape"), "root": "Game", "is_dir": True}],
+        }
+        targets = restore_engine.plan_targets(manifest, allowed_root=self.root)
+        self.assertEqual(targets, {})
 
 
 class BackupIndexTest(unittest.TestCase):
@@ -169,6 +219,13 @@ class BackupIndexTest(unittest.TestCase):
 
         self.assertIsNone(backup_index.get_entry("Game", "missing"))
 
+    def test_latest_entry_when_id_omitted(self):
+        backup_index.add_entry("Game", "old")
+        backup_index.add_entry("Game", "new")
+        latest = backup_index.get_entry("Game")
+        self.assertIsNotNone(latest)
+        self.assertEqual(latest["remote"], "new")
+
     def test_prunes_to_limit(self):
         for index in range(backup_index.MAX_PER_GAME + 5):
             backup_index.add_entry("Game", f"remote-{index}", size=index)
@@ -185,6 +242,60 @@ class BackupIndexTest(unittest.TestCase):
     def test_empty_remote_is_ignored(self):
         self.assertIsNone(backup_index.add_entry("Game", ""))
         self.assertEqual(backup_index.count(), 0)
+
+
+class AppSettingsTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self._old_config = config_manager.CONFIG_DIR
+        config_manager.CONFIG_DIR = self.root / "config"
+
+    def tearDown(self):
+        config_manager.CONFIG_DIR = self._old_config
+        self._tmp.cleanup()
+
+    def test_defaults(self):
+        settings = config_manager.load_app_settings()
+        self.assertFalse(settings["auto_sync"])
+        self.assertEqual(settings["default_save_paths"], [])
+
+    def test_roundtrip_filters_invalid_paths(self):
+        config_manager.save_app_settings(auto_sync=True, default_save_paths=["/a", " ", 5])
+        settings = config_manager.load_app_settings()
+        self.assertTrue(settings["auto_sync"])
+        self.assertEqual(settings["default_save_paths"], ["/a"])
+
+    def test_partial_update_keeps_other_fields(self):
+        config_manager.save_app_settings(auto_sync=True)
+        config_manager.save_app_settings(default_save_paths=["/b"])
+        settings = config_manager.load_app_settings()
+        self.assertTrue(settings["auto_sync"])
+        self.assertEqual(settings["default_save_paths"], ["/b"])
+
+
+class AutoSyncTest(unittest.TestCase):
+    def test_collect_groups_processes_by_game(self):
+        processes = [
+            {"pid": 10, "cwd": "/home/deck/PortProton/prefixes/GameA/drive_c"},
+            {"pid": 11, "cmdline": ["wine", "/home/deck/PortProton/prefixes/GameA/drive_c/game.exe"]},
+            {"pid": 12, "cwd": "/home/deck/PortProton/prefixes/DEFAULT/drive_c"},
+            {"pid": 13, "cwd": "/tmp"},
+        ]
+        running = auto_sync.collect_running_games(processes)
+        self.assertEqual(set(running), {"GameA"})
+        self.assertEqual(running["GameA"], {10, 11})
+
+    def test_finished_only_when_last_process_is_gone(self):
+        previous = {"GameA": {10, 11}, "GameB": {20}}
+        still_running = {"GameA": {11}, "GameB": {20}}
+        self.assertEqual(auto_sync.finished_games(previous, still_running), [])
+
+        finished = auto_sync.finished_games(previous, {"GameA": {11}})
+        self.assertEqual(finished, ["GameB"])
+
+        finished_all = auto_sync.finished_games(previous, {})
+        self.assertCountEqual(finished_all, ["GameA", "GameB"])
 
 
 if __name__ == "__main__":
