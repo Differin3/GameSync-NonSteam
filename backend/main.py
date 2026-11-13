@@ -305,12 +305,17 @@ class Plugin:
                     import pathlib as _pathlib
                     from portproton_scanner import scan_portproton_games
                     games = await asyncio.to_thread(scan_portproton_games, False)
+                    want_dir = game_name[4:].replace("\\", "/").lower() if game_name.startswith("exe:") else ""
                     for candidate in games:
                         prefix_name = _pathlib.Path(candidate.get("prefixPath") or "").name
-                        if (
-                            prefix_name.lower() == game_name.lower()
-                            or game_name.lower() in (candidate.get("name") or "").lower()
-                        ):
+                        exec_norm = (candidate.get("exec") or "").replace("\\", "/").lower()
+                        matched = bool(want_dir) and want_dir in exec_norm
+                        if not matched and not want_dir:
+                            matched = (
+                                prefix_name.lower() == game_name.lower()
+                                or game_name.lower() in (candidate.get("name") or "").lower()
+                            )
+                        if matched:
                             resolved_name = candidate.get("name") or game_name
                             resolved_paths = candidate.get("savePaths") or []
                             logger.info(
