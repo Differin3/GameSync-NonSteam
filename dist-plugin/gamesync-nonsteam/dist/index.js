@@ -1167,20 +1167,18 @@ function StatsTab() {
                             }, children: [SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "7px", fontSize: "12px", color: colors.text }, children: [SP_JSX.jsx(FaHistory, { style: { color: colors.dim } }), entry.game] }), SP_JSX.jsxs("span", { style: { fontSize: "10.5px", color: colors.dim }, children: [formatDate$1(entry.created), entry.size ? ` · ${formatBytes$1(entry.size)}` : ""] })] }, `${entry.game}-${index}`))) }) }) }))] }));
 }
 
-var SettingsTab;
-(function (SettingsTab) {
-    SettingsTab["MAIN"] = "main";
-    SettingsTab["GAME_PATHS"] = "game_paths";
-    SettingsTab["BACKUPS"] = "backups";
-    SettingsTab["STATS"] = "stats";
-})(SettingsTab || (SettingsTab = {}));
-const tabTitle = (icon, label) => (SP_JSX.jsxs("span", { style: { display: "inline-flex", alignItems: "center", gap: "7px" }, children: [icon, label] }));
+const TABS = [
+    { id: "main", title: "Основные", icon: SP_JSX.jsx(FaSlidersH, {}), content: SP_JSX.jsx(Settings, {}) },
+    { id: "game_paths", title: "Пути игр", icon: SP_JSX.jsx(FaFolderOpen, {}), content: SP_JSX.jsx(GamePathsTab, {}) },
+    { id: "backups", title: "Бэкапы", icon: SP_JSX.jsx(FaCloudDownloadAlt, {}), content: SP_JSX.jsx(BackupsTab, {}) },
+    { id: "stats", title: "Статистика", icon: SP_JSX.jsx(FaChartBar, {}), content: SP_JSX.jsx(StatsTab, {}) },
+];
 function SettingsPage() {
-    const [currentTab, setCurrentTab] = SP_REACT.useState(SettingsTab.MAIN);
+    const [currentTab, setCurrentTab] = SP_REACT.useState("main");
     SP_REACT.useEffect(() => {
         const handleTabSwitch = (event) => {
             const tab = event.detail;
-            if (tab === "game_paths" || tab === "main" || tab === "stats" || tab === "backups") {
+            if (TABS.some((item) => item.id === tab)) {
                 setCurrentTab(tab);
             }
         };
@@ -1189,28 +1187,39 @@ function SettingsPage() {
             window.removeEventListener("gamesync-switch-tab", handleTabSwitch);
         };
     }, []);
-    return (SP_JSX.jsx("div", { style: { paddingTop: "var(--basicui-header-height, 50px)", minHeight: "100vh" }, children: SP_JSX.jsx(DFL.Tabs, { activeTab: currentTab, onShowTab: (tab) => setCurrentTab(tab), tabs: [
-                {
-                    id: SettingsTab.MAIN,
-                    title: tabTitle(SP_JSX.jsx(FaSlidersH, {}), "Основные"),
-                    content: SP_JSX.jsx(Settings, {}),
-                },
-                {
-                    id: SettingsTab.GAME_PATHS,
-                    title: tabTitle(SP_JSX.jsx(FaFolderOpen, {}), "Пути игр"),
-                    content: SP_JSX.jsx(GamePathsTab, {}),
-                },
-                {
-                    id: SettingsTab.BACKUPS,
-                    title: tabTitle(SP_JSX.jsx(FaCloudDownloadAlt, {}), "Бэкапы"),
-                    content: SP_JSX.jsx(BackupsTab, {}),
-                },
-                {
-                    id: SettingsTab.STATS,
-                    title: tabTitle(SP_JSX.jsx(FaChartBar, {}), "Статистика"),
-                    content: SP_JSX.jsx(StatsTab, {}),
-                },
-            ] }) }));
+    const active = TABS.find((item) => item.id === currentTab) || TABS[0];
+    return (SP_JSX.jsxs("div", { style: {
+            display: "flex",
+            flexDirection: "column",
+            height: "100vh",
+            boxSizing: "border-box",
+            paddingTop: "var(--basicui-header-height, 50px)",
+            background: "transparent",
+        }, children: [SP_JSX.jsx("div", { style: {
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                    gap: "4px",
+                    padding: "0 12px",
+                    height: "52px",
+                    flex: "0 0 auto",
+                    borderBottom: "1px solid rgba(255,255,255,0.06)",
+                }, children: TABS.map((tab) => {
+                    const isActive = tab.id === active.id;
+                    return (SP_JSX.jsxs(DFL.Focusable, { onClick: () => setCurrentTab(tab.id), onActivate: () => setCurrentTab(tab.id), style: {
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: "9px 18px 10px",
+                            borderRadius: "4px 4px 0 0",
+                            fontSize: "13px",
+                            color: isActive ? "#ffffff" : "rgba(200,210,218,0.65)",
+                            background: isActive ? "rgba(255,255,255,0.07)" : "transparent",
+                            boxShadow: isActive ? "inset 0 -2px 0 #66c0f4" : "none",
+                            cursor: "pointer",
+                            userSelect: "none",
+                        }, children: [SP_JSX.jsx(Icon, { children: tab.icon }), tab.title] }, tab.id));
+                }) }), SP_JSX.jsx("div", { style: { flex: "1 1 auto", overflowY: "auto", overflowX: "hidden", padding: "14px 24px 24px" }, children: active.content })] }));
 }
 
 const formatDate = (value) => {
