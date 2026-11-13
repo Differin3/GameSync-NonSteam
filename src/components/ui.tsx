@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { PanelSection, PanelSectionRow, Spinner, ButtonItem } from "@decky/ui";
 import { colors, radius, pathText } from "../utils/theme";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 
 export type Tone = "success" | "error" | "warning" | "info";
 
@@ -146,5 +147,38 @@ export function ActionButton({
         {children}
       </span>
     </ButtonItem>
+  );
+}
+
+/** Пагинация: «Назад / N из M / Вперёд» в стиле кнопок плагина. */
+export function Pager({
+  page,
+  pages,
+  onChange,
+  totalLabel,
+}: {
+  page: number;
+  pages: number;
+  onChange: (page: number) => void;
+  totalLabel?: string;
+}) {
+  if (pages <= 1) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "space-between", marginTop: "8px" }}>
+      <div style={{ width: "176px", flex: "0 0 auto" }}>
+        <ActionButton icon={<FaChevronLeft />} onClick={() => onChange(page - 1)} disabled={page <= 1}>
+          Назад
+        </ActionButton>
+      </div>
+      <span style={{ fontSize: "11px", color: colors.dim }}>
+        {totalLabel ? `${totalLabel} · ` : ""}
+        {page} / {pages}
+      </span>
+      <div style={{ width: "176px", flex: "0 0 auto" }}>
+        <ActionButton icon={<FaChevronRight />} onClick={() => onChange(page + 1)} disabled={page >= pages}>
+          Вперёд
+        </ActionButton>
+      </div>
+    </div>
   );
 }

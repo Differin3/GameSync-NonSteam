@@ -552,5 +552,24 @@ class BackupKeepSettingTest(unittest.TestCase):
         self.assertEqual(len(backup_index.list_for("Game")), 3)
         doomed = backup_index.prepare_trim("Game", 3)
         self.assertEqual(len(doomed), 1)
+class AppSettingsPersistenceTest(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self._old_config = config_manager.CONFIG_DIR
+        config_manager.CONFIG_DIR = self.root / "config"
+
+    def tearDown(self):
+        config_manager.CONFIG_DIR = self._old_config
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_max_backup_versions_roundtrip(self):
+        config_manager.save_app_settings(max_backup_versions=20)
+        self.assertEqual(config_manager.load_app_settings()["max_backup_versions"], 20)
+
+    def test_max_backup_versions_is_clamped(self):
+        config_manager.save_app_settings(max_backup_versions=0)
+        self.assertEqual(config_manager.load_app_settings()["max_backup_versions"], 1)
+        config_manager.save_app_settings(max_backup_versions=1000)
+        self.assertEqual(config_manager.load_app_settings()["max_backup_versions"], 100)
 if __name__ == "__main__":
     unittest.main(verbosity=2)

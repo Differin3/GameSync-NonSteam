@@ -3,7 +3,7 @@ import { call } from "@decky/api";
 import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
 import { FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
-import { ActionButton, Badge, EmptyState, ErrorState, Hint, Loading, StatusMessage } from "./ui";
+import { ActionButton, Badge, EmptyState, ErrorState, Hint, Loading, Pager, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
 import { card, colors, dimText } from "../utils/theme";
 
@@ -30,6 +30,7 @@ const formatDate = (value?: string): string => {
 };
 
 const VERSION_OPTIONS = [3, 5, 10, 20, 50].map((value) => ({ data: value, label: `${value} версий` }));
+const PAGE_SIZE = 6;
 
 export function BackupsTab() {
   const [games, setGames] = useState<GameBackups[]>([]);
@@ -37,6 +38,7 @@ export function BackupsTab() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
   const [restoring, setRestoring] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
   const [maxVersions, setMaxVersions] = useState<number>(10);
@@ -77,6 +79,11 @@ export function BackupsTab() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
+    if (page > pages) setPage(pages);
+  }, [games.length, page]);
 
   const selectedGame = games.find((item) => item.game === selected) || games[0] || null;
 
@@ -162,6 +169,8 @@ export function BackupsTab() {
   const totalBackups = games.reduce((sum, item) => sum + item.entries.length, 0);
   const totalSize = games.reduce((sum, item) => sum + item.entries.reduce((acc, entry) => acc + (entry.size || 0), 0), 0);
   const latest = selectedGame?.entries[0];
+  const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
+  const visibleGames = games.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -208,7 +217,7 @@ export function BackupsTab() {
 
       <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "0 16px" }}>
         <div style={{ flex: "1 1 0", minWidth: "0", display: "flex", flexDirection: "column", gap: "10px" }}>
-          {games.map((item) => {
+          {visibleGames.map((item) => {
             const last = item.entries[0];
             const isSelected = selectedGame?.game === item.game;
             return (
@@ -241,6 +250,7 @@ export function BackupsTab() {
               </div>
             );
           })}
+          <Pager page={page} pages={pages} onChange={setPage} totalLabel={`${games.length} игр`} />
         </div>
 
         {selectedGame && latest && (
