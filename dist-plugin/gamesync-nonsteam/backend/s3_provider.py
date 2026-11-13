@@ -70,12 +70,12 @@ class S3Provider(StorageProvider):
             config=config,
         )
 
-    def _make_key(self, remote_dir: Optional[str], file_path: str) -> str:
+    def _make_key(self, remote_dir: Optional[str], file_path: str, remote_name: Optional[str] = None) -> str:
         directory = (remote_dir or "GameSync").strip("/")
-        return f"{directory}/{Path(file_path).name}"
+        return f"{directory}/{remote_name or Path(file_path).name}"
 
-    def upload_file(self, file_path: str, remote_dir: str = None) -> Optional[str]:
-        key = self._make_key(remote_dir, file_path)
+    def upload_file(self, file_path: str, remote_dir: str = None, remote_name: str = None) -> Optional[str]:
+        key = self._make_key(remote_dir, file_path, remote_name)
         try:
             path_obj = Path(file_path)
             extra_args: Dict[str, Any] = {}

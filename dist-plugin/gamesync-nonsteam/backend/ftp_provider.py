@@ -61,9 +61,9 @@ class FTPProvider(StorageProvider):
             if not str(e).startswith("550"):
                 raise
 
-    def upload_file(self, file_path: str, remote_dir: str = None) -> Optional[str]:
+    def upload_file(self, file_path: str, remote_dir: str = None, remote_name: str = None) -> Optional[str]:
         directory = (remote_dir or self.folder_name).strip("/")
-        file_name = Path(file_path).name
+        file_name = remote_name or Path(file_path).name
         remote_path = f"{directory}/{file_name}"
         ftp = None
         try:

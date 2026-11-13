@@ -448,7 +448,7 @@ function GameList() {
                 })] }));
 }
 
-const formatDate$1 = (isoString) => {
+const formatDate$2 = (isoString) => {
     try {
         return new Date(isoString).toLocaleString("ru-RU", {
             year: "numeric",
@@ -531,7 +531,7 @@ function SyncedGamesList() {
     }
     return (SP_JSX.jsxs(DFL.PanelSection, { title: `Синхронизированные игры (${syncedGames.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: loadSyncedGames, disabled: loading, children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: status }) })), syncedGames.map((game, index) => {
                 const isSyncing = syncing[game.gameName];
-                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: game.gameName }), SP_JSX.jsx("span", { style: { fontSize: "11px", color: colors.dim }, children: formatDate$1(game.lastSync) })] }), SP_JSX.jsx("div", { style: actionRow, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => resyncGame(game), disabled: isSyncing, children: isSyncing ? (SP_JSX.jsxs("span", { style: { display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F\u2026" })] })) : ("Синхронизировать снова") }) })] }) }, index));
+                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: game.gameName }), SP_JSX.jsx("span", { style: { fontSize: "11px", color: colors.dim }, children: formatDate$2(game.lastSync) })] }), SP_JSX.jsx("div", { style: actionRow, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => resyncGame(game), disabled: isSyncing, children: isSyncing ? (SP_JSX.jsxs("span", { style: { display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F\u2026" })] })) : ("Синхронизировать снова") }) })] }) }, index));
             })] }));
 }
 
@@ -977,6 +977,102 @@ function GamePathsTab() {
             })] }));
 }
 
+const formatBytes$1 = (bytes) => {
+    if (!bytes || bytes <= 0)
+        return "—";
+    const units = ["Б", "КБ", "МБ", "ГБ"];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${Math.round((bytes / Math.pow(1024, index)) * 10) / 10} ${units[index]}`;
+};
+const formatDate$1 = (value) => {
+    if (!value)
+        return "дата неизвестна";
+    try {
+        return new Date(value).toLocaleString("ru-RU", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+    catch {
+        return value;
+    }
+};
+function BackupsTab() {
+    const [games, setGames] = SP_REACT.useState([]);
+    const [loading, setLoading] = SP_REACT.useState(true);
+    const [error, setError] = SP_REACT.useState(null);
+    const [selected, setSelected] = SP_REACT.useState(null);
+    const [restoring, setRestoring] = SP_REACT.useState(false);
+    const [status, setStatus] = SP_REACT.useState(null);
+    const load = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await call("get_backups", {});
+            if (response?.success) {
+                setGames(response.games || []);
+            }
+            else {
+                setError(response?.error || "Не удалось загрузить список бэкапов");
+            }
+        }
+        catch (err) {
+            setError(`Ошибка: ${err}`);
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    SP_REACT.useEffect(() => {
+        load();
+    }, []);
+    const selectedGame = games.find((item) => item.game === selected) || games[0] || null;
+    const doRestore = async (gameName, entry) => {
+        setRestoring(true);
+        setStatus(null);
+        try {
+            const response = await call("restore_backup", { game_name: gameName, backup_id: entry.id });
+            if (response?.success) {
+                const suffix = response.safety_backup ? " · текущие сейвы сохранены в резерв" : "";
+                setStatus({ tone: "success", text: `${response.message || "Восстановлено"}${suffix}` });
+                await load();
+            }
+            else {
+                setStatus({ tone: "error", text: response?.error || "Ошибка восстановления" });
+            }
+        }
+        catch (err) {
+            setStatus({ tone: "error", text: err?.message || String(err) });
+        }
+        finally {
+            setRestoring(false);
+        }
+    };
+    const askRestore = (gameName, entry) => {
+        let modal = null;
+        modal = DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `Восстановить «${gameName}»?`, strDescription: SP_JSX.jsxs(SP_JSX.Fragment, { children: ["\u0411\u044D\u043A\u0430\u043F \u043E\u0442 ", formatDate$1(entry.created), " \u00B7 ", formatBytes$1(entry.size), ".", SP_JSX.jsx("br", {}), "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0431\u0443\u0434\u0443\u0442 \u0440\u0430\u0441\u043F\u0430\u043A\u043E\u0432\u0430\u043D\u044B \u0432 \u043F\u0430\u043F\u043A\u0438 \u044D\u0442\u043E\u0439 \u0438\u0433\u0440\u044B \u0438 \u0437\u0430\u043C\u0435\u043D\u044F\u0442 \u0442\u0435\u043A\u0443\u0449\u0438\u0435 \u0444\u0430\u0439\u043B\u044B. \u041F\u0435\u0440\u0435\u0434 \u0437\u0430\u043C\u0435\u043D\u043E\u0439 \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432."] }), strOKButtonText: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C", strCancelButtonText: "\u041E\u0442\u043C\u0435\u043D\u0430", bDestructiveWarning: true, onOK: () => {
+                modal?.Close();
+                doRestore(gameName, entry);
+            }, onCancel: () => modal?.Close() }));
+    };
+    if (loading)
+        return SP_JSX.jsx(Loading, { text: "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u0431\u044D\u043A\u0430\u043F\u043E\u0432..." });
+    if (error)
+        return SP_JSX.jsx(ErrorState, { text: error, onRetry: load });
+    if (games.length === 0)
+        return SP_JSX.jsx(EmptyState, { text: "\u0412 \u043E\u0431\u043B\u0430\u043A\u0435 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u2014 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u0443\u0439\u0442\u0435 \u0438\u0433\u0440\u0443" });
+    return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { title: `Бэкапы (${games.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u041F\u0435\u0440\u0435\u0434 \u044D\u0442\u0438\u043C \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432 \u2014 \u043E\u043D \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u044D\u0442\u043E\u0439 \u0436\u0435 \u0438\u0433\u0440\u044B." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: load, disabled: loading || restoring, children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), games.map((item) => {
+                        const last = item.entries[0];
+                        const isSelected = selectedGame?.game === item.game;
+                        return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelected(item.game), disabled: restoring, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600 }, children: item.game }), SP_JSX.jsxs(Badge, { tone: "info", children: [item.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] }), isSelected && SP_JSX.jsx(Badge, { tone: "success", children: "\u0432\u044B\u0431\u0440\u0430\u043D\u043E" }), last?.legacy && SP_JSX.jsx(Badge, { tone: "warning", children: "\u0441\u0442\u0430\u0440\u044B\u0439 \u0431\u044D\u043A\u0430\u043F" })] }), SP_JSX.jsxs("div", { style: dimText, children: [formatDate$1(last?.created), " \u00B7 ", formatBytes$1(last?.size)] })] }) }) }, item.game));
+                    })] }), selectedGame && (SP_JSX.jsxs(DFL.PanelSection, { title: `Версии · ${selectedGame.game}`, children: [selectedGame.entries.map((entry) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "12px", fontWeight: 600 }, children: formatDate$1(entry.created) }), SP_JSX.jsx("span", { style: dimText, children: formatBytes$1(entry.size) })] }), SP_JSX.jsxs("div", { style: dimText, children: [entry.kind === "prerestore"
+                                            ? "автоматическая копия перед восстановлением"
+                                            : "синхронизация", entry.legacy ? " · создан старой версией плагина" : ""] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => askRestore(selectedGame.game, entry), disabled: restoring, children: restoring ? "Восстановление…" : "Восстановить" })] }) }, entry.id))), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: status.tone, children: status.text }) }))] }))] }));
+}
+
 const formatBytes = (bytes) => {
     if (!bytes)
         return "0 B";
@@ -1041,6 +1137,7 @@ var SettingsTab;
 (function (SettingsTab) {
     SettingsTab["MAIN"] = "main";
     SettingsTab["GAME_PATHS"] = "game_paths";
+    SettingsTab["BACKUPS"] = "backups";
     SettingsTab["STATS"] = "stats";
 })(SettingsTab || (SettingsTab = {}));
 function SettingsPage() {
@@ -1048,7 +1145,7 @@ function SettingsPage() {
     SP_REACT.useEffect(() => {
         const handleTabSwitch = (event) => {
             const tab = event.detail;
-            if (tab === "game_paths" || tab === "main" || tab === "stats") {
+            if (tab === "game_paths" || tab === "main" || tab === "stats" || tab === "backups") {
                 setCurrentTab(tab);
             }
         };
@@ -1067,6 +1164,11 @@ function SettingsPage() {
                     id: SettingsTab.GAME_PATHS,
                     title: "Пути игр",
                     content: SP_JSX.jsx(GamePathsTab, {}),
+                },
+                {
+                    id: SettingsTab.BACKUPS,
+                    title: "Бэкапы",
+                    content: SP_JSX.jsx(BackupsTab, {}),
                 },
                 {
                     id: SettingsTab.STATS,
