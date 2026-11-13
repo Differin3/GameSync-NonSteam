@@ -293,18 +293,42 @@ class Plugin:
         from auto_sync import GameMonitor
 
         async def sync_callback(game_name: str, save_paths: List[str]):
-            """Callback для автосинхронизации"""
+            """Callback для автосинхронизации после выхода из игры."""
             logger.info(f"Auto-syncing game: {game_name}")
+            resolved_name = game_name
             resolved_paths = save_paths or _resolve_save_paths_for_game(game_name)
+
+            # Имя папки префикса может не совпадать с названием игры:
+            # тогда ищем игру по префиксу и берём её пути.
+            if not resolved_paths:
+                try:
+                    import pathlib as _pathlib
+                    from portproton_scanner import scan_portproton_games
+                    games = await asyncio.to_thread(scan_portproton_games, False)
+                    for candidate in games:
+                        prefix_name = _pathlib.Path(candidate.get("prefixPath") or "").name
+                        if (
+                            prefix_name.lower() == game_name.lower()
+                            or game_name.lower() in (candidate.get("name") or "").lower()
+                        ):
+                            resolved_name = candidate.get("name") or game_name
+                            resolved_paths = candidate.get("savePaths") or []
+                            logger.info(
+                                f"Auto-sync matched {game_name} -> {resolved_name} ({len(resolved_paths)} paths)"
+                            )
+                            break
+                except Exception as e:
+                    logger.warning(f"Auto-sync prefix match failed: {e}")
+
             if not resolved_paths:
                 logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
                 return
             plugin_instance = Plugin()
-            result = await plugin_instance.sync_game(game_name, resolved_paths)
+            result = await plugin_instance.sync_game(resolved_name, resolved_paths)
             if result.get("success"):
-                logger.info(f"Auto-sync completed for {game_name}")
+                logger.info(f"Auto-sync completed for {resolved_name}")
             else:
-                logger.error(f"Auto-sync failed for {game_name}: {result.get('error')}")
+                logger.error(f"Auto-sync failed for {resolved_name}: {result.get('error')}")
 
         Plugin.game_monitor = GameMonitor(sync_callback)
         asyncio.create_task(Plugin.game_monitor.start_monitoring())
@@ -551,7 +575,10 @@ class Plugin:
 
             # История бэкапов — по ней работает вкладка «Бэкапы» и восстановление
             try:
-                from backup_index import add_entry
+                from backup_index import add_entry, prepare_trim
+                # Записи, которые выпадут из истории (лимит 10 на игру),
+                # удаляем и из облака — иначе файлы копятся бесконечно.
+                to_prune = prepare_trim(game_name)
                 add_entry(
                     game_name,
                     remote=version_remote or file_id,
@@ -559,6 +586,18 @@ class Plugin:
                     paths=save_paths,
                     kind="sync",
                 )
+                for old_entry in to_prune:
+                    old_remote = old_entry.get("remote")
+                    if not old_remote:
+                        continue
+                    try:
+                        deleted = await asyncio.to_thread(provider.delete_file, old_remote)
+                        if deleted:
+                            logger.info(f"Pruned old backup: {old_remote}")
+                        else:
+                            logger.warning(f"Could not prune old backup: {old_remote}")
+                    except Exception as e:
+                        logger.warning(f"Prune failed for {old_remote}: {e}")
             except Exception as e:
                 logger.warning(f"Failed to record backup entry: {e}")
             

@@ -43,6 +43,7 @@ export function GameSyncMain() {
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [progress, setProgress] = useState<SyncProgress | null>(null);
+  const [autoSync, setAutoSync] = useState<boolean>(false);
   const [message, setMessage] = useState<{ tone: Tone; text: string } | null>(null);
 
   const loadStorage = async () => {
@@ -60,12 +61,14 @@ export function GameSyncMain() {
 
   const load = async () => {
     try {
-      const [test, stats, scan] = await Promise.all([
+      const [test, stats, scan, appSettings] = await Promise.all([
         call("get_test", {}),
         call("get_sync_stats", {}),
         call("scan_games", {}),
+        call("get_app_settings", {}),
       ]);
       setPluginOk(Boolean((test as any)?.success));
+      setAutoSync(Boolean((appSettings as any)?.auto_sync));
       setSummary({
         games: Array.isArray((scan as any)?.games) ? (scan as any).games.length : 0,
         synced: Number((stats as any)?.stats?.gamesCount || 0),
@@ -218,7 +221,12 @@ export function GameSyncMain() {
       )}
 
       <PanelSectionRow>
-        <Hint>Пути сохранений и история бэкапов — на полноэкранной странице плагина.</Hint>
+        <Hint>
+        {autoSync
+          ? "Автосинхронизация включена: плагин отслеживает запуск игр и сохраняет игру после выхода."
+          : "Автосинхронизация выключена — включите её в настройках, чтобы игра сохранялась после выхода."}
+        {" "}Пути и история — на полной странице.
+      </Hint>
       </PanelSectionRow>
     </PanelSection>
   );

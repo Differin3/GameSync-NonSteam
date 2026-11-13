@@ -32,3 +32,7 @@ class StorageProvider(ABC):
     def test_connection(self) -> Dict[str, Any]:
         """Тест подключения"""
         pass
+
+    def delete_file(self, file_id: str) -> bool:
+        """Удалить файл из хранилища (ротация старых версий)."""
+        return False

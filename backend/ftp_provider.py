@@ -150,3 +150,18 @@ class FTPProvider(StorageProvider):
             return {"success": False, "error": str(e), "message": "Ошибка подключения"}
         finally:
             self._close(ftp)
+
+    def delete_file(self, file_id: str) -> bool:
+        """Удалить файл на FTP (для ротации старых версий)."""
+        if not file_id:
+            return False
+        ftp = None
+        try:
+            ftp = self._connect()
+            ftp.delete(file_id)
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting FTP file {file_id}: {e}")
+            return False
+        finally:
+            self._close(ftp)
