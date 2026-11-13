@@ -351,5 +351,129 @@ class GameStatusTest(unittest.TestCase):
         self.assertEqual(status["size"], 100)
         self.assertEqual(status["versions"], 0)
         self.assertEqual(status["provider"], "s3")
+import game_definitions  # noqa: E402
+import ludusavi  # noqa: E402
+
+
+class SteamMatchingTest(unittest.TestCase):
+    def test_ludusavi_index_maps_steam_id(self):
+        index = ludusavi._build_index({
+            "Game A": {
+                "files": {"<winAppData>/A/save.dat": {"tags": ["save"]}},
+                "steam": {"id": 123},
+            },
+            "Game B": {
+                "files": {"<winDocuments>/B": {"tags": ["save"]}},
+            },
+        })
+        self.assertEqual(index["steam"].get("123"), 0)
+        self.assertIn("users/deck/AppData/Roaming/A", index["entries"][0]["paths"][0])
+        self.assertEqual(len(index["entries"]), 2)
+
+    def test_ludusavi_steam_id_of(self):
+        self.assertEqual(ludusavi._steam_id_of({"steam": {"id": 42}}), "42")
+        self.assertIsNone(ludusavi._steam_id_of({"steam": {"id": None}}))
+        self.assertIsNone(ludusavi._steam_id_of({}))
+
+    def test_openclouds_matches_steam_id_before_name(self):
+        original = game_definitions.load_raw_gamedef_map
+        game_definitions.load_raw_gamedef_map = lambda: {
+            "Unknown Localized Title": {
+                "display_name": "Unknown Localized Title",
+                "steam_id": "999",
+                "win_path": [{"path": "%APPDATA%\\SomeGame\\saves"}],
+            },
+            "Other": {
+                "display_name": "Other",
+                "steam_id": "111",
+                "win_path": [{"path": "%APPDATA%\\Other\\saves"}],
+            },
+        }
+        try:
+            paths = game_definitions._find_in_openclouds("Совсем другое имя", 999)
+        finally:
+            game_definitions.load_raw_gamedef_map = original
+
+        self.assertEqual(len(paths), 1)
+        self.assertIn("AppData/Roaming/SomeGame/saves", paths[0])
+
+    def test_openclouds_without_steam_id_uses_name(self):
+        original = game_definitions.load_raw_gamedef_map
+        game_definitions.load_raw_gamedef_map = lambda: {
+            "Factorio": {
+                "display_name": "Factorio",
+                "steam_id": "427520",
+                "win_path": [{"path": "%APPDATA%\\Factorio\\saves"}],
+            },
+        }
+        try:
+            paths = game_definitions._find_in_openclouds("Factorio", None)
+        finally:
+            game_definitions.load_raw_gamedef_map = original
+
+        self.assertEqual(len(paths), 1)
+        self.assertIn("Factorio", paths[0])
+import portproton_scanner  # noqa: E402
+
+
+class SteamAppIdDetectionTest(unittest.TestCase):
+    def test_extract_exe_path_quoted(self):
+        cmd = 'env "/home/deck/PortProton/data/scripts/start.sh" "/home/deck/GAEM/Tomb Raider - Underworld/tru.exe"'
+        self.assertEqual(
+            portproton_scanner._extract_exe_path(cmd),
+            "/home/deck/GAEM/Tomb Raider - Underworld/tru.exe",
+        )
+
+    def test_extract_exe_path_unquoted(self):
+        self.assertEqual(
+            portproton_scanner._extract_exe_path("start.sh /games/foo/bar.exe --args"),
+            "/games/foo/bar.exe",
+        )
+
+    def test_detect_real_appid_from_game_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = Path(tmp) / "TheLongDark"
+            game_dir.mkdir()
+            (game_dir / "steam_appid.txt").write_text("305620\n", encoding="utf-8")
+            exe = game_dir / "tld.exe"
+            exe.write_text("", encoding="utf-8")
+            self.assertEqual(
+                portproton_scanner.detect_real_steam_appid(f'start.sh "{exe}"'),
+                305620,
+            )
+
+    def test_detect_real_appid_from_steam_settings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = Path(tmp) / "CoD"
+            (game_dir / "steam_settings").mkdir(parents=True)
+            (game_dir / "steam_settings" / "steam_appid.txt").write_text("7940", encoding="utf-8")
+            exe = game_dir / "sp26.exe"
+            exe.write_text("", encoding="utf-8")
+            self.assertEqual(
+                portproton_scanner.detect_real_steam_appid(f'"{exe}"'),
+                7940,
+            )
+
+    def test_shortcut_appid_is_ignored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = Path(tmp) / "Darksiders2"
+            game_dir.mkdir()
+            (game_dir / "steam_appid.txt").write_text("3291164299", encoding="utf-8")
+            exe = game_dir / "game.exe"
+            exe.write_text("", encoding="utf-8")
+            self.assertIsNone(portproton_scanner.detect_real_steam_appid(f'"{exe}"'))
+
+    def test_no_appid_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "game.exe"
+            exe.write_text("", encoding="utf-8")
+            self.assertIsNone(portproton_scanner.detect_real_steam_appid(f'"{exe}"'))
+class NormalizationTest(unittest.TestCase):
+    def test_edition_and_year_are_stripped(self):
+        self.assertEqual(ludusavi._normalize("The Long Dark: GOTY Edition (2020)"), "the long dark")
+        self.assertEqual(game_definitions._normalize_name("Hades - Ultimate Edition 2020"), "hades")
+
+    def test_base_names_still_normalized(self):
+        self.assertEqual(ludusavi._normalize("Factorio"), "factorio")
 if __name__ == "__main__":
     unittest.main(verbosity=2)
