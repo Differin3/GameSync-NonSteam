@@ -448,7 +448,7 @@ function GameList() {
                 })] }));
 }
 
-const formatDate$2 = (isoString) => {
+const formatDate$3 = (isoString) => {
     try {
         return new Date(isoString).toLocaleString("ru-RU", {
             year: "numeric",
@@ -531,7 +531,7 @@ function SyncedGamesList() {
     }
     return (SP_JSX.jsxs(DFL.PanelSection, { title: `Синхронизированные игры (${syncedGames.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: loadSyncedGames, disabled: loading, children: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A" }) }), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: "error", children: status }) })), syncedGames.map((game, index) => {
                 const isSyncing = syncing[game.gameName];
-                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: game.gameName }), SP_JSX.jsx("span", { style: { fontSize: "11px", color: colors.dim }, children: formatDate$2(game.lastSync) })] }), SP_JSX.jsx("div", { style: actionRow, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => resyncGame(game), disabled: isSyncing, children: isSyncing ? (SP_JSX.jsxs("span", { style: { display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F\u2026" })] })) : ("Синхронизировать снова") }) })] }) }, index));
+                return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600, color: colors.text }, children: game.gameName }), SP_JSX.jsx("span", { style: { fontSize: "11px", color: colors.dim }, children: formatDate$3(game.lastSync) })] }), SP_JSX.jsx("div", { style: actionRow, children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => resyncGame(game), disabled: isSyncing, children: isSyncing ? (SP_JSX.jsxs("span", { style: { display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }, children: [SP_JSX.jsx(DFL.Spinner, {}), SP_JSX.jsx("span", { children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F\u2026" })] })) : ("Синхронизировать снова") }) })] }) }, index));
             })] }));
 }
 
@@ -1006,14 +1006,14 @@ function GamePathsTab() {
             })] }));
 }
 
-const formatBytes$1 = (bytes) => {
+const formatBytes$2 = (bytes) => {
     if (!bytes || bytes <= 0)
         return "—";
     const units = ["Б", "КБ", "МБ", "ГБ"];
     const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
     return `${Math.round((bytes / Math.pow(1024, index)) * 10) / 10} ${units[index]}`;
 };
-const formatDate$1 = (value) => {
+const formatDate$2 = (value) => {
     if (!value)
         return "дата неизвестна";
     try {
@@ -1093,7 +1093,7 @@ function BackupsTab() {
     };
     const askRestore = (gameName, entry) => {
         let modal = null;
-        modal = DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `Восстановить «${gameName}»?`, strDescription: SP_JSX.jsxs(SP_JSX.Fragment, { children: ["\u0411\u044D\u043A\u0430\u043F \u043E\u0442 ", formatDate$1(entry.created), " \u00B7 ", formatBytes$1(entry.size), ".", SP_JSX.jsx("br", {}), "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0431\u0443\u0434\u0443\u0442 \u0440\u0430\u0441\u043F\u0430\u043A\u043E\u0432\u0430\u043D\u044B \u0432 \u043F\u0430\u043F\u043A\u0438 \u044D\u0442\u043E\u0439 \u0438\u0433\u0440\u044B \u0438 \u0437\u0430\u043C\u0435\u043D\u044F\u0442 \u0442\u0435\u043A\u0443\u0449\u0438\u0435 \u0444\u0430\u0439\u043B\u044B. \u041F\u0435\u0440\u0435\u0434 \u0437\u0430\u043C\u0435\u043D\u043E\u0439 \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432."] }), strOKButtonText: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C", strCancelButtonText: "\u041E\u0442\u043C\u0435\u043D\u0430", bDestructiveWarning: true, onOK: () => {
+        modal = DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: `Восстановить «${gameName}»?`, strDescription: SP_JSX.jsxs(SP_JSX.Fragment, { children: ["\u0411\u044D\u043A\u0430\u043F \u043E\u0442 ", formatDate$2(entry.created), " \u00B7 ", formatBytes$2(entry.size), ".", SP_JSX.jsx("br", {}), "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u0431\u0443\u0434\u0443\u0442 \u0440\u0430\u0441\u043F\u0430\u043A\u043E\u0432\u0430\u043D\u044B \u0432 \u043F\u0430\u043F\u043A\u0438 \u044D\u0442\u043E\u0439 \u0438\u0433\u0440\u044B \u0438 \u0437\u0430\u043C\u0435\u043D\u044F\u0442 \u0442\u0435\u043A\u0443\u0449\u0438\u0435 \u0444\u0430\u0439\u043B\u044B. \u041F\u0435\u0440\u0435\u0434 \u0437\u0430\u043C\u0435\u043D\u043E\u0439 \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432."] }), strOKButtonText: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C", strCancelButtonText: "\u041E\u0442\u043C\u0435\u043D\u0430", bDestructiveWarning: true, onOK: () => {
                 modal?.Close();
                 doRestore(gameName, entry);
             }, onCancel: () => modal?.Close() }));
@@ -1107,13 +1107,13 @@ function BackupsTab() {
     return (SP_JSX.jsxs("div", { children: [SP_JSX.jsxs(DFL.PanelSection, { title: `Бэкапы (${games.length})`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u041F\u0435\u0440\u0435\u0434 \u044D\u0442\u0438\u043C \u043F\u043B\u0430\u0433\u0438\u043D \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442 \u0438\u0445 \u0432 \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432 \u2014 \u043E\u043D \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u044D\u0442\u043E\u0439 \u0436\u0435 \u0438\u0433\u0440\u044B." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => load(true), disabled: loading || refreshing || restoring, children: refreshing ? "Обновление…" : "Обновить список" }) }), games.map((item) => {
                         const last = item.entries[0];
                         const isSelected = selectedGame?.game === item.game;
-                        return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelected(item.game), disabled: restoring, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600 }, children: item.game }), SP_JSX.jsxs(Badge, { tone: "info", children: [item.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] }), isSelected && SP_JSX.jsx(Badge, { tone: "success", children: "\u0432\u044B\u0431\u0440\u0430\u043D\u043E" }), last?.legacy && SP_JSX.jsx(Badge, { tone: "warning", children: "\u0441\u0442\u0430\u0440\u044B\u0439 \u0431\u044D\u043A\u0430\u043F" })] }), SP_JSX.jsxs("div", { style: dimText, children: [formatDate$1(last?.created), " \u00B7 ", formatBytes$1(last?.size)] })] }) }) }, item.game));
-                    })] }), selectedGame && (SP_JSX.jsxs(DFL.PanelSection, { title: `Версии · ${selectedGame.game}`, children: [selectedGame.entries.map((entry) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "12px", fontWeight: 600 }, children: formatDate$1(entry.created) }), SP_JSX.jsx("span", { style: dimText, children: formatBytes$1(entry.size) })] }), SP_JSX.jsxs("div", { style: dimText, children: [entry.kind === "prerestore"
+                        return (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => setSelected(item.game), disabled: restoring, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "3px", width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }, children: [SP_JSX.jsx("span", { style: { fontSize: "13px", fontWeight: 600 }, children: item.game }), SP_JSX.jsxs(Badge, { tone: "info", children: [item.entries.length, " \u0432\u0435\u0440\u0441\u0438\u0439"] }), isSelected && SP_JSX.jsx(Badge, { tone: "success", children: "\u0432\u044B\u0431\u0440\u0430\u043D\u043E" }), last?.legacy && SP_JSX.jsx(Badge, { tone: "warning", children: "\u0441\u0442\u0430\u0440\u044B\u0439 \u0431\u044D\u043A\u0430\u043F" })] }), SP_JSX.jsxs("div", { style: dimText, children: [formatDate$2(last?.created), " \u00B7 ", formatBytes$2(last?.size)] })] }) }) }, item.game));
+                    })] }), selectedGame && (SP_JSX.jsxs(DFL.PanelSection, { title: `Версии · ${selectedGame.game}`, children: [selectedGame.entries.map((entry) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { ...card, display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }, children: [SP_JSX.jsx("span", { style: { fontSize: "12px", fontWeight: 600 }, children: formatDate$2(entry.created) }), SP_JSX.jsx("span", { style: dimText, children: formatBytes$2(entry.size) })] }), SP_JSX.jsxs("div", { style: dimText, children: [entry.kind === "prerestore"
                                             ? "автоматическая копия перед восстановлением"
                                             : "синхронизация", entry.legacy ? " · создан старой версией плагина" : ""] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "below", onClick: () => askRestore(selectedGame.game, entry), disabled: restoring, children: restoring ? "Восстановление…" : "Восстановить" })] }) }, entry.id))), status && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: status.tone, children: status.text }) }))] }))] }));
 }
 
-const formatBytes = (bytes) => {
+const formatBytes$1 = (bytes) => {
     if (!bytes)
         return "0 B";
     const k = 1024;
@@ -1121,7 +1121,7 @@ const formatBytes = (bytes) => {
     const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
     return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
 };
-const formatDate = (isoString) => {
+const formatDate$1 = (isoString) => {
     try {
         return new Date(isoString).toLocaleString("ru-RU", {
             year: "numeric",
@@ -1170,7 +1170,7 @@ function StatsTab() {
         return SP_JSX.jsx(ErrorState, { text: error, onRetry: loadStats });
     if (!stats)
         return SP_JSX.jsx(EmptyState, { text: "\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u0434\u043B\u044F \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F" });
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: [SP_JSX.jsx(StatRow, { label: "\u0412\u0441\u0435\u0433\u043E \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439", value: stats.totalSyncs.toLocaleString() }), SP_JSX.jsx(StatRow, { label: "\u0418\u0433\u0440 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u043D\u043E", value: stats.gamesCount.toLocaleString() }), stats.lastSync && SP_JSX.jsx(StatRow, { label: "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F", value: formatDate(stats.lastSync) }), typeof stats.totalSize === "number" && stats.totalSize > 0 && (SP_JSX.jsx(StatRow, { label: "\u041E\u0431\u0449\u0438\u0439 \u0440\u0430\u0437\u043C\u0435\u0440", value: formatBytes(stats.totalSize) }))] }) }), stats.syncsByDate && stats.syncsByDate.length > 0 && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", fontWeight: 600, color: colors.muted, marginTop: "6px" }, children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0438 \u043F\u043E \u0434\u0430\u0442\u0430\u043C" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: stats.syncsByDate.slice(0, 10).map((item, index) => (SP_JSX.jsx(StatRow, { label: new Date(item.date).toLocaleDateString("ru-RU"), value: item.count.toLocaleString() }, index))) }) })] }))] }));
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: [SP_JSX.jsx(StatRow, { label: "\u0412\u0441\u0435\u0433\u043E \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0439", value: stats.totalSyncs.toLocaleString() }), SP_JSX.jsx(StatRow, { label: "\u0418\u0433\u0440 \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u043D\u043E", value: stats.gamesCount.toLocaleString() }), stats.lastSync && SP_JSX.jsx(StatRow, { label: "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044F\u044F \u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F", value: formatDate$1(stats.lastSync) }), typeof stats.totalSize === "number" && stats.totalSize > 0 && (SP_JSX.jsx(StatRow, { label: "\u041E\u0431\u0449\u0438\u0439 \u0440\u0430\u0437\u043C\u0435\u0440", value: formatBytes$1(stats.totalSize) }))] }) }), stats.syncsByDate && stats.syncsByDate.length > 0 && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: "12px", fontWeight: 600, color: colors.muted, marginTop: "6px" }, children: "\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u0438 \u043F\u043E \u0434\u0430\u0442\u0430\u043C" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "6px", width: "100%" }, children: stats.syncsByDate.slice(0, 10).map((item, index) => (SP_JSX.jsx(StatRow, { label: new Date(item.date).toLocaleDateString("ru-RU"), value: item.count.toLocaleString() }, index))) }) })] }))] }));
 }
 
 var SettingsTab;
@@ -1218,7 +1218,201 @@ function SettingsPage() {
             ] }) }));
 }
 
+const formatDate = (value) => {
+    if (!value)
+        return "";
+    try {
+        return new Date(value).toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+    catch {
+        return value;
+    }
+};
+const formatBytes = (bytes) => {
+    if (!bytes || bytes <= 0)
+        return "";
+    const units = ["Б", "КБ", "МБ", "ГБ"];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${Math.round((bytes / Math.pow(1024, index)) * 10) / 10} ${units[index]}`;
+};
+/**
+ * Строка GameSync на странице non-Steam игры в библиотеке Steam.
+ *
+ * Патч страницы передаёт сюда appid и название; для игр, которые плагин
+ * не знает, бэкенд отвечает found=false и строка не рисуется.
+ */
+function GameSyncGameRow({ appId, title }) {
+    const [status, setStatus] = SP_REACT.useState(null);
+    const [checked, setChecked] = SP_REACT.useState(false);
+    const [busy, setBusy] = SP_REACT.useState(false);
+    const [message, setMessage] = SP_REACT.useState(null);
+    const load = async () => {
+        try {
+            const response = await call("get_game_sync_status", { appid: appId, game_name: title });
+            setStatus(response?.found ? response : null);
+        }
+        catch (error) {
+            console.error("[GameSync] status request failed", error);
+            setStatus(null);
+        }
+        finally {
+            setChecked(true);
+        }
+    };
+    SP_REACT.useEffect(() => {
+        setChecked(false);
+        setStatus(null);
+        load();
+    }, [appId]);
+    if (!checked || !status) {
+        return null;
+    }
+    const syncNow = async () => {
+        setBusy(true);
+        setMessage(null);
+        try {
+            const response = await call("sync_game", { game_name: status.game });
+            if (!response?.success) {
+                setMessage(response?.error || "Не удалось синхронизировать");
+            }
+            await load();
+        }
+        catch (error) {
+            setMessage(error?.message || String(error));
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    const openSettings = () => {
+        try {
+            DFL.Router.CloseSideMenus();
+            DFL.Router.Navigate("/gamesync-settings");
+            setTimeout(() => window.dispatchEvent(new CustomEvent("gamesync-switch-tab", { detail: "game_paths" })), 150);
+        }
+        catch (error) {
+            console.error("[GameSync] navigation failed", error);
+        }
+    };
+    const details = [
+        status.last_sync ? `в облаке с ${formatDate(status.last_sync)}` : "ещё не синхронизировались",
+        formatBytes(status.size),
+        status.versions && status.versions > 1 ? `${status.versions} версий` : "",
+        status.save_paths ? `${status.save_paths} путей` : "",
+    ]
+        .filter(Boolean)
+        .join(" · ");
+    return (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "10px 16px",
+            margin: "0 0 10px",
+            background: "rgba(20, 32, 40, 0.72)",
+            borderLeft: "3px solid #66c0f4",
+            borderRadius: "4px",
+        }, children: [SP_JSX.jsx(FaCloud, { style: { fontSize: "20px", color: "#7fd0ff", flex: "0 0 auto" } }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "2px", flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", letterSpacing: "0.6px", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }, children: "GameSync" }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#e8eef3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: details }), message && SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#f0a0a0" }, children: message })] }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "170px" }, onClick: syncNow, disabled: busy, children: busy ? "Синхронизация…" : "Синхронизировать" }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "110px" }, onClick: openSettings, children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C" })] }));
+}
+
+const ROUTE = "/library/app/:appid";
+/** renderFunc уже пропатченные — не навешиваем второй afterPatch. */
+const patchedRenderFuncs = new WeakSet();
+/** Патчи, которые надо снять при выгрузке плагина. */
+const appliedPatches = [];
+function getOverview(tree) {
+    const node = DFL.findInReactTree(tree, (x) => x?.props?.children?.props?.overview);
+    return node?.props?.children?.props?.overview;
+}
+function getInnerContainer(tree) {
+    const innerClass = DFL.appDetailsClasses?.InnerContainer;
+    if (!innerClass) {
+        return null;
+    }
+    return DFL.findInReactTree(tree, (x) => Array.isArray(x?.props?.children) &&
+        typeof x?.props?.className === "string" &&
+        x.props.className.includes(innerClass));
+}
+function injectRow(tree) {
+    const overview = getOverview(tree);
+    const appId = overview?.appid ?? overview?.app_id;
+    if (appId === undefined || appId === null) {
+        return;
+    }
+    const container = getInnerContainer(tree);
+    if (!container) {
+        return;
+    }
+    const key = `gamesync-status-${appId}`;
+    const children = container.props.children;
+    if (children.some((child) => child?.key === key)) {
+        return;
+    }
+    const title = overview?.display_name || overview?.localized_name || overview?.name;
+    // 0 — обложка, 1 — строка Play, дальше — описание игры.
+    const index = Math.min(2, children.length);
+    children.splice(index, 0, SP_REACT.createElement(GameSyncGameRow, { key, appId, title }));
+}
+/**
+ * Добавляет строку GameSync на страницу игры.
+ * Возвращает функцию очистки для `onDismount`.
+ */
+function installAppDetailsPatch() {
+    try {
+        const routePatch = routerHook.addPatch(ROUTE, (tree) => {
+            try {
+                const routeProps = DFL.findInReactTree(tree, (x) => x?.renderFunc);
+                if (routeProps && !patchedRenderFuncs.has(routeProps)) {
+                    patchedRenderFuncs.add(routeProps);
+                    const handler = DFL.createReactTreePatcher([(node) => DFL.findInReactTree(node, (x) => x?.props?.children?.props?.overview)?.props?.children], (_args, ret) => {
+                        try {
+                            injectRow(ret);
+                        }
+                        catch (error) {
+                            console.error("[GameSync] failed to inject game row", error);
+                        }
+                        return ret;
+                    });
+                    appliedPatches.push(DFL.afterPatch(routeProps, "renderFunc", handler));
+                }
+            }
+            catch (error) {
+                console.error("[GameSync] app details patch setup failed", error);
+            }
+            return tree;
+        });
+        return () => {
+            try {
+                routerHook.removePatch(ROUTE, routePatch);
+            }
+            catch (error) {
+                console.error("[GameSync] failed to remove route patch", error);
+            }
+            while (appliedPatches.length > 0) {
+                try {
+                    appliedPatches.pop()?.unpatch();
+                }
+                catch (error) {
+                    console.error("[GameSync] failed to unpatch renderFunc", error);
+                }
+            }
+        };
+    }
+    catch (error) {
+        console.error("[GameSync] cannot register app details patch", error);
+        return () => { };
+    }
+}
+
 var index = definePlugin(() => {
+    // Строка статуса на странице non-Steam игры в библиотеке Steam
+    const removeAppDetailsPatch = installAppDetailsPatch();
     // Регистрация маршрута для полноразмерной страницы настроек
     routerHook.addRoute("/gamesync-settings", () => {
         return SP_JSX.jsx(SettingsPage, {});
@@ -1229,6 +1423,12 @@ var index = definePlugin(() => {
         content: (SP_JSX.jsx("div", { children: SP_JSX.jsx(GameSyncMain, {}) })),
         icon: SP_JSX.jsx(FaCloud, {}),
         onDismount() {
+            try {
+                removeAppDetailsPatch();
+            }
+            catch (error) {
+                console.error("[GameSync] failed to remove app details patch", error);
+            }
             routerHook.removeRoute("/gamesync-settings");
         },
     };
