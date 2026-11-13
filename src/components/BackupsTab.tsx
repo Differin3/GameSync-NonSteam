@@ -206,8 +206,8 @@ export function BackupsTab() {
         )}
       </PanelSection>
 
-      <div style={{ display: "flex", gap: "14px", alignItems: "flex-start", padding: "0 16px", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 520px", minWidth: "0", display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "0 16px" }}>
+        <div style={{ flex: "1 1 0", minWidth: "0", display: "flex", flexDirection: "column", gap: "10px" }}>
           {games.map((item) => {
             const last = item.entries[0];
             const isSelected = selectedGame?.game === item.game;
@@ -244,7 +244,7 @@ export function BackupsTab() {
         </div>
 
         {selectedGame && latest && (
-          <aside style={{ ...card, width: "320px", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <aside style={{ ...card, width: "296px", flex: "0 0 296px", display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
             <div style={{ fontSize: "14px", fontWeight: 600, color: colors.text }}>{selectedGame.game}</div>
             <div style={dimText}>последний бэкап: {formatDate(latest.created)}</div>
 
@@ -260,7 +260,7 @@ export function BackupsTab() {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
                 <span>В облаке</span>
-                <span style={{ color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: "0 1 auto" }}>
                   {String(latest.remote || "").split("/").slice(-2).join("/")}
                 </span>
               </div>
