@@ -246,10 +246,25 @@ const formatDate$3 = (value) => {
     }
 };
 function GameSyncMain() {
-    const [connected, setConnected] = SP_REACT.useState(false);
+    const [pluginOk, setPluginOk] = SP_REACT.useState(false);
     const [summary, setSummary] = SP_REACT.useState(null);
+    const [storage, setStorage] = SP_REACT.useState(null);
     const [syncing, setSyncing] = SP_REACT.useState(false);
+    const [progress, setProgress] = SP_REACT.useState(null);
     const [message, setMessage] = SP_REACT.useState(null);
+    const loadStorage = async () => {
+        try {
+            const result = await call("get_storage_status", {});
+            setStorage({
+                success: Boolean(result?.success),
+                provider: result?.provider || "хранилище",
+                error: result?.error,
+            });
+        }
+        catch (error) {
+            setStorage({ success: false, provider: "хранилище", error: error?.message || String(error) });
+        }
+    };
     const load = async () => {
         try {
             const [test, stats, scan] = await Promise.all([
@@ -257,8 +272,7 @@ function GameSyncMain() {
                 call("get_sync_stats", {}),
                 call("scan_games", {}),
             ]);
-            const ok = Boolean(test?.success);
-            setConnected(ok);
+            setPluginOk(Boolean(test?.success));
             setSummary({
                 games: Array.isArray(scan?.games) ? scan.games.length : 0,
                 synced: Number(stats?.stats?.gamesCount || 0),
@@ -266,13 +280,36 @@ function GameSyncMain() {
             });
         }
         catch (error) {
-            setConnected(false);
+            setPluginOk(false);
             setSummary(null);
         }
     };
     SP_REACT.useEffect(() => {
         load();
+        loadStorage();
     }, []);
+    // Пока идёт синхронизация — опрашиваем прогресс (этап, проценты, игра).
+    SP_REACT.useEffect(() => {
+        if (!syncing)
+            return;
+        let cancelled = false;
+        const tick = async () => {
+            try {
+                const next = await call("get_sync_progress", {});
+                if (!cancelled && next)
+                    setProgress(next);
+            }
+            catch {
+                /* плагин мог перезапуститься — просто пропускаем тик */
+            }
+        };
+        tick();
+        const timer = setInterval(tick, 500);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [syncing]);
     const openSettings = (tab) => {
         DFL.Router.CloseSideMenus();
         DFL.Router.Navigate("/gamesync-settings");
@@ -281,6 +318,7 @@ function GameSyncMain() {
     const syncAll = async () => {
         setSyncing(true);
         setMessage(null);
+        setProgress({ active: true, stage: "Запуск…", percent: 0, currentGame: "", index: 0, total: 0, ok: 0, failed: 0 });
         try {
             const result = await call("sync_all_games", {});
             if (result?.success) {
@@ -291,6 +329,7 @@ function GameSyncMain() {
                     text: failed > 0 ? `Синхронизировано ${synced}, с ошибками ${failed}` : `Синхронизировано игр: ${synced}`,
                 });
                 await load();
+                await loadStorage();
             }
             else {
                 setMessage({ tone: "error", text: result?.error || "Не удалось синхронизировать" });
@@ -303,10 +342,20 @@ function GameSyncMain() {
             setSyncing(false);
         }
     };
-    const description = connected
-        ? `подключено · ${summary?.games ?? "…"} игр · ${summary?.synced ?? 0} в облаке${summary?.lastSync ? ` · ${formatDate$3(summary.lastSync)}` : ""}`
-        : "нет связи с бэкендом";
-    return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { icon: SP_JSX.jsx(Icon, { children: SP_JSX.jsx(FaCloud, { style: { color: "#66c0f4" } }) }), label: "GameSync", description: description }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", icon: syncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaSyncAlt, {}), onClick: syncAll, disabled: syncing || !connected, children: syncing ? "Синхронизация…" : "Синхронизировать всё" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCloudDownloadAlt, {}), onClick: () => openSettings("backups"), children: "\u0411\u044D\u043A\u0430\u043F\u044B \u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCog, {}), onClick: () => openSettings("main"), children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438" }) }), message && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: message.tone, children: message.text }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439 \u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u2014 \u043D\u0430 \u043F\u043E\u043B\u043D\u043E\u044D\u043A\u0440\u0430\u043D\u043D\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u043F\u043B\u0430\u0433\u0438\u043D\u0430." }) })] }));
+    const percent = Math.max(0, Math.min(100, Math.round(progress?.percent ?? 0)));
+    const storageLabel = storage ? `${storage.provider} · ${storage.success ? "подключено" : "нет связи"}` : "проверка хранилища…";
+    const storageOk = storage?.success ?? false;
+    return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { icon: SP_JSX.jsx(Icon, { children: SP_JSX.jsx(FaCloud, { style: { color: storageOk ? "#5fd88a" : storage ? "#e05b5b" : "#8b929a" } }) }), label: "GameSync", description: `${storageLabel} · ${summary?.games ?? "…"} игр · ${summary?.synced ?? 0} в облаке${summary?.lastSync ? ` · ${formatDate$3(summary.lastSync)}` : ""}` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: syncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaSyncAlt, {}), onClick: syncAll, disabled: syncing || !pluginOk, children: syncing ? "Синхронизация…" : "Синхронизировать всё" }) }), (syncing || progress?.active) && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#b8bcbf", marginBottom: "4px" }, children: [SP_JSX.jsx("span", { children: progress?.stage || "Подготовка…" }), SP_JSX.jsxs("span", { children: [percent, "%"] })] }), SP_JSX.jsx("div", { style: { height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }, children: SP_JSX.jsx("div", { style: {
+                                    width: `${percent}%`,
+                                    height: "100%",
+                                    borderRadius: "3px",
+                                    background: "linear-gradient(90deg, #1a9fff, #66c0f4)",
+                                    transition: "width 0.3s ease",
+                                } }) }), SP_JSX.jsxs("div", { style: { fontSize: "10.5px", color: "#8b929a", marginTop: "4px", minHeight: "13px" }, children: [progress?.currentGame
+                                    ? `${progress.currentGame}${progress.total ? ` · ${progress.index}/${progress.total}` : ""}`
+                                    : progress?.total
+                                        ? `${progress.index}/${progress.total}`
+                                        : "", progress && (progress.ok > 0 || progress.failed > 0) ? ` · ок: ${progress.ok}, ошибок: ${progress.failed}` : ""] })] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCloudDownloadAlt, {}), onClick: () => openSettings("backups"), children: "\u0411\u044D\u043A\u0430\u043F\u044B \u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCog, {}), onClick: () => openSettings("main"), children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438" }) }), message && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: message.tone, children: message.text }) })), storage && !storage.success && !syncing && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(StatusMessage, { tone: "error", children: ["\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: ", storage.error || "нет подключения"] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439 \u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u2014 \u043D\u0430 \u043F\u043E\u043B\u043D\u043E\u044D\u043A\u0440\u0430\u043D\u043D\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u043F\u043B\u0430\u0433\u0438\u043D\u0430." }) })] }));
 }
 
 /**
