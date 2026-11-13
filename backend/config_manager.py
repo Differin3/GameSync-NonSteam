@@ -202,6 +202,11 @@ def save_app_settings(**kwargs) -> Dict[str, Any]:
     if "default_save_paths" in kwargs:
         paths = kwargs.get("default_save_paths") or []
         data["default_save_paths"] = [p for p in paths if isinstance(p, str) and p.strip()]
+    if "max_backup_versions" in kwargs:
+        try:
+            data["max_backup_versions"] = max(1, min(100, int(kwargs["max_backup_versions"])))
+        except (TypeError, ValueError):
+            pass
 
     _ensure_config_dir()
     try:

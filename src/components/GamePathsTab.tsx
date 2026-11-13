@@ -5,9 +5,11 @@ import { PanelSection, PanelSectionRow, TextField } from "@decky/ui";
 import { FaBan, FaCheck, FaEdit, FaFolderOpen, FaPlus, FaRedo, FaTimes, FaTrash } from "react-icons/fa";
 import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
-import { Badge, EmptyState, ErrorState, Loading, StatusMessage } from "./ui";
+import { Badge, EmptyState, ErrorState, Loading, Pager, StatusMessage } from "./ui";
 import { ActionButton } from "./ui";
 import { card, colors, dimText } from "../utils/theme";
+
+const PAGE_SIZE = 5;
 
 const pathLine: CSSProperties = {
   fontFamily: "Consolas, 'Cascadia Mono', monospace",
@@ -43,6 +45,7 @@ export function GamePathsTab() {
   const [newPath, setNewPath] = useState<string>("");
   const [validating, setValidating] = useState<boolean>(false);
   const [pathValidationResult, setPathValidationResult] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
 
   const loadGames = async (forceRefresh: boolean = false) => {
     setLoading(true);
@@ -144,10 +147,17 @@ export function GamePathsTab() {
     loadGames();
   }, []);
 
+  useEffect(() => {
+    const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
+    if (page > pages) setPage(pages);
+  }, [games.length, page]);
+
   if (loading) return <Loading text="Загрузка игр..." />;
   if (error) return <ErrorState text={error} onRetry={loadGames} />;
 
   const settings = loadSettings();
+  const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
+  const visibleGames = games.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -172,7 +182,7 @@ export function GamePathsTab() {
 
       {games.length === 0 && <EmptyState text="Игры не найдены" />}
 
-      {games.map((game) => {
+      {visibleGames.map((game) => {
         const isEditing = editingGame === game.name;
         const candidates = (game.saveCandidates || []).filter((c) => !game.savePaths.includes(c.path));
 
@@ -314,6 +324,12 @@ export function GamePathsTab() {
           </PanelSection>
         );
       })}
+
+      <PanelSection>
+        <PanelSectionRow>
+          <Pager page={page} pages={pages} onChange={setPage} totalLabel={`${games.length} игр`} />
+        </PanelSectionRow>
+      </PanelSection>
     </div>
   );
 }
