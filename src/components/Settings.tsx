@@ -364,25 +364,21 @@ export function Settings() {
               />
             </PanelSectionRow>
           )}
-          {settings.webdavProvider === "yandex" && (
-            <>
-              <PanelSectionRow>
-                <TextField
-                  label="Логин"
-                  value={settings.webdavUsername || ""}
-                  onChange={(e) => update({ webdavUsername: e.target.value })}
-                />
-              </PanelSectionRow>
-              <PanelSectionRow>
-                <TextField
-                  label="Пароль"
-                  value={settings.webdavPassword || ""}
-                  onChange={(e) => update({ webdavPassword: e.target.value })}
-                  bIsPassword
-                />
-              </PanelSectionRow>
-            </>
-          )}
+          <PanelSectionRow>
+            <TextField
+              label="Логин"
+              value={settings.webdavUsername || ""}
+              onChange={(e) => update({ webdavUsername: e.target.value })}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <TextField
+              label="Пароль"
+              value={settings.webdavPassword || ""}
+              onChange={(e) => update({ webdavPassword: e.target.value })}
+              bIsPassword
+            />
+          </PanelSectionRow>
           <PanelSectionRow>
             <Hint>
               Файлы сохраняются в папку GameSync вашего облака — их можно открыть в веб-интерфейсе сервиса.
