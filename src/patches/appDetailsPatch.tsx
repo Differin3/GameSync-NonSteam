@@ -30,6 +30,17 @@ function getInnerContainer(tree: any): any {
   );
 }
 
+function findPlaySectionIndex(children: any[]): number {
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index];
+    const name = String(child?.type?.displayName || child?.type?.name || "");
+    if (/play/i.test(name)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
 function injectRow(tree: any): void {
   const overview = getOverview(tree);
   const appId = overview?.appid ?? overview?.app_id;
@@ -49,8 +60,10 @@ function injectRow(tree: any): void {
   }
 
   const title = overview?.display_name || overview?.localized_name || overview?.name;
-  // 0 — обложка, 1 — строка Play, дальше — описание игры.
-  const index = Math.min(2, children.length);
+  // Ставим сразу после строки Play. Если её не нашли — в начало контента,
+  // но никогда в конец: раньше фиксированный индекс 2 отправлял строку вниз.
+  const playIndex = findPlaySectionIndex(children);
+  const index = playIndex >= 0 ? playIndex + 1 : Math.min(1, children.length);
   children.splice(index, 0, createElement(GameSyncGameRow, { key, appId, title }));
 }
 

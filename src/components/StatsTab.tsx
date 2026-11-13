@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { call } from "@decky/api";
 import { PanelSection, PanelSectionRow } from "@decky/ui";
+import { FaChartBar, FaCloudDownloadAlt, FaHistory, FaClock, FaGamepad } from "react-icons/fa";
+import type { IconType } from "react-icons";
 import { SyncStats } from "../utils/types";
 import { EmptyState, ErrorState, Loading } from "./ui";
-import { colors, card } from "../utils/theme";
+import { card, colors } from "../utils/theme";
 
 const formatBytes = (bytes: number): string => {
   if (!bytes) return "0 B";
@@ -27,10 +29,13 @@ const formatDate = (isoString: string): string => {
   }
 };
 
-function StatRow({ label, value }: { label: string; value: string }) {
+function StatRow({ icon: Icon, label, value }: { icon: IconType; label: string; value: string }) {
   return (
     <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-      <span style={{ fontSize: "12px", color: colors.muted }}>{label}</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "12px", color: colors.muted }}>
+        <Icon style={{ color: "#66c0f4" }} />
+        {label}
+      </span>
       <span style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>{value}</span>
     </div>
   );
@@ -69,12 +74,12 @@ export function StatsTab() {
   return (
     <PanelSection title="Статистика синхронизаций">
       <PanelSectionRow>
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
-          <StatRow label="Всего синхронизаций" value={stats.totalSyncs.toLocaleString()} />
-          <StatRow label="Игр синхронизировано" value={stats.gamesCount.toLocaleString()} />
-          {stats.lastSync && <StatRow label="Последняя синхронизация" value={formatDate(stats.lastSync)} />}
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%" }}>
+          <StatRow icon={FaChartBar} label="Всего синхронизаций" value={stats.totalSyncs.toLocaleString()} />
+          <StatRow icon={FaGamepad} label="Игр синхронизировано" value={stats.gamesCount.toLocaleString()} />
+          {stats.lastSync && <StatRow icon={FaClock} label="Последняя синхронизация" value={formatDate(stats.lastSync)} />}
           {typeof stats.totalSize === "number" && stats.totalSize > 0 && (
-            <StatRow label="Общий размер" value={formatBytes(stats.totalSize)} />
+            <StatRow icon={FaCloudDownloadAlt} label="Общий размер" value={formatBytes(stats.totalSize)} />
           )}
         </div>
       </PanelSectionRow>
@@ -82,7 +87,18 @@ export function StatsTab() {
       {stats.syncsByDate && stats.syncsByDate.length > 0 && (
         <>
           <PanelSectionRow>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: colors.muted, marginTop: "6px" }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: colors.muted,
+                marginTop: "6px",
+              }}
+            >
+              <FaHistory />
               Синхронизации по датам
             </div>
           </PanelSectionRow>
@@ -91,6 +107,7 @@ export function StatsTab() {
               {stats.syncsByDate.slice(0, 10).map((item, index) => (
                 <StatRow
                   key={index}
+                  icon={FaHistory}
                   label={new Date(item.date).toLocaleDateString("ru-RU")}
                   value={item.count.toLocaleString()}
                 />

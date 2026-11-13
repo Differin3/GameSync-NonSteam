@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import { Tabs } from "@decky/ui";
+import { FaChartBar, FaCloudDownloadAlt, FaFolderOpen, FaSlidersH } from "react-icons/fa";
 import { Settings } from "./Settings";
 import { GamePathsTab } from "./GamePathsTab";
 import { BackupsTab } from "./BackupsTab";
@@ -11,6 +13,14 @@ enum SettingsTab {
   BACKUPS = "backups",
   STATS = "stats",
 }
+
+const tabTitle = (icon: ReactNode, label: string) =>
+  (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+      {icon}
+      {label}
+    </span>
+  ) as unknown as string;
 
 export function SettingsPage() {
   const [currentTab, setCurrentTab] = useState<string>(SettingsTab.MAIN);
@@ -34,27 +44,27 @@ export function SettingsPage() {
         activeTab={currentTab}
         onShowTab={(tab: string) => setCurrentTab(tab)}
         tabs={[
-        {
-          id: SettingsTab.MAIN,
-          title: "Основные",
-          content: <Settings />,
-        },
-        {
-          id: SettingsTab.GAME_PATHS,
-          title: "Пути игр",
-          content: <GamePathsTab />,
-        },
-        {
-          id: SettingsTab.BACKUPS,
-          title: "Бэкапы",
-          content: <BackupsTab />,
-        },
-        {
-          id: SettingsTab.STATS,
-          title: "Статистика",
-          content: <StatsTab />,
-        },
-      ]}
+          {
+            id: SettingsTab.MAIN,
+            title: tabTitle(<FaSlidersH />, "Основные"),
+            content: <Settings />,
+          },
+          {
+            id: SettingsTab.GAME_PATHS,
+            title: tabTitle(<FaFolderOpen />, "Пути игр"),
+            content: <GamePathsTab />,
+          },
+          {
+            id: SettingsTab.BACKUPS,
+            title: tabTitle(<FaCloudDownloadAlt />, "Бэкапы"),
+            content: <BackupsTab />,
+          },
+          {
+            id: SettingsTab.STATS,
+            title: tabTitle(<FaChartBar />, "Статистика"),
+            content: <StatsTab />,
+          },
+        ]}
       />
     </div>
   );

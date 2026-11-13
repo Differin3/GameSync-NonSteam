@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FaHistory, FaRedo, FaUndoAlt } from "react-icons/fa";
 import { call } from "@decky/api";
 import { ButtonItem, ConfirmModal, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
 import type { BackupEntry, GameBackups } from "../utils/types";
@@ -127,7 +128,7 @@ export function BackupsTab() {
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => load(true)} disabled={loading || refreshing || restoring}>
-            {refreshing ? "Обновление…" : "Обновить список"}
+            <span style={{display:"inline-flex",alignItems:"center",gap:"7px"}}><FaRedo />{refreshing ? "Обновление…" : "Обновить список"}</span>
           </ButtonItem>
         </PanelSectionRow>
 
@@ -140,7 +141,7 @@ export function BackupsTab() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "100%" }}>
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: "13px", fontWeight: 600 }}>{item.game}</span>
-                    <Badge tone="info">{item.entries.length} версий</Badge>
+                    <Badge tone="info"><FaHistory style={{marginRight:"4px"}} />{item.entries.length} версий</Badge>
                     {isSelected && <Badge tone="success">выбрано</Badge>}
                     {last?.legacy && <Badge tone="warning">старый бэкап</Badge>}
                   </div>
@@ -170,7 +171,7 @@ export function BackupsTab() {
                   {entry.legacy ? " · создан старой версией плагина" : ""}
                 </div>
                 <ButtonItem layout="below" onClick={() => askRestore(selectedGame.game, entry)} disabled={restoring}>
-                  {restoring ? "Восстановление…" : "Восстановить"}
+                  <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:"7px"}}><FaUndoAlt />{restoring ? "Восстановление…" : "Восстановить"}</span>
                 </ButtonItem>
               </div>
             </PanelSectionRow>
