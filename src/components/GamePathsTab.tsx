@@ -1,19 +1,13 @@
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+
 import { call } from "@decky/api";
 import { ButtonItem, PanelSection, PanelSectionRow, TextField } from "@decky/ui";
-import { FaBan, FaEdit, FaPlus, FaRedo, FaTimes, FaTrash, FaCheck } from "react-icons/fa";
+import { FaBan, FaCheck, FaEdit, FaFolderOpen, FaPlus, FaRedo, FaTimes, FaTrash } from "react-icons/fa";
 import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
 import { Badge, EmptyState, ErrorState, Loading, PathText, StatusMessage } from "./ui";
 import { card, colors, dimText } from "../utils/theme";
 
-const icon = (node: ReactNode, label: string) => (
-  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-    {node}
-    {label}
-  </span>
-);
 
 const sourceLabel = (source: string): string => {
   switch (source) {
@@ -32,7 +26,7 @@ export function GamePathsTab() {
   const [games, setGames] = useState<GameInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [editingGame, setEditingGame] = useState<GameInfo | null>(null);
+  const [editingGame, setEditingGame] = useState<string | null>(null);
   const [editingPathIndex, setEditingPathIndex] = useState<number | null>(null);
   const [editingPathValue, setEditingPathValue] = useState<string>("");
   const [newPath, setNewPath] = useState<string>("");
@@ -111,12 +105,6 @@ export function GamePathsTab() {
     await persistPaths(game, updatedPaths, updatedExcludes);
   };
 
-  const startEditingPath = (game: GameInfo, pathIndex: number) => {
-    setEditingGame(game);
-    setEditingPathIndex(pathIndex);
-    setEditingPathValue(game.savePaths[pathIndex]);
-  };
-
   const saveEditedPath = async (game: GameInfo, pathIndex: number) => {
     if (!editingPathValue.trim()) {
       setPathValidationResult("Введите путь");
@@ -141,12 +129,6 @@ export function GamePathsTab() {
     }
   };
 
-  const cancelEditingPath = () => {
-    setEditingPathIndex(null);
-    setEditingPathValue("");
-    setPathValidationResult(null);
-  };
-
   useEffect(() => {
     loadGames();
   }, []);
@@ -158,30 +140,63 @@ export function GamePathsTab() {
 
   return (
     <div>
-      <PanelSection title={`Управление путями (${games.length})`}>
+      <PanelSection>
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => loadGames(true)} disabled={loading}>
-            {icon(<FaRedo />, loading ? "Сканирование…" : "Обновить список")}
-          </ButtonItem>
+          <div style={{ ...card, display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
+            <FaFolderOpen style={{ color: "#66c0f4", fontSize: "18px" }} />
+            <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: colors.text }}>Управление путями</div>
+              <div style={{ fontSize: "11px", color: colors.dim, marginTop: "2px" }}>
+                {games.length} игр · глобальных путей: {settings.defaultSavePaths.length}
+              </div>
+            </div>
+            <div style={{ minWidth: "160px" }}>
+              <ButtonItem layout="below" icon={<FaRedo />} onClick={() => loadGames(true)} disabled={loading}>
+                Обновить
+              </ButtonItem>
+            </div>
+          </div>
         </PanelSectionRow>
       </PanelSection>
 
       {games.length === 0 && <EmptyState text="Игры не найдены" />}
 
-      {games.map((game, index) => {
-        const isEditing = editingGame?.name === game.name;
+      {games.map((game) => {
+        const isEditing = editingGame === game.name;
         const candidates = (game.saveCandidates || []).filter((c) => !game.savePaths.includes(c.path));
 
         return (
-          <PanelSection key={index} title={game.name}>
+          <PanelSection key={game.name}>
             <PanelSectionRow>
-              <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-                  <Badge tone={game.hasSaves ? "success" : "warning"}>
-                    {game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"}
-                  </Badge>
-                  {typeof game.steamAppId === "number" && <Badge>appid {game.steamAppId}</Badge>}
-                  {(game.excludePaths?.length || 0) > 0 && <Badge tone="error">исключено {game.excludePaths!.length}</Badge>}
+              <div style={{ ...card, display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: colors.text }}>{game.name}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                      <Badge tone={game.hasSaves ? "success" : "warning"}>
+                        {game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"}
+                      </Badge>
+                      {typeof game.steamAppId === "number" && <Badge>appid {game.steamAppId}</Badge>}
+                      {(game.excludePaths?.length || 0) > 0 && (
+                        <Badge tone="error">исключено {game.excludePaths!.length}</Badge>
+                      )}
+                      {game.sharedPrefix && <Badge tone="warning">общий префикс</Badge>}
+                    </div>
+                  </div>
+                  <div style={{ minWidth: "150px" }}>
+                    <ButtonItem
+                      layout="below"
+                      icon={isEditing ? <FaTimes /> : <FaEdit />}
+                      onClick={() => {
+                        setEditingGame(isEditing ? null : game.name);
+                        setEditingPathIndex(null);
+                        setNewPath("");
+                        setPathValidationResult(null);
+                      }}
+                    >
+                      {isEditing ? "Готово" : "Изменить"}
+                    </ButtonItem>
+                  </div>
                 </div>
 
                 {game.sharedPrefix && (
@@ -190,128 +205,105 @@ export function GamePathsTab() {
                   </StatusMessage>
                 )}
 
-                {settings.defaultSavePaths.length > 0 && (
-                  <div style={dimText}>Глобальные пути: {settings.defaultSavePaths.length} (применяются ко всем играм)</div>
-                )}
-
                 {game.savePaths.length === 0 && <div style={dimText}>Пути не найдены — добавьте вручную.</div>}
-              </div>
-            </PanelSectionRow>
 
-            {game.savePaths.map((path, pathIndex) => {
-              const isEditingThisPath = editingGame?.name === game.name && editingPathIndex === pathIndex;
-              return (
-                <PanelSectionRow key={pathIndex}>
-                  {isEditingThisPath ? (
-                    <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
+                {game.savePaths.map((path, pathIndex) => {
+                  const isEditingThisPath = editingPathIndex === pathIndex && isEditing;
+                  return isEditingThisPath ? (
+                    <div key={pathIndex} style={{ ...card, background: "rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: "8px" }}>
                       <TextField label="Путь" value={editingPathValue} onChange={(e) => setEditingPathValue(e.target.value)} />
-                      {pathValidationResult && (
-                        <StatusMessage tone={pathValidationResult.startsWith("✓") ? "success" : "error"}>
-                          {pathValidationResult}
-                        </StatusMessage>
-                      )}
-                      <div style={{ display: "flex", gap: "8px", width: "100%" }}>
+                      <div style={{ display: "flex", gap: "8px" }}>
                         <div style={{ flex: 1 }}>
                           <ButtonItem
                             layout="below"
+                            icon={<FaCheck />}
                             onClick={() => saveEditedPath(game, pathIndex)}
                             disabled={validating || !editingPathValue.trim()}
                           >
-                            {validating ? "Проверка…" : icon(<FaCheck />, "Сохранить")}
+                            Сохранить
                           </ButtonItem>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <ButtonItem layout="below" onClick={cancelEditingPath}>
-                            {icon(<FaTimes />, "Отмена")}
+                          <ButtonItem layout="below" icon={<FaTimes />} onClick={() => setEditingPathIndex(null)}>
+                            Отмена
                           </ButtonItem>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div key={pathIndex} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       <PathText>{path}</PathText>
-                      <div style={{ display: "flex", gap: "8px", width: "100%" }}>
+                      <div style={{ display: "flex", gap: "6px" }}>
                         <div style={{ flex: 1 }}>
-                          <ButtonItem layout="below" onClick={() => startEditingPath(game, pathIndex)}>
-                            {icon(<FaEdit />, "Изменить")}
+                          <ButtonItem
+                            layout="below"
+                            icon={<FaEdit />}
+                            onClick={() => {
+                              setEditingGame(game.name);
+                              setEditingPathIndex(pathIndex);
+                              setEditingPathValue(path);
+                            }}
+                          >
+                            Изменить
                           </ButtonItem>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <ButtonItem layout="below" onClick={() => excludePathFromGame(game, path)}>
-                            {icon(<FaBan />, "Исключить")}
+                          <ButtonItem layout="below" icon={<FaBan />} onClick={() => excludePathFromGame(game, path)}>
+                            Исключить
                           </ButtonItem>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <ButtonItem layout="below" onClick={() => removePathFromGame(game, pathIndex)}>
-                            {icon(<FaTrash />, "Удалить")}
+                          <ButtonItem layout="below" icon={<FaTrash />} onClick={() => removePathFromGame(game, pathIndex)}>
+                            Удалить
                           </ButtonItem>
                         </div>
                       </div>
                     </div>
-                  )}
-                </PanelSectionRow>
-              );
-            })}
+                  );
+                })}
 
-            {candidates.length > 0 && (
-              <PanelSectionRow>
-                <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ ...dimText, fontWeight: 600 }}>Найденные кандидаты ({candidates.length})</div>
-                  {candidates.map((candidate, ci) => (
-                    <div key={ci} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      <PathText>{candidate.path}</PathText>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "10px", color: colors.dim }}>
-                          источник: {sourceLabel(candidate.source)} · оценка: {candidate.score}
-                          {candidate.fileCount ? ` · файлов: ${candidate.fileCount}` : ""}
-                        </span>
-                        <div style={{ minWidth: "130px" }}>
-                          <ButtonItem layout="below" onClick={() => addCandidateToGame(game, candidate.path)}>
-                            {icon(<FaPlus />, "Добавить")}
+                {candidates.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ ...dimText, fontWeight: 600 }}>Найденные кандидаты ({candidates.length})</div>
+                    {candidates.map((candidate, ci) => (
+                      <div key={ci} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <PathText>{candidate.path}</PathText>
+                          <div style={{ fontSize: "10px", color: colors.dim, marginTop: "2px" }}>
+                            {sourceLabel(candidate.source)} · оценка {candidate.score}
+                            {candidate.fileCount ? ` · файлов: ${candidate.fileCount}` : ""}
+                          </div>
+                        </div>
+                        <div style={{ width: "130px", flex: "0 0 auto" }}>
+                          <ButtonItem icon={<FaPlus />} onClick={() => addCandidateToGame(game, candidate.path)}>
+                            Добавить
                           </ButtonItem>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </PanelSectionRow>
-            )}
-
-            {isEditing && (
-              <>
-                <PanelSectionRow>
-                  <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
-                </PanelSectionRow>
-                <PanelSectionRow>
-                  <ButtonItem layout="below" onClick={() => addPathToGame(game)} disabled={validating || !newPath.trim()}>
-                    {validating ? "Проверка…" : icon(<FaPlus />, "Добавить")}
-                  </ButtonItem>
-                </PanelSectionRow>
-                {pathValidationResult && !editingPathIndex && (
-                  <PanelSectionRow>
-                    <StatusMessage tone={pathValidationResult.startsWith("✓") ? "success" : "error"}>
-                      {pathValidationResult}
-                    </StatusMessage>
-                  </PanelSectionRow>
+                    ))}
+                  </div>
                 )}
-              </>
-            )}
 
-            <PanelSectionRow>
-              <ButtonItem
-                layout="below"
-                onClick={() => {
-                  if (isEditing) {
-                    setEditingGame(null);
-                    setNewPath("");
-                    setPathValidationResult(null);
-                  } else {
-                    setEditingGame(game);
-                  }
-                }}
-              >
-                {isEditing ? icon(<FaTimes />, "Готово") : icon(<FaEdit />, "Редактировать пути")}
-              </ButtonItem>
+                {isEditing && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
+                    <ButtonItem
+                      layout="below"
+                      icon={<FaPlus />}
+                      onClick={() => addPathToGame(game)}
+                      disabled={validating || !newPath.trim()}
+                    >
+                      {validating ? "Проверка…" : "Добавить путь"}
+                    </ButtonItem>
+                  </div>
+                )}
+
+                {pathValidationResult && (
+                  <StatusMessage tone={pathValidationResult.startsWith("✓") ? "success" : "error"}>
+                    {pathValidationResult}
+                  </StatusMessage>
+                )}
+              </div>
             </PanelSectionRow>
           </PanelSection>
         );
