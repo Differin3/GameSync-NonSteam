@@ -27,10 +27,25 @@ LOCAL_GAME_SAVE_DEFINITIONS: Dict[str, List[str]] = {
 }
 
 
+_NOISE_WORDS = {
+    "goty", "definitive", "deluxe", "complete", "enhanced", "remastered",
+    "remaster", "edition", "collection", "ultimate", "gold", "premium",
+    "digital",
+}
+
+
 def _normalize_name(name: str) -> str:
-    """Нормализация имени игры для поиска в базе."""
-    name = name.lower()
-    return "".join(c for c in name if c.isalnum() or c.isspace()).strip()
+    """Нормализация имени: без пунктуации, годов и слов-изданий."""
+    import re
+    cleaned = "".join(c if (c.isalnum() or c.isspace()) else " " for c in (name or "").lower())
+    tokens = []
+    for token in cleaned.split():
+        if token in _NOISE_WORDS:
+            continue
+        if re.fullmatch(r"(19|20)\d{2}", token):
+            continue
+        tokens.append(token)
+    return " ".join(tokens).strip()
 
 
 def _convert_windows_path_to_portproton_rel(path: str) -> Optional[str]:
@@ -113,11 +128,34 @@ def _title_score(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
-def _find_in_openclouds(game_name: str) -> List[str]:
-    """Поиск путей в большой базе OpenCloudSaves (агрегирует близкие совпадения)."""
+def _entry_rel_paths(entry: dict) -> List[str]:
+    """Относительные пути из одной записи OpenCloudSaves."""
+    result: List[str] = []
+    for item in entry.get("win_path") or []:
+        win_path = item.get("path") if isinstance(item, dict) else item
+        rel = _convert_windows_path_to_portproton_rel(win_path)
+        if rel and rel not in result:
+            result.append(rel)
+    return result
+
+
+def _find_in_openclouds(game_name: str, steam_appid=None) -> List[str]:
+    """Поиск путей в базе OpenCloudSaves: сначала по Steam ID, потом по имени."""
     raw = load_raw_gamedef_map()
     if not raw:
         return []
+
+    # Точное совпадение по Steam ID — не зависит от локализации названия
+    if steam_appid not in (None, ""):
+        appid_key = str(steam_appid)
+        for entry in raw.values():
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("steam_id") or "") == appid_key:
+                paths = _entry_rel_paths(entry)
+                if paths:
+                    logger.debug(f"OpenCloudSaves: steam id {appid_key} -> {paths}")
+                    return paths
 
     normalized = _normalize_name(game_name)
     if not normalized:
@@ -155,7 +193,7 @@ def _find_in_openclouds(game_name: str) -> List[str]:
     return rel_paths
 
 
-def get_known_save_paths_for_game(game_name: str) -> List[str]:
+def get_known_save_paths_for_game(game_name: str, steam_appid=None) -> List[str]:
     """
     Вернуть список относительных путей (относительно drive_c) для известной игры.
     Приоритет:
@@ -180,7 +218,7 @@ def get_known_save_paths_for_game(game_name: str) -> List[str]:
                 result.extend(paths)
 
     # 2. База OpenCloudSaves
-    oc_paths = _find_in_openclouds(game_name)
+    oc_paths = _find_in_openclouds(game_name, steam_appid)
     if oc_paths:
         logger.debug(f"Matched game '{game_name}' to OpenCloudSaves, paths={oc_paths}")
         result.extend(oc_paths)
@@ -188,7 +226,7 @@ def get_known_save_paths_for_game(game_name: str) -> List[str]:
     # 3. База Ludusavi (скачивается и кэшируется автоматически)
     try:
         from ludusavi import get_known_save_paths_for_game as ludusavi_paths
-        lu_paths = ludusavi_paths(game_name)
+        lu_paths = ludusavi_paths(game_name, steam_appid)
     except Exception as e:
         logger.debug(f"Ludusavi lookup failed for '{game_name}': {e}")
         lu_paths = []

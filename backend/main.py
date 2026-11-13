@@ -231,6 +231,9 @@ class Plugin:
             except Exception:
                 provider = "webdav"
             asyncio.create_task(dependencies.ensure_dependencies_async(provider))
+            # PyYAML нужен для манифеста Ludusavi — это один из главных
+            # источников точных путей сохранений.
+            asyncio.create_task(dependencies.ensure_dependencies_async("ludusavi"))
             logger.info("Dependency bootstrap started")
         except Exception as e:
             logger.warning(f"Dependency bootstrap failed: {e}")

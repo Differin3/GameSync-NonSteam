@@ -63,8 +63,27 @@ def _index_path() -> Path:
     return _data_dir() / "ludusavi_index.json"
 
 
+_INDEX_VERSION = 2
+
+_NOISE_WORDS = {
+    "goty", "definitive", "deluxe", "complete", "enhanced", "remastered",
+    "remaster", "edition", "collection", "ultimate", "gold", "premium",
+    "digital",
+}
+
+
 def _normalize(text: str) -> str:
-    return "".join(c for c in (text or "").lower() if c.isalnum() or c.isspace()).strip()
+    """Нормализация имени: без пунктуации, годов и слов-изданий."""
+    import re
+    cleaned = "".join(c if (c.isalnum() or c.isspace()) else " " for c in (text or "").lower())
+    tokens = []
+    for token in cleaned.split():
+        if token in _NOISE_WORDS:
+            continue
+        if re.fullmatch(r"(19|20)\d{2}", token):
+            continue
+        tokens.append(token)
+    return " ".join(tokens).strip()
 
 
 def _similarity(a: str, b: str) -> float:
@@ -155,11 +174,22 @@ def _manifest_fresh() -> bool:
         return False
 
 
+def _steam_id_of(entry: Dict) -> Optional[str]:
+    """Steam-идентификатор игры из записи манифеста Ludusavi."""
+    steam = entry.get("steam")
+    if isinstance(steam, dict):
+        value = steam.get("id")
+        if value not in (None, ""):
+            return str(value)
+    return None
+
+
 def _build_index(manifest: Dict) -> Dict:
     entries: List[Dict] = []
     exact: Dict[str, int] = {}
+    steam_index: Dict[str, int] = {}
     if not isinstance(manifest, dict):
-        return {"entries": entries, "exact": exact}
+        return {"version": _INDEX_VERSION, "entries": entries, "exact": exact, "steam": steam_index}
 
     for game_id, entry in manifest.items():
         if not isinstance(entry, dict):
@@ -180,10 +210,13 @@ def _build_index(manifest: Dict) -> Dict:
         if not norm:
             continue
         idx = len(entries)
-        entries.append({"name": name, "norm": norm, "paths": paths[:10]})
+        steam_id = _steam_id_of(entry)
+        entries.append({"name": name, "norm": norm, "paths": paths[:10], "steam": steam_id})
         exact.setdefault(norm, idx)
+        if steam_id:
+            steam_index.setdefault(steam_id, idx)
 
-    return {"entries": entries, "exact": exact}
+    return {"version": _INDEX_VERSION, "entries": entries, "exact": exact, "steam": steam_index}
 
 
 def _save_index(index: Dict) -> None:
@@ -209,8 +242,10 @@ def _load_index(force: bool = False) -> Dict:
         if index_file.exists() and manifest.exists() and index_file.stat().st_mtime >= manifest.stat().st_mtime:
             with open(index_file, "r", encoding="utf-8") as f:
                 _index_cache = json.load(f)
-            _build_token_index()
-            return _index_cache
+            if _index_cache.get("version") == _INDEX_VERSION:
+                _build_token_index()
+                return _index_cache
+            _index_cache = None
     except Exception as e:
         logger.warning(f"Failed to read Ludusavi index: {e}")
 
@@ -249,8 +284,27 @@ def _build_token_index() -> None:
     _token_index = tokens
 
 
-def get_known_save_paths_for_game(game_name: str) -> List[str]:
-    """Найти пути сохранений игры в базе Ludusavi."""
+def get_known_save_paths_for_steam_id(steam_id) -> List[str]:
+    """Точный поиск по Steam ID — самый надёжный источник путей."""
+    if steam_id in (None, ""):
+        return []
+    index = _load_index()
+    entries = index.get("entries") or []
+    idx = (index.get("steam") or {}).get(str(steam_id))
+    if idx is None or idx >= len(entries):
+        return []
+    return list(entries[idx].get("paths") or [])
+
+
+def get_known_save_paths_for_game(game_name: str, steam_appid=None) -> List[str]:
+    """Найти пути сохранений игры в базе Ludusavi.
+
+    Сначала пробуем точное совпадение по Steam ID (если игра пришла из
+    Steam-ярлыка), затем — по нормализованному имени.
+    """
+    exact_steam = get_known_save_paths_for_steam_id(steam_appid)
+    if exact_steam:
+        return exact_steam
     if not game_name:
         return []
 
