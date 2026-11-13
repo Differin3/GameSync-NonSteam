@@ -251,6 +251,7 @@ function GameSyncMain() {
     const [storage, setStorage] = SP_REACT.useState(null);
     const [syncing, setSyncing] = SP_REACT.useState(false);
     const [progress, setProgress] = SP_REACT.useState(null);
+    const [autoSync, setAutoSync] = SP_REACT.useState(false);
     const [message, setMessage] = SP_REACT.useState(null);
     const loadStorage = async () => {
         try {
@@ -267,12 +268,14 @@ function GameSyncMain() {
     };
     const load = async () => {
         try {
-            const [test, stats, scan] = await Promise.all([
+            const [test, stats, scan, appSettings] = await Promise.all([
                 call("get_test", {}),
                 call("get_sync_stats", {}),
                 call("scan_games", {}),
+                call("get_app_settings", {}),
             ]);
             setPluginOk(Boolean(test?.success));
+            setAutoSync(Boolean(appSettings?.auto_sync));
             setSummary({
                 games: Array.isArray(scan?.games) ? scan.games.length : 0,
                 synced: Number(stats?.stats?.gamesCount || 0),
@@ -355,7 +358,9 @@ function GameSyncMain() {
                                     ? `${progress.currentGame}${progress.total ? ` · ${progress.index}/${progress.total}` : ""}`
                                     : progress?.total
                                         ? `${progress.index}/${progress.total}`
-                                        : "", progress && (progress.ok > 0 || progress.failed > 0) ? ` · ок: ${progress.ok}, ошибок: ${progress.failed}` : ""] })] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCloudDownloadAlt, {}), onClick: () => openSettings("backups"), children: "\u0411\u044D\u043A\u0430\u043F\u044B \u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCog, {}), onClick: () => openSettings("main"), children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438" }) }), message && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: message.tone, children: message.text }) })), storage && !storage.success && !syncing && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(StatusMessage, { tone: "error", children: ["\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: ", storage.error || "нет подключения"] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(Hint, { children: "\u041F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439 \u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u0431\u044D\u043A\u0430\u043F\u043E\u0432 \u2014 \u043D\u0430 \u043F\u043E\u043B\u043D\u043E\u044D\u043A\u0440\u0430\u043D\u043D\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u043F\u043B\u0430\u0433\u0438\u043D\u0430." }) })] }));
+                                        : "", progress && (progress.ok > 0 || progress.failed > 0) ? ` · ок: ${progress.ok}, ошибок: ${progress.failed}` : ""] })] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCloudDownloadAlt, {}), onClick: () => openSettings("backups"), children: "\u0411\u044D\u043A\u0430\u043F\u044B \u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaCog, {}), onClick: () => openSettings("main"), children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438" }) }), message && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(StatusMessage, { tone: message.tone, children: message.text }) })), storage && !storage.success && !syncing && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(StatusMessage, { tone: "error", children: ["\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435: ", storage.error || "нет подключения"] }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(Hint, { children: [autoSync
+                            ? "Автосинхронизация включена: плагин отслеживает запуск игр и сохраняет игру после выхода."
+                            : "Автосинхронизация выключена — включите её в настройках, чтобы игра сохранялась после выхода.", " ", "\u041F\u0443\u0442\u0438 \u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u2014 \u043D\u0430 \u043F\u043E\u043B\u043D\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435."] }) })] }));
 }
 
 /**

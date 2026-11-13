@@ -237,3 +237,18 @@ class WebDAVProvider(StorageProvider):
                 "error": str(e),
                 "message": "Ошибка подключения"
             }
+
+    def delete_file(self, file_id: str) -> bool:
+        """Удалить файл из облака (для ротации старых версий)."""
+        if not file_id:
+            return False
+        try:
+            headers = self._get_headers()
+            response = requests.delete(self._get_full_path(file_id), auth=self.auth, headers=headers, timeout=10)
+            if response.status_code in (200, 204, 404):
+                return True
+            logger.warning(f"DELETE {file_id}: {explain_http_error(response.status_code, response.text)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error deleting {file_id}: {e}")
+            return False
