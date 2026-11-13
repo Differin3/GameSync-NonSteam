@@ -80,7 +80,32 @@ Python‑зависимости (requests, boto3, paramiko, psutil) плагин
 - Плагин автоматически сканирует игры PortProton
 - Для каждой игры можно настроить пути сохранений
 - Нажмите "Синхронизировать" для загрузки сохранений в облако
+- Каждая синхронизация создаёт версию бэкапа в облаке (последние 10 хранятся в истории)
 - Включите автосинхронизацию для автоматической загрузки при выходе из игры
+
+### Восстановление сохранений
+
+Настройки → вкладка **Бэкапы**:
+
+1. Выберите игру — под ней появится список версий (дата, размер, тип).
+2. Нажмите «Восстановить» у нужной версии и подтвердите.
+3. Плагин скачает архив, распакует его по путям из манифеста и вернёт файлы в `drive_c`.
+4. Перед восстановлением текущие сейвы автоматически сохраняются в облако как
+   `prerestore-<дата>.tar.gz` — откатиться можно из этого же списка.
+
+Ограничения:
+
+- восстановить можно бэкапы, созданные версией плагина 0.3.0 и новее (в архиве есть манифест);
+  старые архивы нужно пересоздать повторной синхронизацией;
+- в истории хранятся последние 10 версий на игру, более старые записи удаляются из индекса
+  (сами файлы в облаке остаются).
+
+### Как устроены бэкапы
+
+- `GameSync/<Игра>/backup-<YYYYMMDD-HHMMSS>.tar.gz` — версии;
+- `GameSync/<Игра>.tar.gz` — стабильная копия последней синхронизации (для ручного доступа);
+- внутри архива — файлы сохранений и манифест `.gamesync/manifest.json` с исходными путями;
+- история версий хранится локально в `~/.config/gamesync/backups.json`.
 
 ### Как плагин находит игры и сохранения
 
@@ -92,10 +117,15 @@ Python‑зависимости (requests, boto3, paramiko, psutil) плагин
 
 ### Структура проекта
 
-- `backend/` - Python бэкенд
+- `backend/` - Python бэкенд (синхронизация, провайдеры, восстановление)
 - `src/` - React фронтенд
+- `tests/` - unit-тесты бэкенда (`python -m unittest discover -s tests`)
+- `docs/` - архитектура и описание API
+- `mockups/` - HTML-макеты интерфейса и скриншоты
 - `plugin.json` - конфигурация плагина
 - `requirements.txt` - Python зависимости
+
+Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md)
 
 ---
 
@@ -177,7 +207,31 @@ is needed the first time.
 - Plugin automatically scans PortProton games
 - Save paths can be configured for each game
 - Click "Synchronize" to upload saves to cloud
+- Every sync creates a versioned backup (the last 10 are kept in history)
 - Enable auto-sync for automatic upload when exiting game
+
+### Restoring saves
+
+Settings → **Backups** tab:
+
+1. Pick a game — the list of versions appears below (date, size, kind).
+2. Click "Restore" on the version you need and confirm.
+3. The plugin downloads the archive, unpacks it using the manifest paths and puts files back into `drive_c`.
+4. Before restoring, the current saves are uploaded as `prerestore-<date>.tar.gz`, so you can roll back from the same list.
+
+Limitations:
+
+- only archives created by plugin 0.3.0+ can be restored (they contain a manifest);
+  old backups must be recreated by syncing again;
+- history keeps the last 10 versions per game; older entries are dropped from the index
+  (the files in cloud storage stay).
+
+### How backups are stored
+
+- `GameSync/<Game>/backup-<YYYYMMDD-HHMMSS>.tar.gz` — versions;
+- `GameSync/<Game>.tar.gz` — stable copy of the latest sync (for manual access);
+- each archive contains save files and `.gamesync/manifest.json` with the original paths;
+- version history is stored locally in `~/.config/gamesync/backups.json`.
 
 ### How the plugin finds games and saves
 
@@ -189,7 +243,12 @@ is needed the first time.
 
 ### Project Structure
 
-- `backend/` - Python backend
+- `backend/` - Python backend (sync, providers, restore)
 - `src/` - React frontend
+- `tests/` - backend unit tests (`python -m unittest discover -s tests`)
+- `docs/` - architecture and API reference
+- `mockups/` - HTML UI mockups and screenshots
 - `plugin.json` - plugin configuration
 - `requirements.txt` - Python dependencies
+
+Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md)

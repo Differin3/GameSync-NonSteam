@@ -2,6 +2,9 @@ import decky
 import os
 import asyncio
 import functools
+import shutil
+import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -325,6 +328,19 @@ class Plugin:
                     logger.info(f"File size for {game_name}: {file_size} bytes")
             except Exception as e:
                 logger.warning(f"Failed to get file info: {e}")
+
+            # Версионированная копия: GameSync/<Игра>/backup-<дата>.tar.gz
+            # Стабильный файл в GameSync/ остаётся для ручного доступа и старых клиентов.
+            version_remote = None
+            try:
+                from sync_engine import sanitize_name
+                version_name = f"backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
+                version_folder = f"GameSync/{sanitize_name(game_name)}"
+                version_remote = provider.upload_file(
+                    archive_path, version_folder, remote_name=version_name
+                )
+            except Exception as e:
+                logger.warning(f"Versioned upload failed for {game_name}: {e}")
             
             # Удаляем временный архив
             try:
@@ -338,8 +354,26 @@ class Plugin:
                 add_synced_game(game_name, file_id, file_size)
             except Exception as e:
                 logger.warning(f"Failed to save sync info: {e}")
+
+            # История бэкапов — по ней работает вкладка «Бэкапы» и восстановление
+            try:
+                from backup_index import add_entry
+                add_entry(
+                    game_name,
+                    remote=version_remote or file_id,
+                    size=file_size,
+                    paths=save_paths,
+                    kind="sync",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to record backup entry: {e}")
             
-            return {"success": True, "file_id": file_id, "message": "Синхронизация завершена"}
+            return {
+                "success": True,
+                "file_id": file_id,
+                "version_id": version_remote,
+                "message": "Синхронизация завершена",
+            }
         except Exception as e:
             logger.error(f"Error syncing game: {e}")
             return {"success": False, "error": str(e)}
@@ -494,6 +528,140 @@ class Plugin:
             logger.error(f"Error enabling auto-sync: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
+    async def get_backups(self, *args, **kwargs) -> Dict[str, Any]:
+        """Список бэкапов для вкладки «Бэкапы».
+
+        Основной источник — локальный индекс загруженных архивов. Если индекс
+        пуст (обновление со старой версии), показываем запись из synced_games.
+        """
+        try:
+            from backup_index import list_all
+            from config_manager import load_synced_games
+
+            index = list_all()
+            legacy = load_synced_games()
+
+            games: List[Dict[str, Any]] = []
+            for name in sorted(set(index) | set(legacy)):
+                entries = list(index.get(name) or [])
+                if not entries and name in legacy:
+                    data = legacy.get(name) or {}
+                    entries = [{
+                        "id": "legacy",
+                        "created": data.get("lastSync"),
+                        "remote": data.get("fileId"),
+                        "size": data.get("fileSize"),
+                        "kind": "sync",
+                        "paths": [],
+                        "legacy": True,
+                    }]
+                games.append({"game": name, "entries": entries})
+
+            return {"success": True, "games": games}
+        except Exception as e:
+            logger.error(f"Error listing backups: {e}")
+            return {"success": False, "error": str(e), "games": []}
+
+    @decky_params
+    async def restore_backup(self, game_name: str = None, backup_id: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Восстановление сохранений игры из облачного бэкапа."""
+        try:
+            if not game_name:
+                return {"success": False, "error": "Не указан game_name"}
+
+            from backup_index import add_entry, get_entry
+            from config_manager import load_storage_config, load_synced_games
+            from restore_engine import read_manifest, restore_archive
+            from sync_engine import create_backup, sanitize_name
+
+            entry = get_entry(game_name, backup_id)
+            if not entry:
+                legacy = (load_synced_games() or {}).get(game_name) or {}
+                if legacy:
+                    entry = {
+                        "id": "legacy",
+                        "remote": legacy.get("fileId"),
+                        "created": legacy.get("lastSync"),
+                        "size": legacy.get("fileSize"),
+                        "kind": "sync",
+                        "paths": [],
+                    }
+            if not entry or not entry.get("remote"):
+                return {"success": False, "error": "Бэкап не найден — сначала синхронизируйте игру"}
+
+            storage_config = load_storage_config()
+
+            try:
+                import dependencies
+                dep = await dependencies.ensure_dependencies_async(storage_config.get("provider", "webdav"))
+                if not dep.get("success"):
+                    return {"success": False, "error": "Не удалось установить зависимости: " + ", ".join(dep.get("missing", []))}
+            except Exception as e:
+                logger.warning(f"Dependency check failed: {e}")
+
+            provider, error = _build_provider(storage_config)
+            if error:
+                return {"success": False, "error": error}
+
+            workdir = tempfile.mkdtemp(prefix="gamesync-restore-")
+            archive_path = os.path.join(workdir, "backup.tar.gz")
+            safety_remote = None
+
+            try:
+                downloaded = await asyncio.to_thread(provider.download_file, entry["remote"], archive_path)
+                if not downloaded:
+                    return {"success": False, "error": "Не удалось скачать бэкап из хранилища"}
+
+                manifest = read_manifest(archive_path)
+                if not manifest:
+                    return {
+                        "success": False,
+                        "error": "Бэкап создан старой версией плагина (без манифеста). Синхронизируйте игру заново.",
+                    }
+
+                # Страховочная копия текущих сейвов перед перезаписью
+                current_paths = entry.get("paths") or _resolve_save_paths_for_game(game_name)
+                if current_paths:
+                    safety_path = await asyncio.to_thread(create_backup, game_name, current_paths)
+                    if safety_path:
+                        try:
+                            safety_name = f"prerestore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
+                            folder = f"GameSync/{sanitize_name(game_name)}"
+                            safety_remote = await asyncio.to_thread(
+                                provider.upload_file, safety_path, folder, safety_name
+                            )
+                            add_entry(
+                                game_name,
+                                remote=safety_remote or "",
+                                size=os.path.getsize(safety_path),
+                                paths=current_paths,
+                                kind="prerestore",
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to upload pre-restore backup: {e}")
+                        finally:
+                            try:
+                                os.remove(safety_path)
+                            except OSError:
+                                pass
+
+                result = await asyncio.to_thread(restore_archive, archive_path, manifest)
+
+                return {
+                    "success": True,
+                    "message": f"Восстановлено файлов: {result['files']}",
+                    "files": result["files"],
+                    "bytes": result["bytes"],
+                    "skipped": result["skipped"],
+                    "safety_backup": safety_remote,
+                }
+            finally:
+                shutil.rmtree(workdir, ignore_errors=True)
+        except Exception as e:
+            logger.error(f"Error restoring backup: {e}")
+            return {"success": False, "error": str(e)}
+
     @decky_params
     async def get_synced_games(self, *args, **kwargs) -> Dict[str, Any]:
         """Получение списка синхронизированных игр"""
@@ -669,6 +837,12 @@ class Plugin:
             except Exception as e:
                 logger.warning(f"Error clearing cache: {e}")
 
+            # История бэкапов
+            try:
+                from backup_index import clear as clear_backups
+                clear_backups()
+            except Exception as e:
+                logger.warning(f"Error clearing backup index: {e}")
             # Сброс изученных путей и кэша Ludusavi
             try:
                 from learning import clear as clear_learned

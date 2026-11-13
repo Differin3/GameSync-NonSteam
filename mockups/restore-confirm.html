@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>GameSync — подтверждение восстановления</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="screen" style="background:linear-gradient(180deg,#10151b,#0a0d11)">
+  <div class="topbar">
+    <div class="back"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></div>
+    <h1>GameSync NonSteam</h1>
+    <span class="crumb">· плагин Decky Loader</span>
+  </div>
+
+  <nav class="tabbar">
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+      Основные
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8z"/></svg>
+      Пути игр
+    </div>
+    <div class="tab active">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.6l3.3-3.3 1.4 1.4L12 17.4l-4.7-4.7 1.4-1.4L12 13.6V3zM5 19h14v2H5z"/></svg>
+      Бэкапы
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 21h3V9H5v12zM10.5 21h3V3h-3v18zM16 21h3v-8h-3v8z"/></svg>
+      Статистика
+    </div>
+  </nav>
+
+  <main class="content">
+    <div class="wrap">
+
+      <section class="panel">
+        <div class="row" style="padding:11px 14px">
+          <div class="label">Восстановление сохранений<small>Облако Mail.ru · 7 игр · 42 бэкапа · 1,24 ГБ</small></div>
+          <div class="control small" style="justify-content:center">Обновить список</div>
+        </div>
+      </section>
+
+      <div class="hint" style="padding-left:2px">Плагин хранит последнюю версию бэкапа и 10 предыдущих. Перед восстановлением текущие сейвы сохраняются в резервный архив.</div>
+
+      <div class="backup-layout">
+        <div class="backup-list">
+
+          <div class="backup-card">
+            <div class="backup-top">
+              <div>
+                <div class="backup-name">Cyberpunk 2077</div>
+                <div class="backup-meta">сегодня, 23:12 · 42,3 МБ · 3 пути</div>
+              </div>
+              <div class="backup-acts">
+                <span class="chip green">в облаке</span>
+                <span class="bk-btn primary">Восстановить</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="backup-card">
+            <div class="backup-top">
+              <div>
+                <div class="backup-name">Baldur's Gate 3</div>
+                <div class="backup-meta">вчера, 21:40 · 128,7 МБ · 1 путь</div>
+              </div>
+              <div class="backup-acts">
+                <span class="chip amber">локально новее</span>
+                <span class="bk-btn primary">Восстановить</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="backup-card">
+            <div class="backup-top">
+              <div>
+                <div class="backup-name">Dwarf Fortress</div>
+                <div class="backup-meta">12.11.2026, 19:05 · 6,1 МБ · 2 пути</div>
+              </div>
+              <div class="backup-acts">
+                <span class="chip green">в облаке</span>
+                <span class="bk-btn primary">Восстановить</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="backup-card">
+            <div class="backup-top">
+              <div>
+                <div class="backup-name">Factorio</div>
+                <div class="backup-meta">08.11.2026, 12:20 · 58,1 МБ · 2 пути</div>
+              </div>
+              <div class="backup-acts">
+                <span class="chip green">в облаке</span>
+                <span class="bk-btn primary">Восстановить</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="backup-card">
+            <div class="backup-top">
+              <div>
+                <div class="backup-name">Expedition 33</div>
+                <div class="backup-meta">07.11.2026, 22:47 · 31,9 МБ · 2 пути</div>
+              </div>
+              <div class="backup-acts">
+                <span class="chip">нет локальной копии</span>
+                <span class="bk-btn primary">Восстановить</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <aside class="side-card">
+          <h3>Cyberpunk 2077</h3>
+          <div class="sub">последний бэкап: сегодня, 23:12</div>
+
+          <div class="big">42,3 МБ <small>· 12 версий</small></div>
+
+          <div class="kv"><span>Путей сохранений</span><span>3</span></div>
+          <div class="kv"><span>Файлов в архиве</span><span>1 240</span></div>
+          <div class="kv"><span>В облаке</span><span>GameSync/Cyberpunk_2077.tar.gz</span></div>
+
+          <div class="versions">
+            <div class="version cur"><span>сегодня, 23:12</span><span>42,3 МБ</span></div>
+            <div class="version"><span>вчера, 18:02</span><span>41,9 МБ</span></div>
+            <div class="version"><span>11.11.2026, 20:31</span><span>41,2 МБ</span></div>
+          </div>
+
+          <div class="btn2 primary">Восстановить из облака</div>
+          <div class="btn2">Скачать .tar.gz</div>
+
+          <div class="warn-line">Восстановление перезапишет локальные сейвы. Текущая версия будет сохранена как резервная.</div>
+        </aside>
+      </div>
+
+    </div>
+  </main>
+  <div class="overlay">
+    <div class="modal">
+      <div class="m-head">
+        <div class="m-ico"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.6l3.3-3.3 1.4 1.4L12 17.4l-4.7-4.7 1.4-1.4L12 13.6V3zM5 19h14v2H5z"/></svg></div>
+        <div>
+          <h2>Восстановить Cyberpunk 2077?</h2>
+          <div class="m-sub">Бэкап от сегодня, 23:12 · 42,3 МБ · 12 версий</div>
+        </div>
+        <div class="m-close">×</div>
+      </div>
+
+      <div class="m-body">Сохранения из облака будут распакованы в <b>3 папки</b> префикса PortProton и заменят текущие файлы игры.</div>
+
+      <div class="m-warn">Сначала плагин сохранит текущие сейвы в резервный архив — вернуться к ним можно будет из этого же списка.</div>
+
+      <div class="modal-actions">
+        <div class="m-btn">Отмена</div>
+        <div class="m-btn primary">Восстановить</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

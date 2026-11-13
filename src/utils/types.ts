@@ -47,3 +47,19 @@ export interface SyncStats {
   totalSize?: number;
   syncsByDate: { date: string; count: number }[];
 }
+
+// Бэкап в облаке (вкладка «Бэкапы»)
+export interface BackupEntry {
+  id: string;
+  created?: string;
+  remote?: string;
+  size?: number;
+  kind?: "sync" | "prerestore" | string;
+  paths?: string[];
+  legacy?: boolean;
+}
+
+export interface GameBackups {
+  game: string;
+  entries: BackupEntry[];
+}
