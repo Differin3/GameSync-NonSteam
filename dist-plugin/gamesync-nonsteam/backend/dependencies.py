@@ -54,7 +54,28 @@ def _plugin_root() -> Path:
 
 
 def py_modules_dir() -> Path:
-    return _plugin_root() / "py_modules"
+    """Каталог для ``pip --target``.
+
+    Папка плагина после установки принадлежит root (Decky ставит плагины от
+    root), поэтому писать в ``<plugin>/py_modules`` нельзя — получаем
+    PermissionError. Используем каталог данных Decky или пользовательский.
+    """
+    candidates = []
+    runtime = os.environ.get("DECKY_PLUGIN_RUNTIME_DIR")
+    if runtime:
+        candidates.append(Path(runtime) / "py_modules")
+    candidates.append(Path.home() / ".local" / "share" / "gamesync" / "py_modules")
+    candidates.append(_plugin_root() / "py_modules")
+
+    for candidate in candidates:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        if os.access(candidate, os.W_OK):
+            return candidate
+
+    return candidates[-1]
 
 
 def _ensure_py_modules_on_path() -> None:
@@ -105,6 +126,7 @@ def _pip_available(python: str) -> bool:
             [python, "-m", "pip", "--version"],
             capture_output=True,
             timeout=60,
+            env=_pip_env(),
         )
         return r.returncode == 0
     except Exception:
@@ -114,15 +136,47 @@ def _pip_available(python: str) -> bool:
 def _ensure_pip(python: str) -> bool:
     if _pip_available(python):
         return True
-    try:
-        subprocess.run(
-            [python, "-m", "ensurepip", "--upgrade"],
-            capture_output=True,
-            timeout=300,
-        )
-    except Exception as e:
-        logger.warning(f"ensurepip failed for {python}: {e}")
+    # Сначала ставим pip в пользовательский site-packages: системный
+    # site-packages на SteamOS принадлежит root.
+    for extra in (["--user"], []):
+        try:
+            subprocess.run(
+                [python, "-m", "ensurepip", "--upgrade", *extra],
+                capture_output=True,
+                timeout=300,
+            )
+        except Exception as e:
+            logger.warning(f"ensurepip failed for {python} {extra}: {e}")
+        if _pip_available(python):
+            return True
+    # ensurepip на SteamOS падает (PEP 668 / права), поэтому распаковываем
+    # встроенный wheel pip прямо в py_modules и запускаем его с PYTHONPATH.
+    if _bootstrap_pip_from_wheel(python):
+        return _pip_available(python)
     return _pip_available(python)
+
+
+def _bootstrap_pip_from_wheel(python: str) -> bool:
+    """Ставит pip из wheel, встроенного в ensurepip (обход PEP 668)."""
+    target = py_modules_dir()
+    lines = [
+        "import ensurepip, pathlib, zipfile",
+        "d = pathlib.Path(ensurepip.__file__).parent / '_bundled'",
+        "t = pathlib.Path(r'" + str(target) + "')",
+        "t.mkdir(parents=True, exist_ok=True)",
+        "for w in d.glob('pip-*.whl'):",
+        "    zipfile.ZipFile(w).extractall(t)",
+    ]
+    script = "\n".join(lines)
+    try:
+        result = subprocess.run([python, "-c", script], capture_output=True, timeout=180)
+        if result.returncode != 0:
+            logger.warning(f"pip bootstrap failed: {result.stderr[-400:]!r}")
+            return False
+        return True
+    except Exception as e:
+        logger.warning(f"pip bootstrap error: {e}")
+        return False
 
 
 def _pip_env() -> Dict[str, str]:
@@ -130,6 +184,10 @@ def _pip_env() -> Dict[str, str]:
     env["PIP_BREAK_SYSTEM_PACKAGES"] = "1"
     env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
     env["PIP_NO_INPUT"] = "1"
+    # pip может лежать в py_modules: тогда его видно только через PYTHONPATH
+    target = str(py_modules_dir())
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = target + ((os.pathsep + existing) if existing else "")
     return env
 
 

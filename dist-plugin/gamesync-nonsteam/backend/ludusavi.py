@@ -101,12 +101,32 @@ def _convert_placeholder(path: str) -> Optional[str]:
     return p or None
 
 
+def _ca_file() -> Optional[str]:
+    """Системный CA-бандл: на SteamOS нет /etc/ssl/cert.pem по умолчанию."""
+    for path in (
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/etc/ssl/cert.pem",
+        "/etc/pki/tls/certs/ca-bundle.crt",
+    ):
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def _download(url: str, dest: Path) -> bool:
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".tmp")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "GameSync-NonSteam"})
-        with urllib.request.urlopen(req, timeout=120) as response:
+        context = None
+        ca = _ca_file()
+        if ca:
+            try:
+                import ssl
+                context = ssl.create_default_context(cafile=ca)
+            except Exception as e:
+                logger.warning(f"Failed to build SSL context: {e}")
+        with urllib.request.urlopen(req, timeout=120, context=context) as response:
             with open(tmp, "wb") as f:
                 while True:
                     chunk = response.read(1 << 20)
