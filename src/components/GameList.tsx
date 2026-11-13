@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
 import { call } from "@decky/api";
 import { ButtonItem, PanelSection, PanelSectionRow, Router, Spinner } from "@decky/ui";
-import { FaFolderOpen, FaSyncAlt, FaRedo } from "react-icons/fa";
+import { FaFolderOpen, FaGamepad, FaRedo } from "react-icons/fa";
 import { GameInfo, SyncStatus } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
-import { Badge, EmptyState, ErrorState, Loading, PathText, StatusMessage } from "./ui";
-import { card, colors, dimText } from "../utils/theme";
+import { EmptyState, ErrorState, Loading, StatusMessage } from "./ui";
 
-const actionButton = (children: ReactNode) => (
-  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
-    {children}
-  </span>
-);
+const VISIBLE_LIMIT = 8;
+
+const descriptionFor = (game: GameInfo): string => {
+  const parts = [game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"];
+  if (typeof game.steamAppId === "number") parts.push(`appid ${game.steamAppId}`);
+  if (game.sharedPrefix) parts.push(`общий префикс: ${(game.sharedWith || []).slice(0, 2).join(", ")}`);
+  parts.push("синхронизировать");
+  return parts.join(" · ");
+};
 
 export function GameList() {
   const [games, setGames] = useState<GameInfo[]>([]);
@@ -83,114 +85,54 @@ export function GameList() {
     loadGames();
   }, []);
 
+  if (loading) {
+    return <Loading text="Сканирование игр PortProton..." />;
+  }
+
+  if (error) {
+    return <ErrorState text={error} onRetry={() => loadGames()} />;
+  }
+
+  if (games.length === 0) {
+    return <EmptyState text="Игры не найдены" />;
+  }
+
   return (
-    <div>
-      <PanelSection title={`Найденные игры (${games.length})`}>
-        <PanelSectionRow>
-          <div style={{ display: "flex", gap: "8px", width: "100%" }}>
-            <div style={{ flex: 1 }}>
-              <ButtonItem layout="below" onClick={() => loadGames(true)} disabled={loading}>
-                {actionButton(
-                  <>
-                    <FaRedo />
-                    {loading ? "Сканирование…" : "Обновить"}
-                  </>
-                )}
-              </ButtonItem>
-            </div>
-            <div style={{ flex: 1 }}>
-              <ButtonItem layout="below" onClick={openPaths}>
-                {actionButton(
-                  <>
-                    <FaFolderOpen />
-                    Настроить пути
-                  </>
-                )}
-              </ButtonItem>
-            </div>
-          </div>
-        </PanelSectionRow>
-      </PanelSection>
+    <PanelSection title={`Найденные игры (${games.length})`}>
+      <PanelSectionRow>
+        <ButtonItem layout="below" icon={<FaRedo />} onClick={() => loadGames(true)}>
+          Обновить список
+        </ButtonItem>
+      </PanelSectionRow>
 
-      {loading && <Loading text="Сканирование игр PortProton..." />}
-      {error && !loading && <ErrorState text={error} onRetry={() => loadGames()} />}
-      {games.length === 0 && !loading && !error && <EmptyState text="Игры не найдены" />}
-
-      {!loading &&
-        games.map((game, index) => {
-          const isSyncing = syncing[game.name];
-          const status = syncStatus[game.name];
-
-          return (
-            <PanelSection key={index} title={game.name}>
-              <PanelSectionRow>
-                <div style={{ ...card, display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-                    <Badge tone={game.hasSaves ? "success" : "warning"}>
-                      {game.hasSaves ? `${game.savePaths.length} путей` : "нет сохранений"}
-                    </Badge>
-                    {typeof game.steamAppId === "number" && <Badge>appid {game.steamAppId}</Badge>}
-                    {game.sharedPrefix && <Badge tone="warning">общий префикс</Badge>}
-                  </div>
-
-                  {game.savePaths.length > 0 ? (
-                    <PathText>{game.savePaths[0]}</PathText>
-                  ) : (
-                    <div style={dimText}>Пути не найдены — добавьте их вручную.</div>
-                  )}
-
-                  <div style={{ display: "flex", gap: "8px", width: "100%" }}>
-                    <div style={{ flex: 1 }}>
-                      <ButtonItem layout="below" onClick={openPaths}>
-                        {actionButton(
-                          <>
-                            <FaFolderOpen />
-                            Изменить пути
-                          </>
-                        )}
-                      </ButtonItem>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <ButtonItem layout="below" onClick={() => syncGame(game)} disabled={isSyncing || !game.hasSaves}>
-                        {isSyncing ? (
-                          <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
-                            <Spinner />
-                            <span>Синхронизация…</span>
-                          </span>
-                        ) : (
-                          actionButton(
-                            <>
-                              <FaSyncAlt />
-                              Синхронизировать
-                            </>
-                          )
-                        )}
-                      </ButtonItem>
-                    </div>
-                  </div>
-                </div>
-              </PanelSectionRow>
-
+      {games.slice(0, VISIBLE_LIMIT).map((game) => {
+        const isSyncing = syncing[game.name];
+        const status = syncStatus[game.name];
+        return (
+          <PanelSectionRow key={game.name}>
+            <div style={{ width: "100%" }}>
+              <ButtonItem
+                icon={isSyncing ? <Spinner /> : <FaGamepad />}
+                label={game.name}
+                description={descriptionFor(game)}
+                onClick={() => syncGame(game)}
+                disabled={isSyncing || !game.hasSaves}
+              />
               {status && (
-                <PanelSectionRow>
-                  <StatusMessage tone={status.status === "success" ? "success" : status.status === "error" ? "error" : "info"}>
-                    {status.message || "Синхронизация…"}
-                  </StatusMessage>
-                </PanelSectionRow>
+                <StatusMessage tone={status.status === "success" ? "success" : status.status === "error" ? "error" : "info"}>
+                  {status.message || "Синхронизация…"}
+                </StatusMessage>
               )}
-            </PanelSection>
-          );
-        })}
-
-      {!loading && games.length > 0 && (
-        <PanelSection>
-          <PanelSectionRow>
-            <div style={{ ...dimText, textAlign: "center", width: "100%", color: colors.dim }}>
-              Игры находятся автоматически по префиксам PortProton и ярлыкам Steam
             </div>
           </PanelSectionRow>
-        </PanelSection>
-      )}
-    </div>
+        );
+      })}
+
+      <PanelSectionRow>
+        <ButtonItem layout="below" icon={<FaFolderOpen />} onClick={openPaths}>
+          {games.length > VISIBLE_LIMIT ? `Все игры и пути (${games.length})` : "Настроить пути"}
+        </ButtonItem>
+      </PanelSectionRow>
+    </PanelSection>
   );
 }
