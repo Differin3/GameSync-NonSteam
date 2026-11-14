@@ -327,6 +327,20 @@ function GameSyncMain() {
             clearInterval(timer);
         };
     }, [syncing]);
+    const toggleAutoSync = async (enabled) => {
+        setAutoSync(enabled);
+        try {
+            const result = await call("enable_auto_sync", { enabled });
+            if (!result?.success) {
+                setAutoSync(!enabled);
+                setMessage({ tone: "error", text: result?.error || "Не удалось переключить автосинхронизацию" });
+            }
+        }
+        catch (error) {
+            setAutoSync(!enabled);
+            setMessage({ tone: "error", text: error?.message || String(error) });
+        }
+    };
     const openSettings = (tab) => {
         DFL.Router.CloseSideMenus();
         DFL.Router.Navigate("/gamesync-settings");
@@ -362,7 +376,11 @@ function GameSyncMain() {
     const percent = Math.max(0, Math.min(100, Math.round(progress?.percent ?? 0)));
     const storageLabel = storage ? `${storage.provider} · ${storage.success ? "подключено" : "нет связи"}` : "проверка хранилища…";
     const storageOk = storage?.success ?? false;
-    return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { icon: SP_JSX.jsx(Icon, { children: SP_JSX.jsx(FaCloud, { style: { color: storageOk ? "#5fd88a" : storage ? "#e05b5b" : "#8b929a" } }) }), label: "GameSync", description: `${storageLabel} · ${summary?.games ?? "…"} игр · ${summary?.synced ?? 0} в облаке${summary?.lastSync ? ` · ${formatDate$3(summary.lastSync)}` : ""}` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: syncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaSyncAlt, {}), onClick: syncAll, disabled: syncing || !pluginOk, children: syncing ? "Синхронизация…" : "Синхронизировать всё" }) }), (syncing || progress?.active) && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#b8bcbf", marginBottom: "4px" }, children: [SP_JSX.jsx("span", { children: progress?.stage || "Подготовка…" }), SP_JSX.jsxs("span", { children: [percent, "%"] })] }), SP_JSX.jsx("div", { style: { height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }, children: SP_JSX.jsx("div", { style: {
+    return (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Field, { icon: SP_JSX.jsx(Icon, { children: SP_JSX.jsx(FaCloud, { style: { color: storageOk ? "#5fd88a" : storage ? "#e05b5b" : "#8b929a" } }) }), label: "GameSync", description: `${storageLabel} · ${summary?.games ?? "…"} игр · ${summary?.synced ?? 0} в облаке${summary?.lastSync ? ` · ${formatDate$3(summary.lastSync)}` : ""}` }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "\u0410\u0432\u0442\u043E\u0441\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F", description: autoSync
+                        ? "Сохранять игру после выхода — включено"
+                        : "Выключена: игра не сохраняется автоматически", checked: autoSync, onChange: (value) => {
+                        void toggleAutoSync(value);
+                    } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(ActionButton, { icon: syncing ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaSyncAlt, {}), onClick: syncAll, disabled: syncing || !pluginOk, children: syncing ? "Синхронизация…" : "Синхронизировать всё" }) }), (syncing || progress?.active) && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { width: "100%" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#b8bcbf", marginBottom: "4px" }, children: [SP_JSX.jsx("span", { children: progress?.stage || "Подготовка…" }), SP_JSX.jsxs("span", { children: [percent, "%"] })] }), SP_JSX.jsx("div", { style: { height: "6px", borderRadius: "3px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }, children: SP_JSX.jsx("div", { style: {
                                     width: `${percent}%`,
                                     height: "100%",
                                     borderRadius: "3px",
@@ -1071,6 +1089,7 @@ function BackupsTab() {
     const [downloading, setDownloading] = SP_REACT.useState(false);
     const [maxVersions, setMaxVersions] = SP_REACT.useState(10);
     const [providerName, setProviderName] = SP_REACT.useState("хранилище");
+    const [downloadDir, setDownloadDir] = SP_REACT.useState("~/Downloads");
     const [status, setStatus] = SP_REACT.useState(null);
     const load = async (silent = false) => {
         if (silent) {
@@ -1093,6 +1112,8 @@ function BackupsTab() {
                 setError(response?.error || "Не удалось загрузить список бэкапов");
             }
             setMaxVersions(Number(appSettings?.max_backup_versions || 10));
+            if (appSettings?.download_dir)
+                setDownloadDir(String(appSettings.download_dir));
             setProviderName(storage?.provider || "хранилище");
         }
         catch (err) {
@@ -1208,7 +1229,7 @@ function BackupsTab() {
                                         color: colors.dim,
                                         padding: "3px 0",
                                         borderTop: "1px solid rgba(255,255,255,0.05)",
-                                    }, children: [SP_JSX.jsx("span", { children: formatDate$2(entry.created) }), SP_JSX.jsx("span", { children: formatBytes$2(entry.size) })] }, entry.id))) }), SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaUndoAlt, {}), onClick: () => askRestore(selectedGame.game, latest), disabled: restoring, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u0437 \u043E\u0431\u043B\u0430\u043A\u0430" }), SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaDownload, {}), onClick: () => download(selectedGame.game, latest), disabled: downloading, children: downloading ? "Скачивание…" : "Скачать .tar.gz" }), SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u0422\u0435\u043A\u0443\u0449\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0431\u0443\u0434\u0435\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u043A\u0430\u043A \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u0430\u044F." })] }))] })] }));
+                                    }, children: [SP_JSX.jsx("span", { children: formatDate$2(entry.created) }), SP_JSX.jsx("span", { children: formatBytes$2(entry.size) })] }, entry.id))) }), SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaUndoAlt, {}), onClick: () => askRestore(selectedGame.game, latest), disabled: restoring, children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u0437 \u043E\u0431\u043B\u0430\u043A\u0430" }), SP_JSX.jsx(ActionButton, { icon: SP_JSX.jsx(FaDownload, {}), onClick: () => download(selectedGame.game, latest), disabled: downloading, children: downloading ? "Скачивание…" : "Скачать .tar.gz" }), SP_JSX.jsxs(Hint, { children: ["\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0432 ", downloadDir] }), SP_JSX.jsx(Hint, { children: "\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0448\u0435\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u0439\u0432\u044B. \u0422\u0435\u043A\u0443\u0449\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0431\u0443\u0434\u0435\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430 \u043A\u0430\u043A \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u0430\u044F." })] }))] })] }));
 }
 
 const formatBytes$1 = (bytes) => {
