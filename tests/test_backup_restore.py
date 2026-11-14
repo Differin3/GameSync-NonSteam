@@ -715,5 +715,25 @@ class EmulatorSavesTest(unittest.TestCase):
                 any(c["source"] == "emulator" and c["path"].endswith("Halo4") for c in candidates),
                 candidates,
             )
+import path_preview  # noqa: E402
+
+
+class PathPreviewTest(unittest.TestCase):
+    def test_describe_path_counts_save_like(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "saves"
+            folder.mkdir()
+            (folder / "slot1.sav").write_text("save", encoding="utf-8")
+            (folder / "game.log").write_text("log", encoding="utf-8")
+
+            result = path_preview.describe_path(str(folder))
+            self.assertTrue(result["success"])
+            self.assertEqual(result["total"], 2)
+            self.assertEqual(result["saveLike"], 1)
+            self.assertTrue(any(item["name"] == "slot1.sav" and item["saveLike"] for item in result["files"]))
+
+    def test_describe_path_missing(self):
+        result = path_preview.describe_path("/definitely/not/here")
+        self.assertFalse(result["success"])
 if __name__ == "__main__":
     unittest.main(verbosity=2)

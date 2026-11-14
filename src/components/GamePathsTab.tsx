@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { call } from "@decky/api";
 import { PanelSection, PanelSectionRow, TextField } from "@decky/ui";
-import { FaBan, FaCheck, FaEdit, FaFolderOpen, FaPlus, FaRedo, FaTimes, FaTrash } from "react-icons/fa";
+import { FaBan, FaCheck, FaEdit, FaEye, FaFolderOpen, FaPlus, FaRedo, FaTimes, FaTrash } from "react-icons/fa";
 import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
 import { Badge, EmptyState, ErrorState, Loading, Pager, StatusMessage } from "./ui";
@@ -46,6 +46,30 @@ export function GamePathsTab() {
   const [validating, setValidating] = useState<boolean>(false);
   const [pathValidationResult, setPathValidationResult] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
+  const [previewTarget, setPreviewTarget] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState<boolean>(false);
+
+  const formatSize = (bytes?: number): string => {
+    if (!bytes || bytes <= 0) return "0 Б";
+    const units = ["Б", "КБ", "МБ", "ГБ"];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${Math.round((bytes / Math.pow(1024, index)) * 10) / 10} ${units[index]}`;
+  };
+
+  const previewPath = async (path: string) => {
+    setPreviewTarget(path);
+    setPreviewData(null);
+    setPreviewLoading(true);
+    try {
+      const result: any = await call("preview_path", { path });
+      setPreviewData(result);
+    } catch (err: any) {
+      setPreviewData({ success: false, error: err?.message || String(err) });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const loadGames = async (forceRefresh: boolean = false) => {
     setLoading(true);
@@ -270,9 +294,59 @@ export function GamePathsTab() {
                             <ActionButton icon={<FaTrash />} onClick={() => removePathFromGame(game, pathIndex)}>
                               Удалить путь
                             </ActionButton>
+                            <ActionButton icon={<FaEye />} onClick={() => previewPath(path)}>
+                              Проверить содержимое
+                            </ActionButton>
                           </div>
                         )}
                       </div>
+
+                      {previewTarget === path && (
+                        <div style={{ ...card, background: "rgba(255,255,255,0.04)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                          {previewLoading && <div style={dimText}>Чтение папки…</div>}
+                          {!previewLoading && previewData && !previewData.success && (
+                            <StatusMessage tone="error">{previewData.error || "Не удалось прочитать путь"}</StatusMessage>
+                          )}
+                          {!previewLoading && previewData?.success && (
+                            <>
+                              <div style={{ fontSize: "11px", color: colors.muted }}>
+                                {previewData.total} файлов · {formatSize(previewData.totalSize)} · похоже на сейвы:{" "}
+                                <b style={{ color: previewData.saveLike > 0 ? colors.text : colors.error }}>{previewData.saveLike}</b>
+                              </div>
+                              {previewData.saveLike === 0 && (
+                                <StatusMessage tone="warning">
+                                  Только служебные файлы — бэкап по этому пути не создастся.
+                                </StatusMessage>
+                              )}
+                              {previewData.files.map((file: any) => (
+                                <div
+                                  key={file.path}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    gap: "8px",
+                                    fontSize: "10.5px",
+                                    color: file.saveLike ? colors.text : colors.dim,
+                                  }}
+                                >
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {file.name}
+                                  </span>
+                                  <span style={{ flex: "0 0 auto" }}>
+                                    {formatSize(file.size)} · {(file.modified || "").slice(0, 16).replace("T", " ")}
+                                  </span>
+                                </div>
+                              ))}
+                              {previewData.total > previewData.files.length && (
+                                <div style={dimText}>…и ещё {previewData.total - previewData.files.length}</div>
+                              )}
+                              <ActionButton icon={<FaTimes />} onClick={() => setPreviewTarget(null)}>
+                                Скрыть
+                              </ActionButton>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
