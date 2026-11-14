@@ -1,5 +1,5 @@
 {
-  "name": "GameSync NonSteam",
+  "name": "GameSync",
   "main": "dist/index.js",
   "author": "GameSync Team",
   "flags": [],

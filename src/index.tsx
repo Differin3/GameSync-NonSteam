@@ -36,8 +36,13 @@ export default definePlugin(() => {
   });
 
   return {
-    name: "GameSync NonSteam",
-    titleView: <div className={staticClasses.Title}>GameSync</div>,
+    name: "GameSync",
+    titleView: (
+      <div className={staticClasses.Title}>
+        GameSync
+        <span style={{ fontSize: "11px", opacity: 0.6, marginLeft: "8px" }}>PortProton</span>
+      </div>
+    ),
     content: (
       <div>
         <GameSyncMain />
