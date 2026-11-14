@@ -46,6 +46,12 @@ STANDARD_SAVE_PATHS = [
 ]
 
 # Расширения файлов сохранений
+# Служебные файлы: логи, картинки, бинарники — это не сохранения.
+SERVICE_EXTENSIONS = {
+    ".log", ".txt", ".dll", ".exe", ".png", ".jpg", ".jpeg", ".dds", ".pdb",
+    ".mdmp", ".wer", ".chunk", ".pak",
+}
+
 SAVE_EXTENSIONS = {
     ".sav", ".save", ".sav0", ".sav1", ".sav2", ".slot", ".dat", ".cfg",
     ".ini", ".json", ".xml", ".profile", ".es3", ".ess", ".d2s", ".nhl",
@@ -339,19 +345,23 @@ def _list_windows_users(drive_c: Path) -> List[str]:
     return names or FALLBACK_WINDOWS_USERS[:2]
 
 
-def _folder_stats(folder: Path) -> Tuple[int, int, int, float]:
-    """(всего файлов, файлов-сохранений, размер, самый свежий mtime)."""
+def _folder_stats(folder: Path) -> Tuple[int, int, int, float, int]:
+    """(всего файлов, файлов-сохранений, размер, mtime, неслужебных файлов)."""
     total = 0
     save_files = 0
     size = 0
     newest = 0.0
+    meaningful = 0
     try:
         for path in folder.rglob("*"):
             if not path.is_file():
                 continue
             total += 1
-            if path.suffix.lower() in SAVE_EXTENSIONS:
+            suffix = path.suffix.lower()
+            if suffix in SAVE_EXTENSIONS:
                 save_files += 1
+            if suffix not in SERVICE_EXTENSIONS:
+                meaningful += 1
             try:
                 stat = path.stat()
                 size += stat.st_size
@@ -362,7 +372,7 @@ def _folder_stats(folder: Path) -> Tuple[int, int, int, float]:
                 break
     except (PermissionError, OSError):
         pass
-    return total, save_files, size, newest
+    return total, save_files, size, newest, meaningful
 
 
 def _score_candidate(name_score: int, total: int, save_files: int, size: int, newest: float, depth: int) -> int:
@@ -512,7 +522,10 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
 
     def add(path: Path, name_score: int, source: str, depth: int, reason: str) -> None:
         key = str(path)
-        total, save_files, size, newest = _folder_stats(path)
+        total, save_files, size, newest, meaningful = _folder_stats(path)
+        # Папка только с логами/картинками/бинарниками — это не сейвы.
+        if source == "heuristic" and total > 0 and meaningful == 0:
+            return
         score = _score_candidate(name_score, total, save_files, size, newest, depth)
         existing = candidates.get(key)
         if existing is None or score > existing["score"]:
@@ -523,6 +536,7 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
                 "reason": reason,
                 "fileCount": total,
                 "saveFileCount": save_files,
+                "meaningfulCount": meaningful,
                 "size": size,
             }
 
@@ -550,7 +564,7 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
     # Отбрасываем пустые эвристические кандидаты без файлов
     filtered = [
         c for c in candidates.values()
-        if c["source"] in ("known", "learned") or c["fileCount"] > 0
+        if c["source"] in ("known", "learned") or c["meaningfulCount"] > 0
     ]
     filtered.sort(key=lambda c: c["score"], reverse=True)
     return filtered[:5]

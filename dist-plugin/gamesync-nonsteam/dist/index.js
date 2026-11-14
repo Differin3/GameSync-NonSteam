@@ -1158,8 +1158,17 @@ function BackupsTab() {
         try {
             const response = await call("restore_backup", { game_name: gameName, backup_id: entry.id });
             if (response?.success) {
+                const files = Number(response.files || 0);
                 const suffix = response.safety_backup ? " · текущие сейвы сохранены в резерв" : "";
-                setStatus({ tone: "success", text: `${response.message || "Восстановлено"}${suffix}` });
+                if (files === 0) {
+                    setStatus({
+                        tone: "warning",
+                        text: "Восстановлено 0 файлов: в этом бэкапе, похоже, только служебные файлы. Пересинхронизируйте игру после исправления путей.",
+                    });
+                }
+                else {
+                    setStatus({ tone: "success", text: `${response.message || "Восстановлено"}${suffix}` });
+                }
                 await load(true);
             }
             else {
