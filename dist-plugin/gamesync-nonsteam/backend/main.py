@@ -292,11 +292,12 @@ class Plugin:
 
         from auto_sync import GameMonitor
 
-        async def sync_callback(game_name: str, save_paths: List[str]):
+        async def sync_callback(game_name: str, save_paths: List[str], started_at: float = None):
             """Callback для автосинхронизации после выхода из игры."""
             logger.info(f"Auto-syncing game: {game_name}")
             resolved_name = game_name
             resolved_paths = save_paths or _resolve_save_paths_for_game(game_name)
+            matched_candidate = None
 
             # Имя папки префикса может не совпадать с названием игры:
             # тогда ищем игру по префиксу и берём её пути.
@@ -318,12 +319,31 @@ class Plugin:
                         if matched:
                             resolved_name = candidate.get("name") or game_name
                             resolved_paths = candidate.get("savePaths") or []
+                            matched_candidate = candidate
                             logger.info(
                                 f"Auto-sync matched {game_name} -> {resolved_name} ({len(resolved_paths)} paths)"
                             )
                             break
                 except Exception as e:
                     logger.warning(f"Auto-sync prefix match failed: {e}")
+
+            # Учимся на сессии: файлы, которые игра писала во время запуска,
+            # становятся путями сохранений (самый надёжный сигнал).
+            if started_at and matched_candidate:
+                try:
+                    from learning import learn_from_session
+                    learned = await asyncio.to_thread(
+                        learn_from_session,
+                        resolved_name,
+                        matched_candidate.get("prefixPath"),
+                        started_at,
+                    )
+                    if learned:
+                        extra = _resolve_save_paths_for_game(resolved_name)
+                        resolved_paths = list(dict.fromkeys(list(resolved_paths) + list(extra)))
+                        logger.info(f"Auto-sync paths after learning: {len(resolved_paths)}")
+                except Exception as e:
+                    logger.warning(f"Session learning failed: {e}")
 
             if not resolved_paths:
                 logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
@@ -491,6 +511,20 @@ class Plugin:
 
             if not save_paths:
                 return {"success": False, "error": "Все пути сохранений исключены"}
+
+            # Надёжность: не делаем бэкап, если в путях только служебные файлы
+            # (логи, кэш) — иначе получается «пустой» архив на 3 КБ.
+            try:
+                from sync_engine import count_meaningful_files
+                meaningful = await asyncio.to_thread(count_meaningful_files, save_paths)
+            except Exception as e:
+                logger.warning(f"Meaningful file check failed: {e}")
+                meaningful = None
+            if meaningful == 0:
+                return {
+                    "success": False,
+                    "error": "В путях сохранений только служебные файлы (логи/кэш). Укажите путь в «Пути игр».",
+                }
 
             try:
                 from sync_engine import create_backup

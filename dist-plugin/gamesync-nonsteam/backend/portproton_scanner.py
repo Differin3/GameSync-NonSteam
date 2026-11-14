@@ -524,7 +524,7 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
         key = str(path)
         total, save_files, size, newest, meaningful = _folder_stats(path)
         # Папка только с логами/картинками/бинарниками — это не сейвы.
-        if source == "heuristic" and total > 0 and meaningful == 0:
+        if total > 0 and meaningful == 0:
             return
         score = _score_candidate(name_score, total, save_files, size, newest, depth)
         existing = candidates.get(key)
