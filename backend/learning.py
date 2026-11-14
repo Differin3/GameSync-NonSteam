@@ -118,6 +118,88 @@ def record_path(game_name: str, path: str) -> None:
         logger.info(f"Learned path for '{game_name}': {rel}")
 
 
+# ---------------------------------------------------------------------------
+# Обучение по реальной сессии: какие файлы игра писала во время запуска
+# ---------------------------------------------------------------------------
+
+_SYSTEM_PARTS = {
+    "windows", "system32", "syswow64", "program files", "program files (x86)",
+    "temp", "tmp", "cache", "logs", "crashdumps", "crashpad", "d3dcompiler",
+    "directx", "nvidia", "intel", "amd", "steam", "steamapps",
+}
+
+
+def _is_service_path(path: Path, base: Optional[Path] = None) -> bool:
+    try:
+        from portproton_scanner import SERVICE_EXTENSIONS
+    except Exception:
+        SERVICE_EXTENSIONS = {".log", ".txt", ".dll", ".exe", ".png", ".jpg", ".dds"}
+    if path.suffix.lower() in SERVICE_EXTENSIONS:
+        return True
+    try:
+        parts = path.relative_to(base).parts if base else path.parts
+    except ValueError:
+        parts = path.parts
+    lowered = {part.lower() for part in parts}
+    return bool(lowered & _SYSTEM_PARTS)
+
+
+def learn_from_session(
+    game_name: str,
+    prefix_path,
+    since_ts: float,
+    max_files: int = 20000,
+) -> List[str]:
+    """Найти папки, в которые игра писала во время сессии, и запомнить их.
+
+    Это самый надёжный сигнал: файлы менялись именно при запущенной игре.
+    Служебные файлы (логи, кэш, бинарники) отбрасываются.
+    """
+    from pathlib import Path as _Path
+
+    if not game_name or not since_ts:
+        return []
+    drive_c = _Path(prefix_path) / "drive_c"
+    if not drive_c.is_dir():
+        return []
+
+    threshold = since_ts - 5.0
+    folders: Dict[str, Dict[str, float]] = {}
+    scanned = 0
+    try:
+        for path in drive_c.rglob("*"):
+            scanned += 1
+            if scanned > max_files:
+                break
+            try:
+                if not path.is_file():
+                    continue
+                if _is_service_path(path, drive_c):
+                    continue
+                if path.stat().st_mtime < threshold:
+                    continue
+            except OSError:
+                continue
+            parent = str(path.parent)
+            info = folders.setdefault(parent, {"count": 0, "newest": 0.0})
+            info["count"] += 1
+            info["newest"] = max(info["newest"], path.stat().st_mtime)
+    except (PermissionError, OSError) as e:
+        logger.warning(f"Session scan failed for {game_name}: {e}")
+
+    if not folders:
+        return []
+
+    ranked = sorted(folders.items(), key=lambda item: (item[1]["count"], item[1]["newest"]), reverse=True)[:3]
+    learned: List[str] = []
+    for folder, _ in ranked:
+        record_path(game_name, folder)
+        learned.append(folder)
+    if learned:
+        logger.info(f"Learned {len(learned)} save dirs for {game_name}: {learned}")
+    return learned
+
+
 def suggest_paths(game_name: str, drive_c: Path) -> List[str]:
     """Подсказать существующие пути для игры на основе изученных похожих игр."""
     if not game_name:

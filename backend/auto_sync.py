@@ -1,6 +1,7 @@
 import psutil
 import logging
 import asyncio
+import time
 from typing import Dict, List, Optional, Set
 from pathlib import Path
 
@@ -142,6 +143,7 @@ class GameMonitor:
     def __init__(self, sync_callback):
         self.sync_callback = sync_callback
         self.running_games: Dict[str, Set[int]] = {}
+        self.started_at: Dict[str, float] = {}
         self.running = False
 
     async def start_monitoring(self):
@@ -153,10 +155,17 @@ class GameMonitor:
             try:
                 current = collect_running_games(find_portproton_processes())
 
+                # Запоминаем момент запуска: по нему видно, какие файлы игра
+                # реально писала во время сессии.
+                for key in current:
+                    if key not in self.running_games:
+                        self.started_at[key] = time.time()
+
                 for game_name in finished_games(self.running_games, current):
                     logger.info(f"Game process ended: {game_name}")
+                    started_at = self.started_at.pop(game_name, None)
                     try:
-                        await self.sync_callback(game_name, [])
+                        await self.sync_callback(game_name, [], started_at)
                     except Exception as e:
                         logger.error(f"Auto-sync callback failed for {game_name}: {e}")
 

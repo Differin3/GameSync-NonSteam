@@ -6,6 +6,7 @@
 """
 
 import io
+import os
 import shutil
 import sys
 import tarfile
@@ -649,5 +650,53 @@ class SaveDetectionServiceFilesTest(unittest.TestCase):
             (docs / "slot1.sav").write_text("save", encoding="utf-8")
             candidates = portproton_scanner.detect_save_candidates(prefix, "TestGameXYZ")
             self.assertTrue(any(c["path"] == str(docs) for c in candidates))
+import learning  # noqa: E402
+import sync_engine  # noqa: E402
+
+
+class ReliablePathsTest(unittest.TestCase):
+    def test_count_meaningful_files_ignores_logs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "saves"
+            folder.mkdir()
+            (folder / "slot1.sav").write_text("save", encoding="utf-8")
+            (folder / "game.log").write_text("log", encoding="utf-8")
+            self.assertEqual(sync_engine.count_meaningful_files([str(folder)]), 1)
+
+    def test_count_meaningful_files_empty_for_logs_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "logs"
+            folder.mkdir()
+            (folder / "a.log").write_text("log", encoding="utf-8")
+            self.assertEqual(sync_engine.count_meaningful_files([str(folder)]), 0)
+
+    def test_learn_from_session_finds_written_dir(self):
+        import time as _time
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefixes" / "SomeGame"
+            docs = prefix / "drive_c" / "users" / "steamuser" / "Documents" / "SomeGame"
+            logs = prefix / "drive_c" / "users" / "steamuser" / "Documents" / "SomeGameLogs"
+            docs.mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (docs / "profile.sav").write_text("save", encoding="utf-8")
+            (logs / "trace.log").write_text("log", encoding="utf-8")
+            now = _time.time()
+            os.utime(docs / "profile.sav", (now, now))
+            os.utime(logs / "trace.log", (now, now))
+
+            learned = learning.learn_from_session("Some Game", prefix, now - 60)
+            self.assertTrue(any("SomeGame" in path and "Logs" not in path for path in learned))
+
+    def test_learn_from_session_ignores_old_files(self):
+        import time as _time
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefixes" / "OldGame"
+            docs = prefix / "drive_c" / "users" / "steamuser" / "Documents" / "OldGame"
+            docs.mkdir(parents=True)
+            old_file = docs / "old.sav"
+            old_file.write_text("old", encoding="utf-8")
+            old = _time.time() - 86400
+            os.utime(old_file, (old, old))
+            self.assertEqual(learning.learn_from_session("Old Game", prefix, _time.time() - 60), [])
 if __name__ == "__main__":
     unittest.main(verbosity=2)
