@@ -16,7 +16,9 @@ if (api._version != API_VERSION) {
     console.warn(`[@decky/api] Requested API version ${API_VERSION} but the running loader only supports version ${api._version}. Some features may not work.`);
 }
 const call = api.call;
+const addEventListener = api.addEventListener;
 const routerHook = api.routerHook;
+const toaster = api.toaster;
 const definePlugin = (fn) => {
     return (...args) => {
         return fn(...args);
@@ -1421,7 +1423,12 @@ function GameSyncGameRow({ appId, title }) {
         setChecked(false);
         setStatus(null);
         load();
+        // Раз в минуту обновляем статус: автосинхронизация после выхода из игры
+        // должна отражаться на значке без перезахода на страницу.
+        const timer = setInterval(load, 60000);
+        return () => clearInterval(timer);
     }, [appId]);
+    const recent = Boolean(status?.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000);
     if (!checked || !status) {
         return null;
     }
@@ -1471,7 +1478,7 @@ function GameSyncGameRow({ appId, title }) {
             background: "rgba(20, 32, 40, 0.72)",
             borderLeft: "3px solid #66c0f4",
             borderRadius: "4px",
-        }, children: [SP_JSX.jsx(DFL.Focusable, { onClick: syncNow, onActivate: syncNow, onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false), onFocus: () => setIconFocused(true), onBlur: () => setIconFocused(false), style: {
+        }, children: [SP_JSX.jsxs(DFL.Focusable, { onClick: syncNow, onActivate: syncNow, onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false), onFocus: () => setIconFocused(true), onBlur: () => setIconFocused(false), style: {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1479,12 +1486,26 @@ function GameSyncGameRow({ appId, title }) {
                     height: "36px",
                     flex: "0 0 auto",
                     borderRadius: "50%",
+                    position: "relative",
                     cursor: busy ? "default" : "pointer",
                     background: iconFocused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
                     boxShadow: iconFocused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
                     transition: "background 0.15s ease, box-shadow 0.15s ease",
                     opacity: busy ? 0.7 : 1,
-                }, title: busy ? "Синхронизация…" : "Синхронизировать игру", children: busy ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaCloud, { style: { fontSize: "20px", color: "#7fd0ff" } }) }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "2px", flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", letterSpacing: "0.6px", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }, children: "GameSync" }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#e8eef3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: details }), message && SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#f0a0a0" }, children: message })] }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "170px" }, onClick: syncNow, disabled: busy, children: busy ? "Синхронизация…" : "Синхронизировать" }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "110px" }, onClick: openSettings, children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C" })] }));
+                }, title: busy
+                    ? "Синхронизация…"
+                    : recent
+                        ? `Синхронизировано ${formatDate(status.last_sync)} — нажмите, чтобы повторить`
+                        : "Синхронизировать игру", children: [busy ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaCloud, { style: { fontSize: "20px", color: "#7fd0ff" } }), recent && !busy && (SP_JSX.jsx("span", { style: {
+                            position: "absolute",
+                            right: "1px",
+                            bottom: "1px",
+                            width: "9px",
+                            height: "9px",
+                            borderRadius: "50%",
+                            background: "#5fd88a",
+                            boxShadow: "0 0 0 2px rgba(20, 32, 40, 0.95)",
+                        } }))] }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "2px", flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", letterSpacing: "0.6px", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }, children: "GameSync" }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#e8eef3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: details }), message && SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#f0a0a0" }, children: message })] }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "170px" }, onClick: syncNow, disabled: busy, children: busy ? "Синхронизация…" : "Синхронизировать" }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "110px" }, onClick: openSettings, children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C" })] }));
 }
 
 const ROUTE = "/library/app/:appid";
@@ -1588,6 +1609,27 @@ function installAppDetailsPatch() {
     }
 }
 
+const formatSize = (bytes) => {
+    if (!bytes || bytes <= 0)
+        return "";
+    const units = ["Б", "КБ", "МБ", "ГБ"];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return ` · ${Math.round((bytes / Math.pow(1024, index)) * 10) / 10} ${units[index]}`;
+};
+// Тост после автосинхронизации по выходу из игры.
+addEventListener("gamesync_auto_saved", (data) => {
+    try {
+        const game = data?.game || "игра";
+        const size = formatSize(Number(data?.size || 0));
+        toaster.toast({
+            title: "GameSync",
+            body: `Сохранено: ${game}${size}`,
+        });
+    }
+    catch (error) {
+        console.error("[GameSync] toast failed", error);
+    }
+});
 var index = definePlugin(() => {
     // Строка статуса на странице non-Steam игры в библиотеке Steam
     const removeAppDetailsPatch = installAppDetailsPatch();
