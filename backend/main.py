@@ -332,6 +332,14 @@ class Plugin:
             result = await plugin_instance.sync_game(resolved_name, resolved_paths)
             if result.get("success"):
                 logger.info(f"Auto-sync completed for {resolved_name}")
+                # Тост в Steam UI: уведомление «сохранено»
+                try:
+                    decky.emit(
+                        "gamesync_auto_saved",
+                        {"game": resolved_name, "size": int(result.get("file_size") or 0)},
+                    )
+                except Exception as emit_error:
+                    logger.warning(f"Failed to emit auto-save event: {emit_error}")
             else:
                 logger.error(f"Auto-sync failed for {resolved_name}: {result.get('error')}")
 
@@ -615,6 +623,7 @@ class Plugin:
                 "success": True,
                 "file_id": file_id,
                 "version_id": version_remote,
+                "file_size": file_size,
                 "message": "Синхронизация завершена",
             }
         except Exception as e:
