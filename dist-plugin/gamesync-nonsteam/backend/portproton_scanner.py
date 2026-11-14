@@ -52,6 +52,12 @@ SERVICE_EXTENSIONS = {
     ".mdmp", ".wer", ".chunk", ".pak",
 }
 
+# Папки Steam-эмуляторов в AppData/Roaming: <EMU>/<appid>/remote — сохранения.
+EMULATOR_DIRS = {
+    "hoodlum", "codex", "goldberg", "gse", "skidrow", "reloaded", "plaza",
+    "empress", "rune", "tenoke", "flt", "razor1911", "elamigos", "prophet",
+}
+
 SAVE_EXTENSIONS = {
     ".sav", ".save", ".sav0", ".sav1", ".sav2", ".slot", ".dat", ".cfg",
     ".ini", ".json", ".xml", ".profile", ".es3", ".ess", ".d2s", ".nhl",
@@ -69,7 +75,10 @@ IGNORED_FOLDER_NAMES = {
 IGNORED_DESKTOP_FILES = {"portproton.desktop", "readme.desktop"}
 
 # Общие имена, которые не являются названиями игр
-GENERIC_GAME_NAMES = {"portproton", "wine", "proton", "readme", "game", "launcher", "default"}
+GENERIC_GAME_NAMES = {"portproton", "wine", "proton", "readme", "game", "launcher", "default", "dotnet"}
+
+# Слова, по которым запись считается не игрой (саундтреки, артбуки).
+NON_GAME_WORDS = {"soundtrack", "artwork", "artbook", "digital art", "bonus content"}
 
 # Финальные «издания», которые не входят в имя папки сохранений.
 _EDITION_SUFFIXES = [
@@ -390,7 +399,7 @@ def _score_candidate(name_score: int, total: int, save_files: int, size: int, ne
     return score
 
 
-def _find_named_dirs(root: Path, game_name: str, max_depth: int = 2, max_dirs: int = 400) -> List[Tuple[Path, int, int]]:
+def _find_named_dirs(root: Path, game_name: str, max_depth: int = 3, max_dirs: int = 800) -> List[Tuple[Path, int, int]]:
     """Найти папки с именем игры под root. Возвращает (path, name_score, depth)."""
     matches: List[Tuple[Path, int, int]] = []
     if not root.is_dir():
@@ -553,6 +562,38 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
             add(Path(learned), 100, "learned", 0, "изученный путь")
     except Exception as e:
         logger.debug(f"Learning lookup failed for '{game_name}': {e}")
+
+    # 1c. Сохранения Steam-эмуляторов: AppData/Roaming/<EMU>/<appid>/remote
+    for user in users:
+        roaming = drive_c / "users" / user / "AppData" / "Roaming"
+        if not roaming.is_dir():
+            continue
+        try:
+            for emu in roaming.iterdir():
+                if not emu.is_dir() or emu.name.lower() not in EMULATOR_DIRS:
+                    continue
+                for appid_dir in emu.iterdir():
+                    remote = appid_dir / "remote"
+                    if not remote.is_dir():
+                        continue
+                    # Совпадение по реальному App ID — самый точный случай.
+                    if steam_appid and str(steam_appid) == appid_dir.name:
+                        add(remote, 80, "emulator", 0, f"эмулятор {emu.name}/{appid_dir.name}")
+                        continue
+                    # Иначе ищем внутри remote подпапку с именем игры
+                    # (например, .../Saves/SaveGame/halo4).
+                    checked = 0
+                    for sub in remote.rglob("*"):
+                        checked += 1
+                        if checked > 500:
+                            break
+                        if not sub.is_dir():
+                            continue
+                        if _name_match_score(game_name, sub.name) >= 85:
+                            add(sub, 85, "emulator", 0, f"эмулятор {emu.name}/{appid_dir.name}/{sub.name}")
+                            break
+        except (PermissionError, OSError):
+            continue
 
     # 2. Эвристика по стандартным корням
     search_names = [n for n in (game_name, prefix_name) if n and n.upper() != "DEFAULT"]
@@ -742,7 +783,10 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
     # Отбрасываем служебные «игры» вроде DEFAULT/DOTNET, которые иногда
     # приходят из .desktop или из имён префиксов.
     def _is_generic(name: str) -> bool:
-        words = [w for w in re.split(r"\s+", (name or "").lower()) if w]
+        lowered = (name or "").lower()
+        if any(word in lowered for word in NON_GAME_WORDS):
+            return True
+        words = [w for w in re.split(r"\s+", lowered) if w]
         return not words or all(w in GENERIC_GAME_NAMES for w in words)
 
     games = [game for game in games if not _is_generic(game.get("name") or "")]
