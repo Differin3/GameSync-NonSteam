@@ -788,6 +788,16 @@ class Plugin:
             return {"success": False, "error": str(e)}
 
     @decky_params
+    async def preview_path(self, path: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Показать файлы в пути сохранений (проверка перед синхронизацией)."""
+        try:
+            from path_preview import describe_path
+            return await asyncio.to_thread(describe_path, path or "")
+        except Exception as e:
+            logger.error(f"Error previewing path: {e}")
+            return {"success": False, "error": str(e)}
+
+    @decky_params
     async def set_max_backup_versions(self, count: int = 10, *args, **kwargs) -> Dict[str, Any]:
         """Сколько версий бэкапа хранить на игру (1–100)."""
         try:
