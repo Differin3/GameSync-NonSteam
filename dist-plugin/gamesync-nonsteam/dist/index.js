@@ -1,4 +1,4 @@
-const manifest = {"name":"GameSync NonSteam"};
+const manifest = {"name":"GameSync"};
 const API_VERSION = 2;
 const internalAPIConnection = window.__DECKY_SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED_deckyLoaderAPIInit;
 if (!internalAPIConnection) {
@@ -1344,7 +1344,7 @@ function SettingsPage() {
             boxSizing: "border-box",
             paddingTop: "var(--basicui-header-height, 50px)",
             background: "transparent",
-        }, children: [SP_JSX.jsx("div", { style: {
+        }, children: [SP_JSX.jsx(DFL.Focusable, { "flow-children": "row", style: {
                     display: "flex",
                     alignItems: "flex-end",
                     justifyContent: "center",
@@ -1355,7 +1355,7 @@ function SettingsPage() {
                     borderBottom: "1px solid rgba(255,255,255,0.06)",
                 }, children: TABS.map((tab) => {
                     const isActive = tab.id === active.id;
-                    return (SP_JSX.jsxs(DFL.Focusable, { onClick: () => setCurrentTab(tab.id), onActivate: () => setCurrentTab(tab.id), style: {
+                    return (SP_JSX.jsxs(DFL.Focusable, { autoFocus: isActive, onClick: () => setCurrentTab(tab.id), onActivate: () => setCurrentTab(tab.id), style: {
                             display: "flex",
                             alignItems: "center",
                             gap: "8px",
@@ -1368,7 +1368,7 @@ function SettingsPage() {
                             cursor: "pointer",
                             userSelect: "none",
                         }, children: [SP_JSX.jsx(Icon, { children: tab.icon }), tab.title] }, tab.id));
-                }) }), SP_JSX.jsx("div", { style: { flex: "1 1 auto", overflowY: "auto", overflowX: "hidden", padding: "14px 24px 24px" }, children: active.content })] }));
+                }) }), SP_JSX.jsx(DFL.Focusable, { "flow-children": "column", style: { flex: "1 1 auto", overflowY: "auto", overflowX: "hidden", padding: "14px 24px 24px" }, children: active.content })] }));
 }
 
 const formatDate = (value) => {
@@ -1654,8 +1654,8 @@ var index = definePlugin(() => {
         return SP_JSX.jsx(SettingsPage, {});
     });
     return {
-        name: "GameSync NonSteam",
-        titleView: SP_JSX.jsx("div", { className: DFL.staticClasses.Title, children: "GameSync" }),
+        name: "GameSync",
+        titleView: (SP_JSX.jsxs("div", { className: DFL.staticClasses.Title, children: ["GameSync", SP_JSX.jsx("span", { style: { fontSize: "11px", opacity: 0.6, marginLeft: "8px" }, children: "PortProton" })] })),
         content: (SP_JSX.jsx("div", { children: SP_JSX.jsx(GameSyncMain, {}) })),
         icon: SP_JSX.jsx(FaCloud, {}),
         onDismount() {

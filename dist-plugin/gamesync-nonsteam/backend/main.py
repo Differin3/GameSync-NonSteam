@@ -1085,16 +1085,19 @@ class Plugin:
             # поэтому реальное число записей берём из истории бэкапов.
             try:
                 from backup_index import list_all as list_all_backups
+                backup_groups = list_all_backups() or {}
                 backup_entries = [
                     entry
-                    for entries in (list_all_backups() or {}).values()
+                    for entries in backup_groups.values()
                     for entry in (entries or [])
                 ]
             except Exception as e:
                 logger.warning(f"Failed to load backup index for stats: {e}")
                 backup_entries = []
+                backup_groups = {}
 
             total_syncs = len(backup_entries) or len(synced_games)
+            # Игры — уникальные имена в истории/облаке, а не число бэкапов
 
             # Получаем даты синхронизаций
             syncs_by_date = {}
@@ -1134,7 +1137,7 @@ class Plugin:
                 "stats": {
                     "totalSyncs": total_syncs,
                     "lastSync": last_sync,
-                    "gamesCount": total_syncs,
+                    "gamesCount": len(backup_groups) or len(synced_games),
                     "totalSize": total_size,
                     "syncsByDate": syncs_by_date_list[:30]  # Последние 30 дней
                 }
