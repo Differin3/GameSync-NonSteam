@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
-import { DialogButton, Focusable, Router } from "@decky/ui";
+import { DialogButton, Focusable, Router, Spinner } from "@decky/ui";
 import { FaCloud } from "react-icons/fa";
 
 interface GameSyncStatus {
@@ -49,6 +49,8 @@ export function GameSyncGameRow({ appId, title }: Props) {
   const [checked, setChecked] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<boolean>(false);
+  const [iconFocused, setIconFocused] = useState<boolean>(false);
 
   const load = async () => {
     try {
@@ -123,7 +125,31 @@ export function GameSyncGameRow({ appId, title }: Props) {
         borderRadius: "4px",
       }}
     >
-      <FaCloud style={{ fontSize: "20px", color: "#7fd0ff", flex: "0 0 auto" }} />
+      <Focusable
+        onClick={syncNow}
+        onActivate={syncNow}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onFocus={() => setIconFocused(true)}
+        onBlur={() => setIconFocused(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "36px",
+          height: "36px",
+          flex: "0 0 auto",
+          borderRadius: "50%",
+          cursor: busy ? "default" : "pointer",
+          background: iconFocused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
+          boxShadow: iconFocused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
+          transition: "background 0.15s ease, box-shadow 0.15s ease",
+          opacity: busy ? 0.7 : 1,
+        }}
+        title={busy ? "Синхронизация…" : "Синхронизировать игру"}
+      >
+        {busy ? <Spinner /> : <FaCloud style={{ fontSize: "20px", color: "#7fd0ff" }} />}
+      </Focusable>
       <div style={{ display: "flex", flexDirection: "column", gap: "2px", flex: "1 1 auto", minWidth: 0 }}>
         <div style={{ fontSize: "11px", letterSpacing: "0.6px", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }}>
           GameSync
