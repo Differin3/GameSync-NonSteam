@@ -803,11 +803,12 @@ class Plugin:
                 "success": True,
                 "auto_sync": bool(settings.get("auto_sync")),
                 "max_backup_versions": int(settings.get("max_backup_versions", 10) or 10),
+                "download_dir": str(__import__("pathlib").Path.home() / "Downloads"),
                 "default_save_paths": settings.get("default_save_paths") or [],
             }
         except Exception as e:
             logger.error(f"Error loading app settings: {e}")
-            return {"success": False, "error": str(e), "auto_sync": False, "max_backup_versions": 10, "default_save_paths": []}
+            return {"success": False, "error": str(e), "auto_sync": False, "max_backup_versions": 10, "download_dir": "~/Downloads", "default_save_paths": []}
 
     @decky_params
     async def set_default_save_paths(self, default_save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:

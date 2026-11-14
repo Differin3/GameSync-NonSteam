@@ -43,6 +43,7 @@ export function BackupsTab() {
   const [downloading, setDownloading] = useState<boolean>(false);
   const [maxVersions, setMaxVersions] = useState<number>(10);
   const [providerName, setProviderName] = useState<string>("хранилище");
+  const [downloadDir, setDownloadDir] = useState<string>("~/Downloads");
   const [status, setStatus] = useState<{ tone: Tone; text: string } | null>(null);
 
   const load = async (silent: boolean = false) => {
@@ -64,6 +65,7 @@ export function BackupsTab() {
         setError(response?.error || "Не удалось загрузить список бэкапов");
       }
       setMaxVersions(Number(appSettings?.max_backup_versions || 10));
+      if (appSettings?.download_dir) setDownloadDir(String(appSettings.download_dir));
       setProviderName(storage?.provider || "хранилище");
     } catch (err) {
       setError(`Ошибка: ${err}`);
@@ -303,6 +305,7 @@ export function BackupsTab() {
               {downloading ? "Скачивание…" : "Скачать .tar.gz"}
             </ActionButton>
 
+            <Hint>Скачивается в {downloadDir}</Hint>
             <Hint>Восстановление перезапишет локальные сейвы. Текущая версия будет сохранена как резервная.</Hint>
           </aside>
         )}

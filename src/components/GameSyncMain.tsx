@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
-import { Field, PanelSection, PanelSectionRow, Router, Spinner } from "@decky/ui";
+import { Field, PanelSection, PanelSectionRow, Router, Spinner, ToggleField } from "@decky/ui";
 import { FaCloud, FaCloudDownloadAlt, FaCog, FaSyncAlt } from "react-icons/fa";
 import { ActionButton, Hint, Icon, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
@@ -105,6 +105,20 @@ export function GameSyncMain() {
     };
   }, [syncing]);
 
+  const toggleAutoSync = async (enabled: boolean) => {
+    setAutoSync(enabled);
+    try {
+      const result: any = await call("enable_auto_sync", { enabled });
+      if (!result?.success) {
+        setAutoSync(!enabled);
+        setMessage({ tone: "error", text: result?.error || "Не удалось переключить автосинхронизацию" });
+      }
+    } catch (error: any) {
+      setAutoSync(!enabled);
+      setMessage({ tone: "error", text: error?.message || String(error) });
+    }
+  };
+
   const openSettings = (tab: string) => {
     Router.CloseSideMenus();
     Router.Navigate("/gamesync-settings");
@@ -153,6 +167,21 @@ export function GameSyncMain() {
           description={`${storageLabel} · ${summary?.games ?? "…"} игр · ${summary?.synced ?? 0} в облаке${
             summary?.lastSync ? ` · ${formatDate(summary.lastSync)}` : ""
           }`}
+        />
+      </PanelSectionRow>
+
+      <PanelSectionRow>
+        <ToggleField
+          label="Автосинхронизация"
+          description={
+            autoSync
+              ? "Сохранять игру после выхода — включено"
+              : "Выключена: игра не сохраняется автоматически"
+          }
+          checked={autoSync}
+          onChange={(value) => {
+            void toggleAutoSync(value);
+          }}
         />
       </PanelSectionRow>
 
