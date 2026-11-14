@@ -698,5 +698,22 @@ class ReliablePathsTest(unittest.TestCase):
             old = _time.time() - 86400
             os.utime(old_file, (old, old))
             self.assertEqual(learning.learn_from_session("Old Game", prefix, _time.time() - 60), [])
+class EmulatorSavesTest(unittest.TestCase):
+    def test_emulator_remote_is_a_candidate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefixes" / "Halo"
+            remote = (
+                prefix / "drive_c" / "users" / "steamuser" / "AppData" / "Roaming"
+                / "HOODLUM" / "976730" / "remote"
+            )
+            (remote / "Saves" / "SaveGame").mkdir(parents=True)
+            (remote / "Saves" / "SaveGame" / "Halo4").mkdir(parents=True)
+            (remote / "Saves" / "SaveGame" / "Halo4" / "deepSave").write_text("save", encoding="utf-8")
+
+            candidates = portproton_scanner.detect_save_candidates(prefix, "Halo 4")
+            self.assertTrue(
+                any(c["source"] == "emulator" and c["path"].endswith("Halo4") for c in candidates),
+                candidates,
+            )
 if __name__ == "__main__":
     unittest.main(verbosity=2)

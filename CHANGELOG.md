@@ -3,6 +3,20 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.10.1] — 2026-11-14
+
+### Добавлено
+
+- **Определение сохранений Steam-эмуляторов**: папки
+  `AppData/Roaming/<EMU>/<appid>/remote` (HOODLUM, CODEX, Goldberg, PLAZA и др.)
+  автоматически становятся кандидатами (Halo 4 и подобные).
+- Поиск папок с именем игры стал глубже (до 3 уровней), чтобы находить
+  `AppData/LocalLow/<Studio>/<Config>/<Game>`.
+
+### Исправлено
+
+- Из списка игр убираются не-игры: `DOTNET`, записи со словами
+  soundtrack/artwork/artbook/bonus content.
 ## [0.10.0] — 2026-11-14
 
 ### Добавлено
