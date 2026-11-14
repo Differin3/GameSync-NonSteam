@@ -146,3 +146,29 @@ def extract_backup(archive_path: str, extract_to: str) -> bool:
     except Exception as e:
         logger.error(f"Error extracting backup: {e}")
         return False
+
+# Служебные файлы не считаем сохранениями (логи, кэш, бинарники).
+SERVICE_EXTENSIONS = {
+    ".log", ".txt", ".dll", ".exe", ".png", ".jpg", ".jpeg", ".dds", ".pdb",
+    ".mdmp", ".wer", ".chunk", ".pak",
+}
+
+
+def count_meaningful_files(paths: List[str], limit: int = 5000) -> int:
+    """Сколько файлов в путях действительно похожи на сохранения."""
+    count = 0
+    for raw in paths or []:
+        path = Path(raw)
+        try:
+            if path.is_file():
+                if path.suffix.lower() not in SERVICE_EXTENSIONS:
+                    count += 1
+            elif path.is_dir():
+                for item in path.rglob("*"):
+                    if item.is_file() and item.suffix.lower() not in SERVICE_EXTENSIONS:
+                        count += 1
+                        if count >= limit:
+                            return count
+        except OSError:
+            continue
+    return count
