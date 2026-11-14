@@ -68,7 +68,15 @@ export function GameSyncGameRow({ appId, title }: Props) {
     setChecked(false);
     setStatus(null);
     load();
+    // Раз в минуту обновляем статус: автосинхронизация после выхода из игры
+    // должна отражаться на значке без перезахода на страницу.
+    const timer = setInterval(load, 60000);
+    return () => clearInterval(timer);
   }, [appId]);
+
+  const recent = Boolean(
+    status?.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000
+  );
 
   if (!checked || !status) {
     return null;
@@ -140,15 +148,36 @@ export function GameSyncGameRow({ appId, title }: Props) {
           height: "36px",
           flex: "0 0 auto",
           borderRadius: "50%",
+          position: "relative",
           cursor: busy ? "default" : "pointer",
           background: iconFocused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
           boxShadow: iconFocused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
           transition: "background 0.15s ease, box-shadow 0.15s ease",
           opacity: busy ? 0.7 : 1,
         }}
-        title={busy ? "Синхронизация…" : "Синхронизировать игру"}
+        title={
+          busy
+            ? "Синхронизация…"
+            : recent
+              ? `Синхронизировано ${formatDate(status.last_sync)} — нажмите, чтобы повторить`
+              : "Синхронизировать игру"
+        }
       >
         {busy ? <Spinner /> : <FaCloud style={{ fontSize: "20px", color: "#7fd0ff" }} />}
+        {recent && !busy && (
+          <span
+            style={{
+              position: "absolute",
+              right: "1px",
+              bottom: "1px",
+              width: "9px",
+              height: "9px",
+              borderRadius: "50%",
+              background: "#5fd88a",
+              boxShadow: "0 0 0 2px rgba(20, 32, 40, 0.95)",
+            }}
+          />
+        )}
       </Focusable>
       <div style={{ display: "flex", flexDirection: "column", gap: "2px", flex: "1 1 auto", minWidth: 0 }}>
         <div style={{ fontSize: "11px", letterSpacing: "0.6px", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }}>
