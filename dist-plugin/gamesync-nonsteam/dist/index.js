@@ -1393,6 +1393,24 @@ const formatBytes = (bytes) => {
     const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
     return `${Math.round((bytes / Math.pow(1024, index)) * 10) / 10} ${units[index]}`;
 };
+const IconAction = ({ title, onClick, active, disabled, children, }) => {
+    const [hovered, setHovered] = SP_REACT.useState(false);
+    const [focused, setFocused] = SP_REACT.useState(false);
+    return (SP_JSX.jsx(DFL.Focusable, { onClick: disabled ? undefined : onClick, onActivate: disabled ? undefined : onClick, onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false), onFocus: () => setFocused(true), onBlur: () => setFocused(false), title: title, style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "34px",
+            height: "34px",
+            flex: "0 0 auto",
+            borderRadius: "50%",
+            cursor: disabled ? "default" : "pointer",
+            background: active ? "rgba(91,216,138,0.20)" : focused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
+            boxShadow: focused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
+            transition: "background 0.15s ease, box-shadow 0.15s ease",
+            opacity: disabled ? 0.55 : 1,
+        }, children: children }));
+};
 /**
  * Строка GameSync на странице non-Steam игры в библиотеке Steam.
  *
@@ -1404,8 +1422,6 @@ function GameSyncGameRow({ appId, title }) {
     const [checked, setChecked] = SP_REACT.useState(false);
     const [busy, setBusy] = SP_REACT.useState(false);
     const [message, setMessage] = SP_REACT.useState(null);
-    const [hovered, setHovered] = SP_REACT.useState(false);
-    const [iconFocused, setIconFocused] = SP_REACT.useState(false);
     const load = async () => {
         try {
             const response = await call("get_game_sync_status", { appid: appId, game_name: title });
@@ -1423,15 +1439,14 @@ function GameSyncGameRow({ appId, title }) {
         setChecked(false);
         setStatus(null);
         load();
-        // Раз в минуту обновляем статус: автосинхронизация после выхода из игры
-        // должна отражаться на значке без перезахода на страницу.
+        // Автосинхронизация после выхода из игры должна отражаться без перезахода.
         const timer = setInterval(load, 60000);
         return () => clearInterval(timer);
     }, [appId]);
-    const recent = Boolean(status?.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000);
     if (!checked || !status) {
         return null;
     }
+    const recent = Boolean(status.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000);
     const syncNow = async () => {
         setBusy(true);
         setMessage(null);
@@ -1460,7 +1475,7 @@ function GameSyncGameRow({ appId, title }) {
         }
     };
     const details = [
-        status.last_sync ? `в облаке с ${formatDate(status.last_sync)}` : "ещё не синхронизировались",
+        status.last_sync ? `сохранено ${formatDate(status.last_sync)}` : "ещё не синхронизировалось",
         formatBytes(status.size),
         status.versions && status.versions > 1 ? `${status.versions} версий` : "",
         status.save_paths ? `${status.save_paths} путей` : "",
@@ -1470,33 +1485,26 @@ function GameSyncGameRow({ appId, title }) {
     return (SP_JSX.jsxs(DFL.Focusable, { "flow-children": "row", style: {
             display: "flex",
             alignItems: "center",
-            gap: "12px",
+            gap: "10px",
             width: "100%",
             boxSizing: "border-box",
-            padding: "10px 16px",
-            margin: "0 0 10px",
+            padding: "8px 12px",
+            margin: "0 0 8px",
             background: "rgba(20, 32, 40, 0.72)",
             borderLeft: "3px solid #66c0f4",
             borderRadius: "4px",
-        }, children: [SP_JSX.jsxs(DFL.Focusable, { onClick: syncNow, onActivate: syncNow, onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false), onFocus: () => setIconFocused(true), onBlur: () => setIconFocused(false), style: {
+        }, children: [SP_JSX.jsxs(DFL.Focusable, { onClick: syncNow, onActivate: syncNow, title: busy ? "Синхронизация…" : recent ? "Синхронизировать ещё раз" : "Синхронизировать игру", style: {
+                    position: "relative",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    width: "36px",
-                    height: "36px",
+                    width: "34px",
+                    height: "34px",
                     flex: "0 0 auto",
                     borderRadius: "50%",
-                    position: "relative",
-                    cursor: busy ? "default" : "pointer",
-                    background: iconFocused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
-                    boxShadow: iconFocused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
-                    transition: "background 0.15s ease, box-shadow 0.15s ease",
-                    opacity: busy ? 0.7 : 1,
-                }, title: busy
-                    ? "Синхронизация…"
-                    : recent
-                        ? `Синхронизировано ${formatDate(status.last_sync)} — нажмите, чтобы повторить`
-                        : "Синхронизировать игру", children: [busy ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaCloud, { style: { fontSize: "20px", color: "#7fd0ff" } }), recent && !busy && (SP_JSX.jsx("span", { style: {
+                    cursor: "pointer",
+                    background: "rgba(102,192,244,0.10)",
+                }, children: [busy ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaCloud, { style: { fontSize: "19px", color: "#7fd0ff" } }), recent && !busy && (SP_JSX.jsx("span", { style: {
                             position: "absolute",
                             right: "1px",
                             bottom: "1px",
@@ -1505,7 +1513,15 @@ function GameSyncGameRow({ appId, title }) {
                             borderRadius: "50%",
                             background: "#5fd88a",
                             boxShadow: "0 0 0 2px rgba(20, 32, 40, 0.95)",
-                        } }))] }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "2px", flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", letterSpacing: "0.6px", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }, children: "GameSync" }), SP_JSX.jsx("div", { style: { fontSize: "13px", color: "#e8eef3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, children: details }), message && SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#f0a0a0" }, children: message })] }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "170px" }, onClick: syncNow, disabled: busy, children: busy ? "Синхронизация…" : "Синхронизировать" }), SP_JSX.jsx(DFL.DialogButton, { style: { minWidth: "110px" }, onClick: openSettings, children: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C" })] }));
+                        } }))] }), SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "1px", flex: "1 1 auto", minWidth: 0 }, children: [SP_JSX.jsx("div", { style: { fontSize: "10px", letterSpacing: "0.7px", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }, children: "GameSync" }), SP_JSX.jsx("div", { style: {
+                            fontSize: "12px",
+                            lineHeight: "1.35",
+                            color: "#e8eef3",
+                            overflow: "hidden",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                        }, children: details }), message && SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#f0a0a0" }, children: message })] }), SP_JSX.jsx(IconAction, { title: busy ? "Синхронизация…" : "Синхронизировать", onClick: syncNow, disabled: busy, children: busy ? SP_JSX.jsx(DFL.Spinner, {}) : SP_JSX.jsx(FaSyncAlt, { style: { fontSize: "15px", color: "#bcd8ea" } }) }), SP_JSX.jsx(IconAction, { title: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u043F\u0443\u0442\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439", onClick: openSettings, children: SP_JSX.jsx(FaCog, { style: { fontSize: "15px", color: "#bcd8ea" } }) })] }));
 }
 
 const ROUTE = "/library/app/:appid";
