@@ -625,5 +625,29 @@ class AutoSyncDetectionTest(unittest.TestCase):
         previous = {"exe:/home/deck/gaem/game": {1, 2}}
         current = {}
         self.assertEqual(auto_sync.finished_games(previous, current), ["exe:/home/deck/gaem/game"])
+class SaveDetectionServiceFilesTest(unittest.TestCase):
+    def test_folder_stats_counts_meaningful_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "game"
+            folder.mkdir()
+            (folder / "a.log").write_text("log", encoding="utf-8")
+            (folder / "b.sav").write_text("save", encoding="utf-8")
+            total, saves, size, newest, meaningful = portproton_scanner._folder_stats(folder)
+            self.assertEqual(total, 2)
+            self.assertEqual(saves, 1)
+            self.assertEqual(meaningful, 1)
+
+    def test_log_only_dir_is_not_a_candidate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefixes" / "TestGameXYZ"
+            docs = prefix / "drive_c" / "users" / "steamuser" / "Documents" / "TestGameXYZ"
+            docs.mkdir(parents=True)
+            (docs / "TestGameXYZ.log").write_text("log", encoding="utf-8")
+
+            self.assertEqual(portproton_scanner.detect_save_candidates(prefix, "TestGameXYZ"), [])
+
+            (docs / "slot1.sav").write_text("save", encoding="utf-8")
+            candidates = portproton_scanner.detect_save_candidates(prefix, "TestGameXYZ")
+            self.assertTrue(any(c["path"] == str(docs) for c in candidates))
 if __name__ == "__main__":
     unittest.main(verbosity=2)

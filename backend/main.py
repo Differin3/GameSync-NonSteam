@@ -1033,6 +1033,10 @@ class Plugin:
                                 pass
 
                 result = await asyncio.to_thread(restore_archive, archive_path, manifest)
+                logger.info(
+                    f"Restore {game_name}: {result.get('files', 0)} files, "
+                    f"{result.get('bytes', 0)} bytes, skipped {len(result.get('skipped') or [])}"
+                )
 
                 return {
                     "success": True,
