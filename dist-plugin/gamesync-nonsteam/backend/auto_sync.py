@@ -63,6 +63,50 @@ def get_game_name_from_process(process: Dict) -> Optional[str]:
     return None
 
 
+def _normalize_path(value: str) -> str:
+    """Привести путь из cmdline Wine к linux-виду в нижнем регистре."""
+    text = (value or "").replace("\\", "/").lower()
+    if len(text) > 2 and text[1] == ":":
+        text = text[2:]
+    return text
+
+
+def _game_dir_from_exe(path: str) -> str:
+    """Каталог игры по пути exe (для общего префикса DEFAULT)."""
+    text = _normalize_path(path)
+    marker = "/gaem/"
+    if marker in text:
+        tail = text.split(marker, 1)[1]
+        first = tail.split("/", 1)[0]
+        return text.split(marker, 1)[0] + marker + first
+    return text.rsplit("/", 1)[0] if "/" in text else ""
+
+
+def find_game_hint_from_process(process: Dict) -> Optional[str]:
+    """Путь к каталогу игры из cmdline процесса (префикс DEFAULT общий).
+
+    PortProton запускает игру с путём к exe в аргументах; wine-процессы
+    тоже содержат этот путь. Системные exe (windows/system32) игнорируем.
+    """
+    hints: List[str] = []
+    for arg in process.get("cmdline") or []:
+        low = _normalize_path(arg)
+        if not low.endswith(".exe"):
+            continue
+        if "/windows/" in low or "/drive_c/" in low:
+            continue
+        hints.append(arg)
+
+    if not hints:
+        return None
+    # Предпочитаем путь вне префикса — это каталог самой игры
+    for hint in hints:
+        directory = _game_dir_from_exe(hint)
+        if directory and "/portproton/prefixes/" not in directory:
+            return directory
+    return _game_dir_from_exe(hints[-1]) or None
+
+
 def collect_running_games(processes: List[Dict]) -> Dict[str, Set[int]]:
     """Сгруппировать процессы по игре: имя префикса -> набор PID.
 
@@ -72,9 +116,15 @@ def collect_running_games(processes: List[Dict]) -> Dict[str, Set[int]]:
     running: Dict[str, Set[int]] = {}
     for process in processes:
         game_name = get_game_name_from_process(process)
-        if not game_name or game_name.upper() in IGNORED_PREFIXES:
-            continue
-        running.setdefault(game_name, set()).add(process.get("pid"))
+        if game_name and game_name.upper() not in IGNORED_PREFIXES:
+            key = game_name
+        else:
+            # Общий префикс DEFAULT: игру определяем по каталогу exe.
+            hint = find_game_hint_from_process(process)
+            if not hint:
+                continue
+            key = "exe:" + hint
+        running.setdefault(key, set()).add(process.get("pid"))
     return running
 
 
