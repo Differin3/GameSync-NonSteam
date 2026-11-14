@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
-import { DialogButton, Focusable, Router, Spinner } from "@decky/ui";
-import { FaCloud } from "react-icons/fa";
+import { Focusable, Router, Spinner } from "@decky/ui";
+import { FaCloud, FaCog, FaSyncAlt } from "react-icons/fa";
 
 interface GameSyncStatus {
   game: string;
@@ -38,6 +38,50 @@ const formatBytes = (bytes?: number): string => {
   return `${Math.round((bytes / Math.pow(1024, index)) * 10) / 10} ${units[index]}`;
 };
 
+const IconAction = ({
+  title,
+  onClick,
+  active,
+  disabled,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) => {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  return (
+    <Focusable
+      onClick={disabled ? undefined : onClick}
+      onActivate={disabled ? undefined : onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      title={title}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "34px",
+        height: "34px",
+        flex: "0 0 auto",
+        borderRadius: "50%",
+        cursor: disabled ? "default" : "pointer",
+        background: active ? "rgba(91,216,138,0.20)" : focused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
+        boxShadow: focused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
+        transition: "background 0.15s ease, box-shadow 0.15s ease",
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      {children}
+    </Focusable>
+  );
+};
+
 /**
  * Строка GameSync на странице non-Steam игры в библиотеке Steam.
  *
@@ -49,8 +93,6 @@ export function GameSyncGameRow({ appId, title }: Props) {
   const [checked, setChecked] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<boolean>(false);
-  const [iconFocused, setIconFocused] = useState<boolean>(false);
 
   const load = async () => {
     try {
@@ -68,19 +110,18 @@ export function GameSyncGameRow({ appId, title }: Props) {
     setChecked(false);
     setStatus(null);
     load();
-    // Раз в минуту обновляем статус: автосинхронизация после выхода из игры
-    // должна отражаться на значке без перезахода на страницу.
+    // Автосинхронизация после выхода из игры должна отражаться без перезахода.
     const timer = setInterval(load, 60000);
     return () => clearInterval(timer);
   }, [appId]);
 
-  const recent = Boolean(
-    status?.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000
-  );
-
   if (!checked || !status) {
     return null;
   }
+
+  const recent = Boolean(
+    status.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000
+  );
 
   const syncNow = async () => {
     setBusy(true);
@@ -109,7 +150,7 @@ export function GameSyncGameRow({ appId, title }: Props) {
   };
 
   const details = [
-    status.last_sync ? `в облаке с ${formatDate(status.last_sync)}` : "ещё не синхронизировались",
+    status.last_sync ? `сохранено ${formatDate(status.last_sync)}` : "ещё не синхронизировалось",
     formatBytes(status.size),
     status.versions && status.versions > 1 ? `${status.versions} версий` : "",
     status.save_paths ? `${status.save_paths} путей` : "",
@@ -123,11 +164,11 @@ export function GameSyncGameRow({ appId, title }: Props) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "12px",
+        gap: "10px",
         width: "100%",
         boxSizing: "border-box",
-        padding: "10px 16px",
-        margin: "0 0 10px",
+        padding: "8px 12px",
+        margin: "0 0 8px",
         background: "rgba(20, 32, 40, 0.72)",
         borderLeft: "3px solid #66c0f4",
         borderRadius: "4px",
@@ -136,34 +177,21 @@ export function GameSyncGameRow({ appId, title }: Props) {
       <Focusable
         onClick={syncNow}
         onActivate={syncNow}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onFocus={() => setIconFocused(true)}
-        onBlur={() => setIconFocused(false)}
+        title={busy ? "Синхронизация…" : recent ? "Синхронизировать ещё раз" : "Синхронизировать игру"}
         style={{
+          position: "relative",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: "36px",
-          height: "36px",
+          width: "34px",
+          height: "34px",
           flex: "0 0 auto",
           borderRadius: "50%",
-          position: "relative",
-          cursor: busy ? "default" : "pointer",
-          background: iconFocused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
-          boxShadow: iconFocused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
-          transition: "background 0.15s ease, box-shadow 0.15s ease",
-          opacity: busy ? 0.7 : 1,
+          cursor: "pointer",
+          background: "rgba(102,192,244,0.10)",
         }}
-        title={
-          busy
-            ? "Синхронизация…"
-            : recent
-              ? `Синхронизировано ${formatDate(status.last_sync)} — нажмите, чтобы повторить`
-              : "Синхронизировать игру"
-        }
       >
-        {busy ? <Spinner /> : <FaCloud style={{ fontSize: "20px", color: "#7fd0ff" }} />}
+        {busy ? <Spinner /> : <FaCloud style={{ fontSize: "19px", color: "#7fd0ff" }} />}
         {recent && !busy && (
           <span
             style={{
@@ -179,21 +207,33 @@ export function GameSyncGameRow({ appId, title }: Props) {
           />
         )}
       </Focusable>
-      <div style={{ display: "flex", flexDirection: "column", gap: "2px", flex: "1 1 auto", minWidth: 0 }}>
-        <div style={{ fontSize: "11px", letterSpacing: "0.6px", textTransform: "uppercase", color: "rgba(255,255,255,0.55)" }}>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "1px", flex: "1 1 auto", minWidth: 0 }}>
+        <div style={{ fontSize: "10px", letterSpacing: "0.7px", textTransform: "uppercase", color: "rgba(255,255,255,0.5)" }}>
           GameSync
         </div>
-        <div style={{ fontSize: "13px", color: "#e8eef3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div
+          style={{
+            fontSize: "12px",
+            lineHeight: "1.35",
+            color: "#e8eef3",
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+          }}
+        >
           {details}
         </div>
         {message && <div style={{ fontSize: "11px", color: "#f0a0a0" }}>{message}</div>}
       </div>
-      <DialogButton style={{ minWidth: "170px" }} onClick={syncNow} disabled={busy}>
-        {busy ? "Синхронизация…" : "Синхронизировать"}
-      </DialogButton>
-      <DialogButton style={{ minWidth: "110px" }} onClick={openSettings}>
-        Настроить
-      </DialogButton>
+
+      <IconAction title={busy ? "Синхронизация…" : "Синхронизировать"} onClick={syncNow} disabled={busy}>
+        {busy ? <Spinner /> : <FaSyncAlt style={{ fontSize: "15px", color: "#bcd8ea" }} />}
+      </IconAction>
+      <IconAction title="Настроить пути сохранений" onClick={openSettings}>
+        <FaCog style={{ fontSize: "15px", color: "#bcd8ea" }} />
+      </IconAction>
     </Focusable>
   );
 }
