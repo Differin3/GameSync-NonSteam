@@ -1,4 +1,4 @@
-# GameSync NonSteam (PortProton Edition)
+# GameSync (PortProton Edition)
 
 ---
 

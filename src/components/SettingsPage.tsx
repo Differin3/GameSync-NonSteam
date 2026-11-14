@@ -51,7 +51,8 @@ export function SettingsPage() {
         background: "transparent",
       }}
     >
-      <div
+      <Focusable
+        flow-children="row"
         style={{
           display: "flex",
           alignItems: "flex-end",
@@ -68,6 +69,7 @@ export function SettingsPage() {
           return (
             <Focusable
               key={tab.id}
+              autoFocus={isActive}
               onClick={() => setCurrentTab(tab.id)}
               onActivate={() => setCurrentTab(tab.id)}
               style={{
@@ -89,11 +91,14 @@ export function SettingsPage() {
             </Focusable>
           );
         })}
-      </div>
+      </Focusable>
 
-      <div style={{ flex: "1 1 auto", overflowY: "auto", overflowX: "hidden", padding: "14px 24px 24px" }}>
+      <Focusable
+        flow-children="column"
+        style={{ flex: "1 1 auto", overflowY: "auto", overflowX: "hidden", padding: "14px 24px 24px" }}
+      >
         {active.content}
-      </div>
+      </Focusable>
     </div>
   );
 }
