@@ -102,7 +102,7 @@ export function SettingsPage() {
           padding: "14px 24px 24px",
           // Запас под нижнюю панель Steam (подсказки кнопок) — иначе
           // последние строки прячутся за футером.
-          paddingBottom: "calc(var(--basicui-footer-height, 52px) + 8px)",
+          paddingBottom: "calc(var(--basicui-footer-height, 42px) + 6px)",
           boxSizing: "border-box",
         }}
       >

@@ -3,6 +3,13 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.10.14] — 2026-11-15
+
+### Изменено
+
+- Нижний отступ настроек ещё уменьшен: 60 → 48 px
+  (`calc(var(--basicui-footer-height, 42px) + 6px)`), контент опустился
+  на 12 px ближе к панели Steam (её высота по замеру — 42 px).
 ## [0.10.13] — 2026-11-15
 
 ### Изменено
