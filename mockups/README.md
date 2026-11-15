@@ -15,6 +15,8 @@
 | `shots/real-04-settings-stats.png` | Настройки → Статистика |
 | `shots/real-05-qam.png` | QAM с открытым GameSync (статус, тумблер, кнопки) |
 | `shots/real-06-game-row.png` | Строка GameSync на странице игры (без арта) |
+| `shots/real-07-game-row-wide.png` | Строка GameSync + кнопка «Играть» (снято с Deck) |
+| `shots/real-08-qam-full.png` | QAM целиком, включая панель Decky |
 
 QAM и строка на странице игры снимаются отдельно: нужен открытый QAM/игра.
 
