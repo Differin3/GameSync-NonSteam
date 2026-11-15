@@ -502,6 +502,88 @@ def detect_real_steam_appid(exec_cmd: str) -> Optional[int]:
     return None
 
 
+SAVE_DIR_NAMES = {
+    "save", "saves", "savedata", "savegames", "saved games", "savegame",
+    "profile", "profiles", "player", "userdata", "user data",
+}
+
+
+SAVE_NAME_HINTS = ("save", "saved", "profile", "player", "slot", "progress")
+
+
+def _dir_has_save_files(directory: Path) -> bool:
+    """Есть ли в папке (без рекурсии) файлы, похожие на сохранения."""
+    try:
+        for child in directory.iterdir():
+            if not child.is_file():
+                continue
+            suffix = child.suffix.lower()
+            name = child.name.lower()
+            if suffix in (".sav", ".save", ".sav0", ".sav1", ".sav2"):
+                return True
+            if any(hint in name for hint in SAVE_NAME_HINTS) and suffix in SAVE_EXTENSIONS:
+                return True
+    except (PermissionError, OSError):
+        return False
+    return False
+
+
+def _install_dir_candidates(exec_cmd: str) -> List[Path]:
+    """Папки сохранений рядом с exe игры (save/saves/profile/Data/...)."""
+    exe = _extract_exe_path(exec_cmd)
+    if not exe:
+        return []
+    base = Path(exe).parent
+    results: List[Path] = []
+    seen = set()
+
+    # Папка exe и её непосредственные подпапки: в них ищем файлы-сейвы
+    # (например, Spelunky/Data/spelunky_save.sav).
+    candidates: List[Path] = [base]
+    try:
+        for child in base.iterdir():
+            if child.is_dir():
+                candidates.append(child)
+    except (PermissionError, OSError):
+        pass
+
+    for directory in candidates:
+        try:
+            if not directory.is_dir():
+                continue
+            if _dir_has_save_files(directory):
+                key = str(directory)
+                if key not in seen:
+                    seen.add(key)
+                    results.append(directory)
+        except (PermissionError, OSError):
+            continue
+    return results
+
+
+def _steam_userdata_dirs(steam_appid, roots=None) -> List[Path]:
+    """Папки Steam userdata/<uid>/<appid>/remote для реального App ID."""
+    if not steam_appid:
+        return []
+    if roots is None:
+        roots = [
+            Path.home() / ".local" / "share" / "Steam" / "userdata",
+            Path.home() / ".steam" / "steam" / "userdata",
+        ]
+    results: List[Path] = []
+    for root in roots:
+        try:
+            if not Path(root).is_dir():
+                continue
+            for uid in Path(root).iterdir():
+                remote = uid / str(steam_appid) / "remote"
+                if remote.is_dir():
+                    results.append(remote)
+        except (PermissionError, OSError):
+            continue
+    return results
+
+
 def _known_save_paths(game_name: str, steam_appid=None) -> List[str]:
     try:
         from game_definitions import get_known_save_paths_for_game
@@ -516,7 +598,7 @@ def _known_save_paths(game_name: str, steam_appid=None) -> List[str]:
         return []
 
 
-def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_appid=None) -> List[Dict[str, Any]]:
+def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_appid=None, exec_cmd: str = "") -> List[Dict[str, Any]]:
     """Вернуть отсортированные кандидаты путей сохранений с оценкой.
 
     Каждый кандидат: {path, score, source, reason, fileCount, saveFileCount, size}.
@@ -562,6 +644,14 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
             add(Path(learned), 100, "learned", 0, "изученный путь")
     except Exception as e:
         logger.debug(f"Learning lookup failed for '{game_name}': {e}")
+
+    # 1d. Steam userdata по реальному App ID (Steam Cloud сейвы)
+    for steam_dir in _steam_userdata_dirs(steam_appid):
+        add(steam_dir, 90, "steam", 0, f"Steam userdata appid {steam_appid}")
+
+    # 1e. Сохранения рядом с exe игры (save/saves/profile)
+    for install_dir in _install_dir_candidates(exec_cmd):
+        add(install_dir, 85, "install", 0, f"рядом с игрой: {install_dir.name}")
 
     # 1c. Сохранения Steam-эмуляторов: AppData/Roaming/<EMU>/<appid>/remote
     for user in users:
@@ -611,9 +701,9 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
     return filtered[:5]
 
 
-def detect_save_paths(game_prefix_path: Path, game_name: str = "", steam_appid=None) -> List[str]:
+def detect_save_paths(game_prefix_path: Path, game_name: str = "", steam_appid=None, exec_cmd: str = "") -> List[str]:
     """Автоопределение путей сохранений (список, отсортированный по уверенности)."""
-    return [c["path"] for c in detect_save_candidates(game_prefix_path, game_name, steam_appid)]
+    return [c["path"] for c in detect_save_candidates(game_prefix_path, game_name, steam_appid, exec_cmd)]
 
 
 def find_game_folders(base_path: Path, game_name: str) -> List[Path]:
@@ -729,7 +819,7 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
         used_prefixes.add(str(prefix_path.resolve()))
         real_appid = detect_real_steam_appid(info.get("exec", ""))
         lookup_appid = real_appid or (shortcut.get("appid") if shortcut else None)
-        candidates = detect_save_candidates(prefix_path, game_name, lookup_appid)
+        candidates = detect_save_candidates(prefix_path, game_name, lookup_appid, info.get("exec", ""))
 
         game: Dict[str, Any] = {
             "name": game_name,
@@ -754,7 +844,7 @@ def scan_portproton_games(force_refresh: bool = False) -> List[Dict[str, Any]]:
         if shortcut:
             game["steamAppId"] = shortcut.get("appid")
 
-        candidates = detect_save_candidates(Path(game["prefixPath"]), game["name"], game.get("steamAppId"))
+        candidates = detect_save_candidates(Path(game["prefixPath"]), game["name"], game.get("steamAppId"), game.get("exec", ""))
         game["savePaths"] = [c["path"] for c in candidates]
         game["saveCandidates"] = candidates
         game["hasSaves"] = len(candidates) > 0

@@ -3,6 +3,15 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.10.6] — 2026-11-15
+
+### Добавлено
+
+- **Сохранения рядом с игрой**: сканируются папки `save/saves/savedata/profile/
+  player/userdata` у exe и на уровень выше (источник `install`).
+- **Steam userdata по реальному App ID**: `userdata/<uid>/<appid>/remote`
+  (источник `steam`) — для игр с настоящим `steam_appid.txt`.
+- Exec-путь передаётся в детектор путей для обоих источников; 68 тестов.
 ## [0.10.5] — 2026-11-15
 
 ### Исправлено

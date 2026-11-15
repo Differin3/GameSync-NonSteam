@@ -772,5 +772,44 @@ class CloudCleanupTest(unittest.TestCase):
         )
         self.assertEqual(result["deleted"], ["backup-20260101-000000.tar.gz"])
         self.assertEqual(provider.deleted, ["GameSync/Game/backup-20260101-000000.tar.gz"])
+class ExtraPathSourcesTest(unittest.TestCase):
+    def test_install_dir_saves_found(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "Game"
+            (game / "saves").mkdir(parents=True)
+            (game / "saves" / "slot1.sav").write_text("save", encoding="utf-8")
+            exe = game / "game.exe"
+            exe.write_text("", encoding="utf-8")
+            found = portproton_scanner._install_dir_candidates(f'start.sh "{exe}"')
+            self.assertTrue(any(path.name == "saves" for path in found))
+
+    def test_install_dir_finds_save_file_in_subdir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "Spelunky"
+            data = game / "Data"
+            data.mkdir(parents=True)
+            (data / "spelunky_save.sav").write_text("save", encoding="utf-8")
+            exe = game / "Spelunky.exe"
+            exe.write_text("", encoding="utf-8")
+            found = portproton_scanner._install_dir_candidates(f'"{exe}"')
+            self.assertTrue(any(path.name == "Data" for path in found))
+    def test_install_dir_ignores_unrelated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "Game"
+            (game / "bin").mkdir(parents=True)
+            exe = game / "game.exe"
+            exe.write_text("", encoding="utf-8")
+            found = portproton_scanner._install_dir_candidates(f'"{exe}"')
+            self.assertFalse(any(path.name == "bin" for path in found))
+
+    def test_steam_userdata_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "userdata"
+            remote = root / "12345" / "305620" / "remote"
+            remote.mkdir(parents=True)
+            (remote / "saves").mkdir()
+            found = portproton_scanner._steam_userdata_dirs(305620, roots=[root])
+            self.assertEqual(found, [remote])
+            self.assertEqual(portproton_scanner._steam_userdata_dirs(None, roots=[root]), [])
 if __name__ == "__main__":
     unittest.main(verbosity=2)
