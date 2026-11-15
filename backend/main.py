@@ -1168,14 +1168,8 @@ class Plugin:
             try:
                 from backup_index import list_all as list_all_backups
                 backup_groups = list_all_backups() or {}
-                backup_entries = [
-                    entry
-                    for entries in backup_groups.values()
-                    for entry in (entries or [])
-                ]
             except Exception as e:
                 logger.warning(f"Failed to load backup index for stats: {e}")
-                backup_entries = []
                 backup_groups = {}
 
             from stats import build_stats
