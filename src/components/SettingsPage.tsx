@@ -95,7 +95,16 @@ export function SettingsPage() {
 
       <Focusable
         flow-children="column"
-        style={{ flex: "1 1 auto", overflowY: "auto", overflowX: "hidden", padding: "14px 24px 24px" }}
+        style={{
+          flex: "1 1 auto",
+          overflowY: "auto",
+          overflowX: "hidden",
+          padding: "14px 24px 24px",
+          // Запас под нижнюю панель Steam (подсказки кнопок) — иначе
+          // последние строки прячутся за футером.
+          paddingBottom: "calc(var(--basicui-footer-height, 96px) + 16px)",
+          boxSizing: "border-box",
+        }}
       >
         {active.content}
       </Focusable>
