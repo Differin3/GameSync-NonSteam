@@ -17,11 +17,11 @@
 
 ### Скриншоты
 
-| QAM | Бэкапы | Статистика |
+| Основные | Бэкапы | Статистика |
 |---|---|---|
-| ![QAM](mockups/shots/10-qam.png) | ![Бэкапы](mockups/shots/13-backups.png) | ![Статистика](mockups/shots/14-stats.png) |
+| ![Основные](mockups/shots/real-01-settings-main.png) | ![Бэкапы](mockups/shots/real-03-settings-backups.png) | ![Статистика](mockups/shots/real-04-settings-stats.png) |
 
-Ещё: [страница игры](mockups/shots/11-game-page.png) · [пути игр](mockups/shots/12-paths.png).
+Ещё: [пути игр](mockups/shots/real-02-settings-paths.png).
 
 ### Установка
 
@@ -36,11 +36,11 @@ npm run build
 
 #### Скриншоты
 
-| QAM | Бэкапы | Статистика |
+| Основные | Бэкапы | Статистика |
 |---|---|---|
-| ![QAM](mockups/shots/10-qam.png) | ![Бэкапы](mockups/shots/13-backups.png) | ![Статистика](mockups/shots/14-stats.png) |
+| ![Основные](mockups/shots/real-01-settings-main.png) | ![Бэкапы](mockups/shots/real-03-settings-backups.png) | ![Статистика](mockups/shots/real-04-settings-stats.png) |
 
-Ещё: [страница игры](mockups/shots/11-game-page.png) · [пути игр](mockups/shots/12-paths.png).
+Ещё: [пути игр](mockups/shots/real-02-settings-paths.png).
 
 ### Установка на Steam Deck
 
@@ -178,11 +178,11 @@ Decky Loader plugin that syncs PortProton game saves to cloud storage:
 
 ### Screenshots
 
-| QAM | Backups | Statistics |
+| General | Backups | Statistics |
 |---|---|---|
-| ![QAM](mockups/shots/10-qam.png) | ![Backups](mockups/shots/13-backups.png) | ![Statistics](mockups/shots/14-stats.png) |
+| ![General](mockups/shots/real-01-settings-main.png) | ![Backups](mockups/shots/real-03-settings-backups.png) | ![Statistics](mockups/shots/real-04-settings-stats.png) |
 
-More: [game page](mockups/shots/11-game-page.png) · [save paths](mockups/shots/12-paths.png).
+More: [save paths](mockups/shots/real-02-settings-paths.png).
 
 ### Installation
 
