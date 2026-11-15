@@ -39,16 +39,6 @@ npm run build
 ```
 2. Соберите архив (`build.bat`) — получится `gamesync-nonsteam.zip`.
 
-#### Скриншоты
-
-| QAM | Строка на странице игры | Пути игр |
-|---|---|---|
-| ![QAM](mockups/shots/real-05-qam.png) | ![Строка игры](mockups/shots/real-06-game-row.png) | ![Пути](mockups/shots/real-02-settings-paths.png) |
-
-| Основные | Бэкапы | Статистика |
-|---|---|---|
-| ![Основные](mockups/shots/real-01-settings-main.png) | ![Бэкапы](mockups/shots/real-03-settings-backups.png) | ![Статистика](mockups/shots/real-04-settings-stats.png) |
-
 ### Установка на Steam Deck
 
 Готовый архив (последняя версия):
