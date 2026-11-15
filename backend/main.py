@@ -1178,52 +1178,10 @@ class Plugin:
                 backup_entries = []
                 backup_groups = {}
 
-            total_syncs = len(backup_entries) or len(synced_games)
-            # Игры — уникальные имена в истории/облаке, а не число бэкапов
+            from stats import build_stats
+            stats = build_stats(backup_groups, synced_games)
+            return {"success": True, "stats": stats}
 
-            # Получаем даты синхронизаций
-            syncs_by_date = {}
-            last_sync = None
-            total_size = 0
-
-            for entry in backup_entries:
-                created = str(entry.get("created") or "")
-                if created:
-                    date_key = created[:10]
-                    syncs_by_date[date_key] = syncs_by_date.get(date_key, 0) + 1
-                    if not last_sync or created > last_sync:
-                        last_sync = created
-
-            if not backup_entries:
-                for game_name, game_data in synced_games.items():
-                    sync_date = game_data.get("lastSync", "")
-                    if sync_date:
-                        date_key = sync_date[:10]  # YYYY-MM-DD
-                        syncs_by_date[date_key] = syncs_by_date.get(date_key, 0) + 1
-                        if not last_sync or sync_date > last_sync:
-                            last_sync = sync_date
-
-            for game_name, game_data in synced_games.items():
-                file_size = game_data.get("fileSize", 0)
-                if file_size and isinstance(file_size, (int, float)):
-                    total_size += int(file_size)
-            
-            # Преобразуем в список для фронтенда
-            syncs_by_date_list = [
-                {"date": date, "count": count}
-                for date, count in sorted(syncs_by_date.items(), reverse=True)
-            ]
-            
-            return {
-                "success": True,
-                "stats": {
-                    "totalSyncs": total_syncs,
-                    "lastSync": last_sync,
-                    "gamesCount": len(backup_groups) or len(synced_games),
-                    "totalSize": total_size,
-                    "syncsByDate": syncs_by_date_list[:30]  # Последние 30 дней
-                }
-            }
         except Exception as e:
             logger.error(f"Error getting sync stats: {e}")
             return {"success": False, "error": str(e), "stats": None}

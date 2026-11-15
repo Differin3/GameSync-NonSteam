@@ -865,5 +865,43 @@ class EmuIniTest(unittest.TestCase):
             target.mkdir(parents=True)
             resolved = portproton_scanner._resolve_case_insensitive(root, "Users/Public/Documents")
             self.assertEqual(resolved, target)
+import stats as stats_module  # noqa: E402
+
+
+class StatsLogicTest(unittest.TestCase):
+    def test_prerestore_not_counted_as_sync(self):
+        groups = {
+            "Game": [
+                {"kind": "sync", "created": "2026-11-14T10:00:00", "size": 100},
+                {"kind": "sync", "created": "2026-11-14T11:00:00", "size": 200},
+                {"kind": "prerestore", "created": "2026-11-15T09:00:00", "size": 50},
+            ]
+        }
+        result = stats_module.build_stats(groups, {})
+        self.assertEqual(result["totalSyncs"], 2)
+        self.assertEqual(result["gamesCount"], 1)
+        self.assertEqual(result["lastSync"], "2026-11-14T11:00:00")
+        self.assertEqual(result["totalSize"], 350)
+        self.assertEqual(result["syncsByDate"], [{"date": "2026-11-14", "count": 2}])
+
+    def test_game_with_only_prerestore_not_counted(self):
+        groups = {
+            "Synced": [{"kind": "sync", "created": "2026-11-14T10:00:00", "size": 10}],
+            "Restored": [{"kind": "prerestore", "created": "2026-11-15T10:00:00", "size": 20}],
+        }
+        result = stats_module.build_stats(groups, {})
+        self.assertEqual(result["gamesCount"], 1)
+        self.assertEqual(result["totalSyncs"], 1)
+        self.assertEqual(result["totalSize"], 30)
+
+    def test_empty_index_uses_legacy_map(self):
+        legacy = {
+            "Game": {"lastSync": "2026-11-14T12:00:00", "fileSize": 123},
+        }
+        result = stats_module.build_stats({}, legacy)
+        self.assertEqual(result["totalSyncs"], 1)
+        self.assertEqual(result["gamesCount"], 1)
+        self.assertEqual(result["totalSize"], 123)
+        self.assertEqual(result["lastSync"], "2026-11-14T12:00:00")
 if __name__ == "__main__":
     unittest.main(verbosity=2)
