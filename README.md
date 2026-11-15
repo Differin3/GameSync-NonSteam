@@ -145,7 +145,7 @@ npm run build
 - `mockups/` — HTML-макеты и скриншоты
 - `plugin.json`, `requirements.txt`
 
-Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) · [docs/PUBLISHING.md](docs/PUBLISHING.md)
 
 ---
 
@@ -250,4 +250,4 @@ Works for WebDAV, S3, FTP and SFTP.
 `backend/` (scanning, sync, providers, restore, stats, cleanup), `src/` (React),
 `tests/`, `docs/`, `mockups/`, `plugin.json`, `requirements.txt`.
 
-Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) · [docs/PUBLISHING.md](docs/PUBLISHING.md)

@@ -1,7 +1,12 @@
 {
-  "name": "GameSync",
+  "name": "GameSync PortProton",
   "main": "dist/index.js",
   "author": "GameSync Team",
   "flags": [],
-  "api_version": 1
+  "api_version": 1,
+  "publish": {
+    "tags": ["backup", "cloud", "save", "portproton", "webdav", "s3"],
+    "description": "Синхронизация сохранений игр PortProton с облаком: WebDAV, S3, FTP и SFTP, версии бэкапов, автосинхронизация после выхода из игры.",
+    "image": "https://raw.githubusercontent.com/Differin3/GameSync-NonSteam/main/assets/icon.png"
+  }
 }
