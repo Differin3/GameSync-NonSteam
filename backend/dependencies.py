@@ -25,11 +25,11 @@ logger = logging.getLogger(__name__)
 
 # Имя модуля -> pip-требование
 PACKAGE_SPECS: Dict[str, str] = {
-    "psutil": "psutil>=5.9.0",
-    "requests": "requests>=2.31.0",
-    "boto3": "boto3>=1.35.0",
-    "paramiko": "paramiko>=3.4.0",
-    "yaml": "PyYAML>=6.0",
+    "psutil": "psutil==7.2.2",
+    "requests": "requests==2.34.2",
+    "boto3": "boto3==1.44.3",
+    "paramiko": "paramiko==5.1.0",
+    "yaml": "PyYAML==6.0.3",
 }
 
 # Провайдер -> нужные ему модули

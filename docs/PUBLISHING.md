@@ -117,5 +117,5 @@ git commit -m "Update GameSync PortProton to 0.11.0"
 - [x] Имя не конфликтует с существующим «Game Sync»
 - [x] `assets/icon.png` — единственный файл в `assets`
 - [x] Нет неиспользуемых `backend/`/`defaults/`
-- [x] Тесты (76) и сборка проходят
+- [x] Зависимости запинены (`requirements.txt` + `PACKAGE_SPECS`)\n- [x] `dist/index.js` не минифицирован, бинарников нет\n- [x] Тесты (76) и сборка проходят
 - [ ] Протестировано на Stable/Beta другим человеком (требование ревью)

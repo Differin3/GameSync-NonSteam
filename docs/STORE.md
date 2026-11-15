@@ -109,6 +109,32 @@ PortProton backed up and in sync, without rclone or a PC.
   вместо rclone, версионные бэкапы и восстановление.
 - В PR стоит явно указать два внешних URL: Ludusavi manifest и PyPI.
 
+## Текст Pull Request (шаблон, EN)
+
+```markdown
+Adds **GameSync PortProton** — save synchronization for non-Steam games
+launched through PortProton.
+
+- Backend: Python (Decky Python backend); frontend: React + @decky/ui.
+- License: MIT (`LICENSE`), public repository.
+- `pnpm-lock.yaml` is at `lockfileVersion: 9.0`.
+- No obfuscation, no binaries: `dist/index.js` is an unminified Rollup bundle;
+  the only binary is `assets/icon.png`.
+- External network requests (declared):
+  1. PyPI (pypi.org) on first launch — installs the Python dependencies
+     pinned in `requirements.txt` / `PACKAGE_SPECS`:
+     psutil==7.2.2, requests==2.34.2, boto3==1.44.3, paramiko==5.1.0, PyYAML==6.0.3
+     into Decky's runtime directory via `pip --target` (system Python untouched).
+  2. Ludusavi manifest (mtkennerly/ludusavi-manifest on GitHub) — cached locally,
+     used only as a save-path database.
+- No telemetry, no analytics; credentials are stored locally
+  (`~/.config/gamesync/`) and sent only to the configured storage.
+- Plugin name "GameSync PortProton" avoids confusion with the existing
+  "Game Sync" plugin.
+- Tested on Steam Deck (SteamOS Stable), plugin 0.10.15: install, WebDAV sync
+  to Mail.ru Cloud, restore, auto-sync after game exit.
+```
+
 ## Что приложить к PR
 
 - Ссылку на этот репозиторий и коммит.
