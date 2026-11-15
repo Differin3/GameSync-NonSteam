@@ -15,6 +15,14 @@
 > (на бесплатном тарифе запись отвечает HTTP 402). S3, FTP и SFTP — для тех,
 > у кого уже есть сервер или бакет.
 
+### Скриншоты
+
+| QAM | Бэкапы | Статистика |
+|---|---|---|
+| ![QAM](mockups/shots/10-qam.png) | ![Бэкапы](mockups/shots/13-backups.png) | ![Статистика](mockups/shots/14-stats.png) |
+
+Ещё: [страница игры](mockups/shots/11-game-page.png) · [пути игр](mockups/shots/12-paths.png).
+
 ### Установка
 
 #### Сборка на Windows
@@ -26,7 +34,15 @@ npm run build
 ```
 2. Соберите архив (`build.bat`) — получится `gamesync-nonsteam.zip`.
 
-#### Установка на Steam Deck
+#### Скриншоты
+
+| QAM | Бэкапы | Статистика |
+|---|---|---|
+| ![QAM](mockups/shots/10-qam.png) | ![Бэкапы](mockups/shots/13-backups.png) | ![Статистика](mockups/shots/14-stats.png) |
+
+Ещё: [страница игры](mockups/shots/11-game-page.png) · [пути игр](mockups/shots/12-paths.png).
+
+### Установка на Steam Deck
 
 1. Скопируйте `gamesync-nonsteam.zip` на Deck.
 2. Decky Loader → Developer → **Install from ZIP**.
@@ -159,6 +175,14 @@ Decky Loader plugin that syncs PortProton game saves to cloud storage:
 
 > **Not sure what to pick?** Use “Cloud (WebDAV) → Mail.ru Cloud”: an app password is
 > enough. Yandex Disk WebDAV requires Yandex 360 (free tier returns HTTP 402 on writes).
+
+### Screenshots
+
+| QAM | Backups | Statistics |
+|---|---|---|
+| ![QAM](mockups/shots/10-qam.png) | ![Backups](mockups/shots/13-backups.png) | ![Statistics](mockups/shots/14-stats.png) |
+
+More: [game page](mockups/shots/11-game-page.png) · [save paths](mockups/shots/12-paths.png).
 
 ### Installation
 
