@@ -165,3 +165,22 @@ class FTPProvider(StorageProvider):
             return False
         finally:
             self._close(ftp)
+
+    def list_files(self, folder_name: str = "GameSync") -> list:
+        """Список файлов в папке на FTP."""
+        directory = folder_name.strip("/")
+        ftp = None
+        try:
+            ftp = self._connect()
+            names = ftp.nlst(directory)
+            result = []
+            for item in names or []:
+                name = Path(item).name
+                if name and not name.endswith("/"):
+                    result.append({"name": name, "path": item})
+            return result
+        except Exception as e:
+            logger.error(f"Error listing FTP folder {directory}: {e}")
+            return []
+        finally:
+            self._close(ftp)

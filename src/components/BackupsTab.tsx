@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
 import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
-import { FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaUndoAlt } from "react-icons/fa";
+import { FaBroom, FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
 import { ActionButton, Badge, EmptyState, ErrorState, Hint, Loading, Pager, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
@@ -41,6 +41,7 @@ export function BackupsTab() {
   const [page, setPage] = useState<number>(1);
   const [restoring, setRestoring] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
+  const [cleaning, setCleaning] = useState<boolean>(false);
   const [maxVersions, setMaxVersions] = useState<number>(10);
   const [providerName, setProviderName] = useState<string>("хранилище");
   const [downloadDir, setDownloadDir] = useState<string>("~/Downloads");
@@ -155,6 +156,52 @@ export function BackupsTab() {
     );
   };
 
+  const doCleanup = async () => {
+    setCleaning(true);
+    setStatus(null);
+    try {
+      const result: any = await call("cleanup_orphans", {});
+      if (result?.success) {
+        setStatus({
+          tone: result.deleted > 0 ? "success" : "info",
+          text: result.deleted > 0 ? `Удалено старых файлов: ${result.deleted}` : "Старых копий не найдено",
+        });
+        await load(true);
+      } else {
+        setStatus({ tone: "error", text: result?.error || "Не удалось выполнить чистку" });
+      }
+    } catch (err: any) {
+      setStatus({ tone: "error", text: err?.message || String(err) });
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const askCleanup = () => {
+    let modal: { Close: () => void } | null = null;
+    modal = showModal(
+      <ConfirmModal
+        strTitle="Удалить старые копии из облака?"
+        strDescription={
+          <>
+            Будут удалены только архивы версий (`backup-*.tar.gz`, `prerestore-*.tar.gz`),
+            которых нет в истории бэкапов — то есть «сироты», оставшиеся от старых версий плагина.
+            <br />
+            Текущие версии и последние бэкапы не затрагиваются.
+          </>
+        }
+        strOKButtonText="Удалить"
+        strCancelButtonText="Отмена"
+        bDestructiveWarning
+        onOK={() => {
+          modal?.Close();
+          doCleanup();
+        }}
+        onCancel={() => modal?.Close()}
+      />
+    );
+  };
+
   const download = async (gameName: string, entry: BackupEntry) => {
     setDownloading(true);
     setStatus(null);
@@ -216,6 +263,12 @@ export function BackupsTab() {
             Плагин хранит последнюю версию и до {Math.max(0, maxVersions - 1)} предыдущих. Перед восстановлением
             текущие сейвы сохраняются в резервный архив.
           </Hint>
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <ActionButton icon={<FaBroom />} onClick={askCleanup} disabled={cleaning}>
+            {cleaning ? "Чистка облака…" : "Удалить старые копии из облака"}
+          </ActionButton>
         </PanelSectionRow>
 
         {status && (

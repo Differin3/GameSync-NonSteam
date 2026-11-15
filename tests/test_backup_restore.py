@@ -735,5 +735,42 @@ class PathPreviewTest(unittest.TestCase):
     def test_describe_path_missing(self):
         result = path_preview.describe_path("/definitely/not/here")
         self.assertFalse(result["success"])
+import cleanup  # noqa: E402
+
+
+class CloudCleanupTest(unittest.TestCase):
+    def test_select_orphans_only_version_files(self):
+        names = [
+            "backup-20260101-000000.tar.gz",
+            "prerestore-20260102-000000.tar.gz",
+            "notes.txt",
+            "backup-not-a-date.tar.gz",
+        ]
+        referenced = ["GameSync/Game/prerestore-20260102-000000.tar.gz"]
+        self.assertEqual(cleanup.select_orphans(names, referenced), ["backup-20260101-000000.tar.gz"])
+
+    def test_cleanup_game_deletes_only_orphans(self):
+        class FakeProvider:
+            def __init__(self):
+                self.deleted = []
+
+            def list_files(self, folder):
+                return [
+                    {"name": "backup-20260101-000000.tar.gz", "path": "x"},
+                    {"name": "backup-20260102-000000.tar.gz", "path": "x"},
+                ]
+
+            def delete_file(self, remote):
+                self.deleted.append(remote)
+                return True
+
+        provider = FakeProvider()
+        result = cleanup.cleanup_game(
+            provider,
+            "GameSync/Game",
+            ["GameSync/Game/backup-20260102-000000.tar.gz"],
+        )
+        self.assertEqual(result["deleted"], ["backup-20260101-000000.tar.gz"])
+        self.assertEqual(provider.deleted, ["GameSync/Game/backup-20260101-000000.tar.gz"])
 if __name__ == "__main__":
     unittest.main(verbosity=2)

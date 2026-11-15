@@ -199,3 +199,26 @@ class SFTPProvider(StorageProvider):
                     client.close()
             except Exception:
                 pass
+
+    def list_files(self, folder_name: str = "GameSync") -> list:
+        """Список файлов в папке на SFTP."""
+        directory = folder_name.strip("/")
+        client = None
+        try:
+            client = self._connect()
+            sftp = client.open_sftp()
+            result = []
+            for entry in sftp.listdir_attr(directory) or []:
+                if entry.filename and not entry.filename.endswith("/"):
+                    result.append({"name": entry.filename, "path": f"{directory}/{entry.filename}"})
+            sftp.close()
+            return result
+        except Exception as e:
+            logger.error(f"Error listing SFTP folder {directory}: {e}")
+            return []
+        finally:
+            try:
+                if client:
+                    client.close()
+            except Exception:
+                pass

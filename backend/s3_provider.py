@@ -187,3 +187,19 @@ class S3Provider(StorageProvider):
         except Exception as e:
             logger.error(f"Error deleting S3 object {file_id}: {e}")
             return False
+
+    def list_files(self, folder_name: str = "GameSync") -> list:
+        """Список файлов в «папке» (префиксе) бакета."""
+        prefix = folder_name.strip("/") + "/"
+        try:
+            response = self.client.list_objects_v2(Bucket=self.bucket, Prefix=prefix)
+            result = []
+            for obj in response.get("Contents", []) or []:
+                key = obj.get("Key") or ""
+                if not key or key.endswith("/"):
+                    continue
+                result.append({"name": key[len(prefix):], "path": key})
+            return result
+        except Exception as e:
+            logger.error(f"Error listing S3 prefix {prefix}: {e}")
+            return []

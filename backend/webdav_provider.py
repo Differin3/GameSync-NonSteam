@@ -174,14 +174,28 @@ class WebDAVProvider(StorageProvider):
             return None
     
     def list_files(self, folder_name: str = "GameSync") -> list:
-        """Список файлов в папке"""
+        """Список файлов в папке. None — если листинг не удался."""
         try:
             folder_path = self._get_full_path(folder_name)
             headers = self._get_headers()
-            
-            # PROPFIND для получения списка файлов
-            response = requests.request('PROPFIND', folder_path, auth=self.auth, headers=headers, timeout=10)
-            
+            headers["Depth"] = "1"
+
+            # Mail.ru отвечает медленно: таймаут больше и одна повторная попытка,
+            # иначе чистка «сирот» молча пропускает папку.
+            response = None
+            last_error = None
+            for _attempt in range(2):
+                try:
+                    response = requests.request('PROPFIND', folder_path, auth=self.auth, headers=headers, timeout=30)
+                    break
+                except Exception as e:
+                    last_error = e
+                    logger.warning(f"PROPFIND list retry for {folder_path}: {e}")
+
+            if response is None:
+                logger.error(f"Cannot list {folder_path}: {last_error}")
+                return None
+
             if response.status_code == 207:
                 # Парсим XML ответ (упрощенный вариант)
                 import xml.etree.ElementTree as ET
@@ -194,10 +208,11 @@ class WebDAVProvider(StorageProvider):
                         if file_path and not file_path.endswith('/'):
                             files.append({'name': Path(file_path).name, 'path': file_path})
                 return files
-            return []
+            logger.warning(f"List {folder_path}: HTTP {response.status_code}")
+            return None
         except Exception as e:
             logger.error(f"Error listing files: {e}")
-            return []
+            return None
     
     def test_connection(self) -> Dict[str, Any]:
         """Тест подключения к WebDAV"""

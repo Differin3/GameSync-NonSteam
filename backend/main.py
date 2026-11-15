@@ -798,6 +798,39 @@ class Plugin:
             return {"success": False, "error": str(e)}
 
     @decky_params
+    async def cleanup_orphans(self, game_name: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Удалить из облака архивы версий, которых нет в истории бэкапов."""
+        try:
+            from backup_index import list_all
+            from cleanup import cleanup_game
+            from config_manager import load_storage_config
+            from sync_engine import sanitize_name
+
+            provider, error = _build_provider(load_storage_config())
+            if error or provider is None:
+                return {"success": False, "error": error or "Хранилище не настроено"}
+
+            groups = list_all() or {}
+            targets = [game_name] if game_name else sorted(groups.keys())
+            results = []
+            total_deleted = 0
+            for name in targets:
+                entries = groups.get(name) or []
+                if not entries:
+                    continue
+                referenced = [entry.get("remote") for entry in entries]
+                folder = f"GameSync/{sanitize_name(name)}"
+                result = await asyncio.to_thread(cleanup_game, provider, folder, referenced)
+                total_deleted += len(result.get("deleted") or [])
+                results.append(result)
+
+            logger.info(f"Cleanup finished: {total_deleted} orphan file(s) deleted")
+            return {"success": True, "deleted": total_deleted, "games": results}
+        except Exception as e:
+            logger.error(f"Error cleaning orphans: {e}")
+            return {"success": False, "error": str(e)}
+
+    @decky_params
     async def set_max_backup_versions(self, count: int = 10, *args, **kwargs) -> Dict[str, Any]:
         """Сколько версий бэкапа хранить на игру (1–100)."""
         try:
