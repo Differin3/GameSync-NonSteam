@@ -1,5 +1,8 @@
 # GameSync (PortProton Edition)
 
+[![Release](https://img.shields.io/github/v/release/Differin3/GameSync-NonSteam)](https://github.com/Differin3/GameSync-NonSteam/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 ---
 
 ## 🇷🇺 Русский
@@ -48,7 +51,12 @@ npm run build
 
 ### Установка на Steam Deck
 
-1. Скопируйте `gamesync-nonsteam.zip` на Deck.
+Готовый архив (последняя версия):
+**https://github.com/Differin3/GameSync-NonSteam/releases/latest/download/gamesync-nonsteam.zip**
+
+Все версии: [Releases](https://github.com/Differin3/GameSync-NonSteam/releases).
+
+1. Скачайте `gamesync-nonsteam.zip` и скопируйте на Deck.
 2. Decky Loader → Developer → **Install from ZIP**.
 3. Плагин сам поставит Python-зависимости (requests, boto3, paramiko, psutil, PyYAML)
    при первом запуске — нужен интернет один раз.
@@ -191,6 +199,13 @@ Decky Loader plugin that syncs PortProton game saves to cloud storage:
 | ![General](mockups/shots/real-01-settings-main.png) | ![Backups](mockups/shots/real-03-settings-backups.png) | ![Statistics](mockups/shots/real-04-settings-stats.png) |
 
 ### Installation
+
+Latest release archive:
+**https://github.com/Differin3/GameSync-NonSteam/releases/latest/download/gamesync-nonsteam.zip**
+
+All versions: [Releases](https://github.com/Differin3/GameSync-NonSteam/releases).
+
+Build from source:
 
 ```bash
 npm install
