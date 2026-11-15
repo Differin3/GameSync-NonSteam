@@ -13,6 +13,8 @@
 | `shots/real-02-settings-paths.png` | Настройки → Пути игр |
 | `shots/real-03-settings-backups.png` | Настройки → Бэкапы |
 | `shots/real-04-settings-stats.png` | Настройки → Статистика |
+| `shots/real-05-qam.png` | QAM с открытым GameSync (статус, тумблер, кнопки) |
+| `shots/real-06-game-row.png` | Строка GameSync на странице игры (без арта) |
 
 QAM и строка на странице игры снимаются отдельно: нужен открытый QAM/игра.
 

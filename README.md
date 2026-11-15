@@ -17,11 +17,13 @@
 
 ### Скриншоты
 
+| QAM | Строка на странице игры | Пути игр |
+|---|---|---|
+| ![QAM](mockups/shots/real-05-qam.png) | ![Строка игры](mockups/shots/real-06-game-row.png) | ![Пути](mockups/shots/real-02-settings-paths.png) |
+
 | Основные | Бэкапы | Статистика |
 |---|---|---|
 | ![Основные](mockups/shots/real-01-settings-main.png) | ![Бэкапы](mockups/shots/real-03-settings-backups.png) | ![Статистика](mockups/shots/real-04-settings-stats.png) |
-
-Ещё: [пути игр](mockups/shots/real-02-settings-paths.png).
 
 ### Установка
 
@@ -36,11 +38,13 @@ npm run build
 
 #### Скриншоты
 
+| QAM | Строка на странице игры | Пути игр |
+|---|---|---|
+| ![QAM](mockups/shots/real-05-qam.png) | ![Строка игры](mockups/shots/real-06-game-row.png) | ![Пути](mockups/shots/real-02-settings-paths.png) |
+
 | Основные | Бэкапы | Статистика |
 |---|---|---|
 | ![Основные](mockups/shots/real-01-settings-main.png) | ![Бэкапы](mockups/shots/real-03-settings-backups.png) | ![Статистика](mockups/shots/real-04-settings-stats.png) |
-
-Ещё: [пути игр](mockups/shots/real-02-settings-paths.png).
 
 ### Установка на Steam Deck
 
@@ -161,7 +165,7 @@ npm run build
 - `mockups/` — HTML-макеты и скриншоты
 - `plugin.json`, `requirements.txt`
 
-Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) · [docs/PUBLISHING.md](docs/PUBLISHING.md)
+Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) · [docs/PUBLISHING.md](docs/PUBLISHING.md) · [docs/STORE.md](docs/STORE.md)
 
 ---
 
@@ -178,11 +182,13 @@ Decky Loader plugin that syncs PortProton game saves to cloud storage:
 
 ### Screenshots
 
+| QAM | Game page row | Save paths |
+|---|---|---|
+| ![QAM](mockups/shots/real-05-qam.png) | ![Game row](mockups/shots/real-06-game-row.png) | ![Save paths](mockups/shots/real-02-settings-paths.png) |
+
 | General | Backups | Statistics |
 |---|---|---|
 | ![General](mockups/shots/real-01-settings-main.png) | ![Backups](mockups/shots/real-03-settings-backups.png) | ![Statistics](mockups/shots/real-04-settings-stats.png) |
-
-More: [save paths](mockups/shots/real-02-settings-paths.png).
 
 ### Installation
 
@@ -274,4 +280,4 @@ Works for WebDAV, S3, FTP and SFTP.
 `backend/` (scanning, sync, providers, restore, stats, cleanup), `src/` (React),
 `tests/`, `docs/`, `mockups/`, `plugin.json`, `requirements.txt`.
 
-Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) · [docs/PUBLISHING.md](docs/PUBLISHING.md)
+Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) · [docs/PUBLISHING.md](docs/PUBLISHING.md) · [docs/STORE.md](docs/STORE.md)
