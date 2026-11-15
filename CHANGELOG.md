@@ -3,6 +3,39 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.10.12] — 2026-11-15
+
+### Добавлено
+
+- **Сохранения эмуляторов в `Users/Public`**: `users/Public/Documents/Steam/
+  <EMU>/<appid>` (CODEX, RUNE, …) — так найдена Subnautica (`CODEX/264710`)
+  и дополнительные пути у The Long Dark и Shadow of the Tomb Raider.
+- **Разбор `steam_emu.ini`**: если эмулятор прописал путь сейвов
+  (`Game data is stored at %SystemDrive%\...`), он используется напрямую
+  (с регистронезависимым поиском по префиксу).
+
+## [0.10.11] — 2026-11-15
+
+### Исправлено
+
+- CPY/эмуляторные папки искались по фейковому App ID ярлыка (~3.3 млрд),
+  поэтому Rise of the Tomb Raider не находился. Теперь App ID используется
+  только если он настоящий (< 3 000 000), иначе берётся из Ludusavi —
+  Rise находится: `Documents/CPY_SAVES/CPY/391220`.
+
+## [0.10.10] — 2026-11-15
+
+### Добавлено
+
+- **Сохранения CPY и подобных эмуляторов в `Documents`**:
+  `Documents/CPY_SAVES/CPY/<appid>`, `SKIDROW/<appid>` и др.
+
+## [0.10.9] — 2026-11-15
+
+### Исправлено
+
+- Нижняя часть страниц настроек перекрывалась панелью Steam: добавлен
+  нижний отступ `calc(var(--basicui-footer-height, 96px) + 16px)`.
 ## [0.10.8] — 2026-11-15
 
 ### Добавлено

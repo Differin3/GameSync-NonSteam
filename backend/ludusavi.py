@@ -284,6 +284,41 @@ def _build_token_index() -> None:
     _token_index = tokens
 
 
+def get_steam_id_for_game(game_name: str) -> Optional[str]:
+    """Steam App ID игры по её названию (точное совпадение или очень близкое)."""
+    if not game_name:
+        return None
+    index = _load_index()
+    entries = index.get("entries") or []
+    if not entries:
+        return None
+    norm = _normalize(game_name)
+    if not norm:
+        return None
+
+    exact_idx = index.get("exact", {}).get(norm)
+    if exact_idx is not None:
+        return entries[exact_idx].get("steam")
+
+    candidates: Dict[int, int] = {}
+    for token in set(norm.split()):
+        if len(token) < 3:
+            continue
+        for idx in (_token_index or {}).get(token, []):
+            candidates[idx] = candidates.get(idx, 0) + 1
+
+    best_idx = None
+    best_score = 0.0
+    for idx in candidates:
+        score = _similarity(norm, entries[idx]["norm"])
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+    if best_idx is not None and best_score >= 0.95:
+        return entries[best_idx].get("steam")
+    return None
+
+
 def get_known_save_paths_for_steam_id(steam_id) -> List[str]:
     """Точный поиск по Steam ID — самый надёжный источник путей."""
     if steam_id in (None, ""):

@@ -811,5 +811,59 @@ class ExtraPathSourcesTest(unittest.TestCase):
             found = portproton_scanner._steam_userdata_dirs(305620, roots=[root])
             self.assertEqual(found, [remote])
             self.assertEqual(portproton_scanner._steam_userdata_dirs(None, roots=[root]), [])
+class EmulatorDocumentsTest(unittest.TestCase):
+    def test_cpy_saves_matched_by_appid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefixes" / "Rise"
+            cpy = (
+                prefix / "drive_c" / "users" / "steamuser" / "Documents"
+                / "CPY_SAVES" / "CPY" / "391220"
+            )
+            cpy.mkdir(parents=True)
+            (cpy / "profile.dat").write_text("save", encoding="utf-8")
+
+            candidates = portproton_scanner.detect_save_candidates(
+                prefix, "Rise of the Tomb Raider", 391220
+            )
+            self.assertTrue(
+                any(c["source"] == "emulator_docs" and c["path"].endswith("391220") for c in candidates),
+                candidates,
+            )
+
+    def test_other_appid_not_matched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prefix = Path(tmp) / "prefixes" / "Rise"
+            cpy = (
+                prefix / "drive_c" / "users" / "steamuser" / "Documents"
+                / "CPY_SAVES" / "CPY" / "999999"
+            )
+            cpy.mkdir(parents=True)
+            (cpy / "profile.dat").write_text("save", encoding="utf-8")
+
+            candidates = portproton_scanner.detect_save_candidates(
+                prefix, "Rise of the Tomb Raider", 391220
+            )
+            self.assertFalse(any(c["source"] == "emulator_docs" for c in candidates))
+class EmuIniTest(unittest.TestCase):
+    def test_emu_ini_rel_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "Game"
+            game.mkdir()
+            (game / "steam_emu.ini").write_text(
+                "### Game data is stored at %SystemDrive%\\Users\\Public\\Documents\\Steam\\CODEX\\264710\n",
+                encoding="utf-8",
+            )
+            exe = game / "game.exe"
+            exe.write_text("", encoding="utf-8")
+            rel = portproton_scanner._emu_ini_rel_path(f'"{exe}"')
+            self.assertEqual(rel, "Users/Public/Documents/Steam/CODEX/264710")
+
+    def test_resolve_case_insensitive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "drive_c"
+            target = root / "users" / "Public" / "Documents"
+            target.mkdir(parents=True)
+            resolved = portproton_scanner._resolve_case_insensitive(root, "Users/Public/Documents")
+            self.assertEqual(resolved, target)
 if __name__ == "__main__":
     unittest.main(verbosity=2)

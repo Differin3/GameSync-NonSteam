@@ -502,6 +502,55 @@ def detect_real_steam_appid(exec_cmd: str) -> Optional[int]:
     return None
 
 
+EMU_INI_NAMES = (
+    "steam_emu.ini", "steam_api.ini", "steam_api64.ini",
+    "codex.ini", "rune.ini", "ali213.ini", "coldclient.ini",
+)
+
+
+def _emu_ini_rel_path(exec_cmd: str) -> str:
+    """Путь сейвов, который эмулятор прописывает в steam_emu.ini (%SystemDrive%)."""
+    exe = _extract_exe_path(exec_cmd)
+    if not exe:
+        return ""
+    base = Path(exe).parent
+    for name in EMU_INI_NAMES:
+        ini = base / name
+        if not ini.is_file():
+            continue
+        try:
+            raw = ini.read_bytes()
+        except OSError:
+            continue
+        text = raw.decode("utf-8", errors="ignore") + "\n" + raw.decode("cp1251", errors="ignore")
+        marker = "%SystemDrive%"
+        idx = text.lower().find(marker.lower())
+        while idx != -1:
+            tail = text[idx + len(marker):]
+            line = tail.splitlines()[0] if tail else ""
+            rel = line.strip().strip('"').lstrip("\\/").strip()
+            if rel:
+                return rel.replace("\\", "/")
+            idx = text.lower().find(marker.lower(), idx + len(marker))
+    return ""
+
+
+def _resolve_case_insensitive(base: Path, rel: str) -> Optional[Path]:
+    """Найти путь внутри base без учёта регистра (Windows-пути в ini)."""
+    current = base
+    for part in rel.replace("\\", "/").split("/"):
+        if not part:
+            continue
+        try:
+            match = next((item for item in current.iterdir() if item.name.lower() == part.lower()), None)
+        except (PermissionError, OSError):
+            return None
+        if match is None:
+            return None
+        current = match
+    return current
+
+
 SAVE_DIR_NAMES = {
     "save", "saves", "savedata", "savegames", "saved games", "savegame",
     "profile", "profiles", "player", "userdata", "user data",
@@ -644,6 +693,54 @@ def detect_save_candidates(game_prefix_path: Path, game_name: str = "", steam_ap
             add(Path(learned), 100, "learned", 0, "изученный путь")
     except Exception as e:
         logger.debug(f"Learning lookup failed for '{game_name}': {e}")
+
+    # 1f. Эмуляторы с сохранениями в Documents: CPY_SAVES/CPY/<appid>,
+    # SKIDROW/<appid> и т.п. App ID берём из steam_appid.txt или из Ludusavi.
+    # App ID ярлыка не-Steam игры фейковый (~3.3e9) — для эмуляторов он не
+    # подходит, поэтому берём только настоящий (< 3 000 000) или из Ludusavi.
+    try:
+        emu_appid = int(steam_appid) if steam_appid and int(steam_appid) < 3_000_000 else None
+    except (TypeError, ValueError):
+        emu_appid = None
+    if not emu_appid:
+        try:
+            from ludusavi import get_steam_id_for_game
+            emu_appid = get_steam_id_for_game(game_name)
+        except Exception as e:
+            logger.debug(f"Ludusavi appid lookup failed for '{game_name}': {e}")
+    if emu_appid:
+        for user in users:
+            docs = drive_c / "users" / user / "Documents"
+            if not docs.is_dir():
+                continue
+            for emu_root in ("CPY_SAVES", "CPY", "SKIDROW", "CODEX", "PLAZA", "EMPRESS", "RUNE", "TENOKE"):
+                root = docs / emu_root
+                if not root.is_dir():
+                    continue
+                try:
+                    for folder in root.rglob(str(emu_appid)):
+                        if folder.is_dir():
+                            add(folder, 95, "emulator_docs", 0, f"{emu_root}/{emu_appid}")
+                except (PermissionError, OSError):
+                    continue
+
+    # 1g. Эмуляторы в Public Documents: users/Public/Documents/Steam/<EMU>/<appid>
+    if emu_appid:
+        public_docs = drive_c / "users" / "Public" / "Documents"
+        if public_docs.is_dir():
+            try:
+                for folder in public_docs.rglob(str(emu_appid)):
+                    if folder.is_dir():
+                        add(folder, 95, "emulator_public", 0, f"Public/Steam/{emu_appid}")
+            except (PermissionError, OSError):
+                pass
+
+    # 1h. Путь из steam_emu.ini (игра/эмулятор сам его прописывает).
+    ini_rel = _emu_ini_rel_path(exec_cmd)
+    if ini_rel:
+        ini_path = _resolve_case_insensitive(drive_c, ini_rel)
+        if ini_path is not None and ini_path.is_dir():
+            add(ini_path, 95, "emu_ini", 0, f"steam_emu.ini: {ini_rel}")
 
     # 1d. Steam userdata по реальному App ID (Steam Cloud сейвы)
     for steam_dir in _steam_userdata_dirs(steam_appid):
