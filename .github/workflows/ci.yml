@@ -1,4 +1,4 @@
-name: CI - Build and Package GameSync NonSteam
+name: CI - Build and Package GameSync
 
 on:
   push:
@@ -101,9 +101,6 @@ jobs:
           # Backend and metadata
           cp -r backend "$PLUGIN_DIR/backend"
           cp main.py plugin.json package.json requirements.txt LICENSE "$PLUGIN_DIR"/
-          if [ -f "install_plugin.sh" ]; then
-            cp install_plugin.sh "$PLUGIN_DIR"/
-          fi
 
           # Не тащим кэш Python в архив
           find "$PLUGIN_DIR" -name "__pycache__" -type d -prune -exec rm -rf {} +
@@ -126,13 +123,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Обновляем распакованную копию плагина в репозитории
-          rm -rf dist-plugin/gamesync-nonsteam
-          mkdir -p dist-plugin
-          unzip -oq gamesync-nonsteam.zip -d dist-plugin
-
-          # -f, потому что dist/ внутри dist-plugin/ игнорируется .gitignore
-          git add -f gamesync-nonsteam.zip dist-plugin
+          # В репозиторий кладём только готовый ZIP (по нему ставится плагин).
+          # Распакованную dist-plugin/ больше не коммитим: это дубликат исходников.
+          git add -f gamesync-nonsteam.zip
 
           if git diff --cached --quiet; then
             echo "Нет изменений для коммита"
