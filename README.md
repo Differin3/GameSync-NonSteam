@@ -3,6 +3,16 @@
 [![Release](https://img.shields.io/github/v/release/Differin3/GameSync-NonSteam)](https://github.com/Differin3/GameSync-NonSteam/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+## Скриншоты / Screenshots
+
+| QAM | Строка на странице игры / Game page row | Пути игр / Save paths |
+|---|---|---|
+| ![QAM](mockups/shots/real-05-qam.png) | ![Строка игры](mockups/shots/real-06-game-row.png) | ![Пути](mockups/shots/real-02-settings-paths.png) |
+
+| Основные / General | Бэкапы / Backups | Статистика / Statistics |
+|---|---|---|
+| ![Основные](mockups/shots/real-01-settings-main.png) | ![Бэкапы](mockups/shots/real-03-settings-backups.png) | ![Статистика](mockups/shots/real-04-settings-stats.png) |
+
 ---
 
 ## 🇷🇺 Русский
@@ -17,16 +27,6 @@
 > и **пароль приложения**. Яндекс Диск по WebDAV требует подписку Яндекс 360
 > (на бесплатном тарифе запись отвечает HTTP 402). S3, FTP и SFTP — для тех,
 > у кого уже есть сервер или бакет.
-
-### Скриншоты
-
-| QAM | Строка на странице игры | Пути игр |
-|---|---|---|
-| ![QAM](mockups/shots/real-05-qam.png) | ![Строка игры](mockups/shots/real-06-game-row.png) | ![Пути](mockups/shots/real-02-settings-paths.png) |
-
-| Основные | Бэкапы | Статистика |
-|---|---|---|
-| ![Основные](mockups/shots/real-01-settings-main.png) | ![Бэкапы](mockups/shots/real-03-settings-backups.png) | ![Статистика](mockups/shots/real-04-settings-stats.png) |
 
 ### Установка
 
@@ -187,16 +187,6 @@ Decky Loader plugin that syncs PortProton game saves to cloud storage:
 
 > **Not sure what to pick?** Use “Cloud (WebDAV) → Mail.ru Cloud”: an app password is
 > enough. Yandex Disk WebDAV requires Yandex 360 (free tier returns HTTP 402 on writes).
-
-### Screenshots
-
-| QAM | Game page row | Save paths |
-|---|---|---|
-| ![QAM](mockups/shots/real-05-qam.png) | ![Game row](mockups/shots/real-06-game-row.png) | ![Save paths](mockups/shots/real-02-settings-paths.png) |
-
-| General | Backups | Statistics |
-|---|---|---|
-| ![General](mockups/shots/real-01-settings-main.png) | ![Backups](mockups/shots/real-03-settings-backups.png) | ![Statistics](mockups/shots/real-04-settings-stats.png) |
 
 ### Installation
 
