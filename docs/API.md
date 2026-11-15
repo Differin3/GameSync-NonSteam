@@ -19,7 +19,8 @@ Decky передаёт аргументы позиционно, поэтому `
 `Game`: `name`, `prefixPath`, `desktopFile`, `exec`, `savePaths`, `saveCandidates`,
 `hasSaves`, `steamAppId`, `sharedPrefix`, `sharedWith`, `excludePaths`.
 
-Кандидат: `{ path, score, source: known|learned|heuristic, reason, fileCount, saveFileCount, size }`.
+Кандидат: `{ path, score, source, reason, fileCount, saveFileCount, meaningfulCount, size }`.
+`source`: `known | learned | heuristic | steam | install | emulator | emulator_docs | emulator_public | emu_ini`.
 
 ### `validate_save_path`
 
@@ -49,7 +50,7 @@ Decky передаёт аргументы позиционно, поэтому `
 ```json
 { "game_name": "...", "save_paths": ["..."] }
 ```
-→ `{ "success": true, "file_id": "GameSync/<Игра>.tar.gz", "version_id": "GameSync/<Игра>/backup-....tar.gz", "message": "Синхронизация завершена" }`
+→ `{ "success": true, "file_id": "GameSync/<Игра>.tar.gz", "version_id": "GameSync/<Игра>/backup-....tar.gz", "file_size": 44302336, "message": "Синхронизация завершена" }`
 
 Если `save_paths` не переданы, пути определяются автоматически. Создаёт архив с манифестом, загружает стабильную и версионированную копии,
 пишет записи в `synced_games.json` и `backups.json`.
@@ -62,7 +63,7 @@ Decky передаёт аргументы позиционно, поэтому `
 
 → `{ "success": true, "stats": { "totalSyncs", "gamesCount", "lastSync", "totalSize", "syncsByDate": [{ "date", "count" }] } }`
 
-`totalSyncs` и `syncsByDate` считаются по истории бэкапов (`backups.json`), а не по числу игр.
+Семантика: `totalSyncs`, `gamesCount`, `lastSync`, `syncsByDate` учитывают только записи `kind="sync"` (страховочные `prerestore` не считаются синхронизациями). `totalSize` — сумма размеров всех файлов истории (все версии, включая страховочные), то есть занятое место в облаке.
 
 ## Бэкапы и восстановление
 
@@ -120,7 +121,7 @@ Decky передаёт аргументы позиционно, поэтому `
 
 ### `get_app_settings`
 
-→ `{ "success": true, "auto_sync": false, "default_save_paths": ["..."] }`
+→ `{ "success": true, "auto_sync": false, "max_backup_versions": 10, "download_dir": "/home/deck/Downloads", "default_save_paths": ["..."] }`
 
 Состояние, которое живёт на бэкенде и переживает перезапуск.
 
@@ -133,6 +134,65 @@ Decky передаёт аргументы позиционно, поэтому `
 → `{ "success": true, "default_save_paths": [...] }`
 
 Глобальные пути применяются и к ручной, и к автосинхронизации.
+### `sync_all_games`
+
+→ `{ "success": true, "total": 17, "synced": ["..."], "failed": [{ "game": "...", "error": "..." }] }`
+
+Последовательно синхронизирует все игры с путями. Ход выполнения — через
+`get_sync_progress` (QAM опрашивает его каждые 500 мс).
+
+### `get_sync_progress`
+
+→ `{ "active": true, "stage": "Загрузка в облако", "percent": 60, "currentGame": "Hades", "index": 3, "total": 17, "ok": 2, "failed": 0 }`
+
+Этапы: «Сканирование игр» → «Архивация сохранений» → «Загрузка в облако» →
+«История версий» → «Готово».
+
+### `get_storage_status`
+
+→ `{ "success": true, "provider": "Облако Mail.ru", "url": "https://webdav.cloud.mail.ru" }`
+или `{ "success": false, "provider": "...", "error": "HTTP 402: ..." }`.
+
+Проверяет и чтение, и запись (создание папки), результат кэшируется на 60 секунд.
+
+### `preview_path`
+
+```json
+{ "path": "/home/deck/PortProton/prefixes/DEFAULT/drive_c/users/steamuser/Documents/Game" }
+```
+→ `{ "success": true, "total": 12, "saveLike": 8, "totalSize": 1234567, "newest": "2026-11-15T22:10:00", "files": [{ "name": "slot1.sav", "path": "...", "size": 40000, "modified": "...", "saveLike": true }] }`
+
+Используется кнопкой «Проверить содержимое» на вкладке «Пути игр».
+
+### `set_max_backup_versions`
+
+```json
+{ "count": 10 }
+```
+→ `{ "success": true, "max_backup_versions": 10 }`. Допустимо 1–100; значение
+применяется при следующей синхронизации (история и файлы в облаке).
+
+### `download_backup`
+
+```json
+{ "game_name": "...", "backup_id": "20261114-001000-a1b2c3" }
+```
+→ `{ "success": true, "path": "/home/deck/Downloads/<Игра>-<id>.tar.gz" }`
+
+Без `backup_id` скачивается последняя версия.
+
+### `cleanup_orphans`
+
+```json
+{ "game_name": "..." }
+```
+(без `game_name` — по всем играм истории)
+
+→ `{ "success": true, "deleted": 2, "games": [{ "folder": "GameSync/Game", "scanned": 4, "deleted": ["backup-...tar.gz"], "errors": [] }] }`
+
+Удаляет только `backup-*.tar.gz` / `prerestore-*.tar.gz`, на которые нет ссылок
+в истории. Если листинг папки не удался, для неё ничего не удаляется.
+
 ## Настройки хранилища
 
 ### `save_storage_config`
@@ -180,6 +240,8 @@ upload_file(file_path, remote_dir=None, remote_name=None) -> str | None
 download_file(file_id, save_path) -> bool
 find_file(file_name, folder_name="GameSync") -> str | None
 get_file_info(file_id) -> dict | None
+delete_file(file_id) -> bool
+list_files(folder_name="GameSync") -> list | None
 test_connection() -> dict
 ```
 

@@ -1,180 +1,143 @@
-# Архитектура GameSync NonSteam
-
-Документ описывает, из чего состоит плагин, как проходят синхронизация и
-восстановление, где хранится состояние и какие ограничения есть у текущей версии.
+# Архитектура GameSync
 
 ## Назначение
 
-Плагин Decky Loader для Steam Deck: находит игры PortProton (Wine-префиксы),
-определяет папки сохранений и синхронизирует их с облаком через WebDAV, S3,
-FTP/FTPS или SFTP. Умеет создавать версии бэкапов и восстанавливать сохранения
-из облака.
+Плагин Decky Loader синхронизирует сохранения игр PortProton (не-Steam игр,
+запускаемых через PortProton) с облачным хранилищем и умеет восстанавливать их
+из облака. Работает полностью на Steam Deck, без внешнего сервера.
 
 ## Компоненты
 
 ### Фронтенд (`src/`)
 
-| Файл | Роль |
-|---|---|
-| `index.tsx` | точка входа плагина, маршрут `/gamesync-settings` |
-| `components/GameSyncMain.tsx` | содержимое быстрого меню (QAM) |
-| `components/GameList.tsx` | найденные игры, кнопка синхронизации |
-| `components/SyncedGamesList.tsx` | последние синхронизации |
-| `components/SettingsPage.tsx` | контейнер вкладок настроек |
-| `components/Settings.tsx` | вкладка «Основные»: хранилище, проверка, автосинхрон |
-| `components/GamePathsTab.tsx` | вкладка «Пути игр» |
-| `components/BackupsTab.tsx` | вкладка «Бэкапы»: история и восстановление |
-| `components/StatsTab.tsx` | вкладка «Статистика» |
-| `utils/storagePresets.ts` | пресеты провайдеров (RU → свои серверы → мир) |
-| `utils/Settings.ts` | локальные настройки UI (без секретов) |
+- `index.tsx` — точка входа: маршрут `/gamesync-settings`, патч страницы игры,
+  слушатель события `gamesync_auto_saved` (тост после автосинхронизации).
+- `components/GameSyncMain.tsx` — QAM: статус хранилища, тумблер автосинхронизации,
+  «Синхронизировать всё» с прогресс-баром, переходы на страницы.
+- `components/SettingsPage.tsx` — собственные вкладки на `Focusable`
+  (Основные / Пути игр / Бэкапы / Статистика). Decky `Tabs` не используется:
+  он позиционирует контент абсолютно и накладывает его на панель вкладок.
+- `components/GamePathsTab.tsx` — карточки игр, пути, кандидаты, предпросмотр
+  содержимого пути, пагинация.
+- `components/BackupsTab.tsx` — статистика облака, лимит версий, карточки игр,
+  боковая карточка версий, восстановление, скачивание, чистка «сирот», пагинация.
+- `components/StatsTab.tsx` — карточки показателей, график по датам, последние записи.
+- `components/GameSyncGameRow.tsx` — строка на странице игры: дата/размер/версии,
+  кликабельное облачко, зелёная точка «синхронизировано за 24 ч», настройки.
+- `patches/appDetailsPatch.tsx` — вставка строки после PlaySection.
+- `utils/storagePresets.ts` — пресеты WebDAV/S3, нормализация URL.
 
 ### Бэкенд (`backend/`)
 
-| Модуль | Роль |
-|---|---|
-| `main.py` | класс `Plugin`, RPC-методы, нормализация аргументов Decky |
-| `portproton_scanner.py` | поиск игр, префиксов и кандидатов путей сохранений |
-| `steam_shortcuts.py` | разбор `shortcuts.vdf` (appid, StartDir) |
-| `game_definitions.py` | база OpenCloudSaves + Ludusavi |
-| `ludusavi.py` | загрузка и кэш манифеста Ludusavi |
-| `learning.py` | запоминание ручных путей |
-| `sync_engine.py` | сборка архива и манифеста |
-| `restore_engine.py` | чтение манифеста и безопасная распаковка |
-| `backup_index.py` | история загруженных бэкапов |
-| `webdav_provider.py`, `s3_provider.py`, `ftp_provider.py`, `sftp_provider.py` | транспорт до хранилища |
-| `base_provider.py` | интерфейс `StorageProvider` |
-| `config_manager.py` | конфиги и статистика в `~/.config/gamesync` |
-| `cache_manager.py` | кэш сканирования (TTL 5 минут) |
-| `auto_sync.py` | монитор Wine-процессов |
-| `dependencies.py` | установка Python-зависимостей в `py_modules` |
+- `main.py` — RPC-методы Decky, прогрев зависимостей, автосинхронизация,
+  прогресс синхронизации, статус хранилища, восстановление.
+- `portproton_scanner.py` — поиск игр и путей сохранений (см. ниже).
+- `game_definitions.py` — OpenCloudSaves (по имени и `steam_id`).
+- `ludusavi.py` — манифест Ludusavi: индекс по именам и Steam ID, плюс
+  `get_steam_id_for_game` для эмуляторных папок.
+- `learning.py` — ручные пути, обучение по сессии (`learn_from_session`).
+- `sync_engine.py` — сборка tar.gz, манифест, `count_meaningful_files`.
+- `restore_engine.py` — чтение манифеста, безопасная распаковка без `extractall`.
+- `backup_index.py` — локальная история (`backups.json`), лимит версий,
+  `prepare_trim` для удаления выпавших файлов.
+- `cleanup.py` — поиск и удаление «сирот» в облаке.
+- `path_preview.py` — описание содержимого пути для UI.
+- `stats.py` — расчёт статистики (синхронизации ≠ страховочные копии).
+- `auto_sync.py` — мониторинг процессов, определение игры, время сессии.
+- `config_manager.py` — настройки приложения и хранилища.
+- `dependencies.py` — установка Python-зависимостей в `py_modules`.
+- Провайдеры: `webdav_provider.py`, `s3_provider.py`, `ftp_provider.py`,
+  `sftp_provider.py` (upload/download/delete/list/test).
 
-## Синхронизация (upload)
+## Поиск путей сохранений
 
-1. Фронтенд вызывает `scan_games` → `portproton_scanner.scan_portproton_games`.
-2. Сканер собирает игры: `.desktop` → префикс → кандидаты путей (известные пути,
-   изученные, эвристика по `drive_c`), результат кэшируется.
-3. `sync_game(game_name, save_paths)`:
-   1. удаляет исключённые пути;
-   2. `create_backup` собирает `tar.gz` с манифестом;
-   3. провайдер загружает стабильную копию в `GameSync/`;
-   4. провайдер загружает версию в `GameSync/<Игра>/backup-<дата>.tar.gz`
-      (`upload_file(..., remote_name=...)`);
-   5. размер и путь пишутся в `synced_games.json` и `backups.json`.
+Порядок источников (от точного к вероятностному):
 
-## Восстановление (restore)
+1. `steam_appid.txt` / `steam_settings/steam_appid.txt` → настоящий App ID.
+2. Точный App ID в Ludusavi (индекс с картой `steam`) и OpenCloudSaves (`steam_id`).
+3. Эмуляторы:
+   - `Documents/CPY_SAVES/CPY/<appid>`, `Documents/SKIDROW/<appid>`;
+   - `AppData/Roaming/<EMU>/<appid>/remote` (HOODLUM, CODEX, RUNE, PLAZA…);
+   - `users/Public/Documents/Steam/<EMU>/<appid>`;
+   - путь из `steam_emu.ini` (`%SystemDrive%\…`, регистронезависимый поиск).
+4. Steam `userdata/<uid>/<appid>/remote` (только для настоящего App ID).
+5. Папка игры: `save/saves/profile/Data` рядом с exe, файлы `*save*`, `*.sav`.
+6. Известные пути по названию (нормализация: годы, GOTY/Definitive/… отбрасываются).
+7. Эвристика по `drive_c` (Documents, Saved Games, AppData, LocalLow), глубина до 3.
+8. Обучение по сессии: после выхода сканируются файлы, изменённые за сессию,
+   служебные и системные отбрасываются; топ-3 папки запоминаются.
+9. Ручные пути пользователя.
 
-1. `get_backups` отдаёт игры и версии из `backups.json` (для старых установок —
-   из `synced_games.json`).
-2. `restore_backup(game_name, backup_id)`:
-   1. находит запись в индексе (или `legacy`-запись);
-   2. скачивает архив во временную папку;
-   3. читает `.gamesync/manifest.json` (архивы без манифеста не поддерживаются);
-   4. делает страховочную копию текущих сейвов и загружает её как
-      `prerestore-<дата>.tar.gz`;
-   5. распаковывает архив по путям из манифеста через `restore_engine`;
-   6. удаляет временные файлы, возвращает количество файлов и пропусков.
+Фильтры: `SERVICE_EXTENSIONS` (логи, txt, dll, exe, картинки, кэш), папки только
+из служебных файлов отбрасываются; кандидат без «осмысленных» файлов не попадает
+в результат. Перед архивацией `count_meaningful_files` не даёт создать пустой бэкап.
 
-## Формат архива
+Фейковый App ID ярлыка (~3.3 млрд) для эмуляторов не используется: берётся только
+настоящий ID (< 3 000 000) или ID из Ludusavi.
 
-```
-<Игра>.tar.gz
-├── .gamesync/manifest.json
-├── <root-1>/...            # файлы первой папки сохранений
-└── <root-2>/...            # файлы второй папки
-```
+## Синхронизация
 
-`manifest.json`:
+1. QAM/страница игры/автосинхронизация вызывают `sync_game`.
+2. Пути фильтруются по исключениям, проверяется наличие осмысленных файлов.
+3. `create_backup` собирает tar.gz с `.gamesync/manifest.json`.
+4. Загрузка: стабильный `GameSync/<Игра>.tar.gz` + версия
+   `GameSync/<Игра>/backup-<дата>.tar.gz`.
+5. `backup_index.add_entry` пишет запись, `prepare_trim` возвращает выпавшие
+   записи — их файлы удаляются через `provider.delete_file`.
+6. Обновляются прогресс (`sync_progress`) и статистика; для автосинхронизации
+   отправляется `decky.emit("gamesync_auto_saved", …)` → тост.
 
-```json
-{
-  "version": 1,
-  "game": "Cyberpunk 2077",
-  "created": "2026-11-14T00:10:00",
-  "paths": [
-    { "path": "/home/deck/PortProton/prefixes/.../Saved Games/CD Projekt Red", "root": "CD Projekt Red", "is_dir": true }
-  ]
-}
-```
+Лимит версий (`max_backup_versions`, 1–100) хранится в `settings.json`.
 
-Корни уникальны: при совпадении имён к корню добавляется индекс пути.
+## Восстановление
+
+1. `restore_backup` находит запись в истории (или legacy `synced_games`).
+2. Скачивает архив, читает манифест (без манифеста — понятная ошибка).
+3. Делает страховочную копию текущих сейвов и загружает её как `prerestore-*`.
+4. `safe_extract` распаковывает только внутрь `Path.home()`: проверяются `..`,
+   абсолютные пути, симлинки/устройства; результат логируется
+   (`Restore <игра>: N files, M bytes, skipped K`).
+5. Если восстановлено 0 файлов, UI предупреждает, что в архиве были только
+   служебные файлы.
+
+## Чистка «сирот»
+
+`cleanup_orphans` проходит по играм истории, получает листинг
+`GameSync/<Игра>/` (WebDAV/S3/FTP/SFTP), сравнивает с `remote` из индекса и
+удаляет только `backup-*.tar.gz` / `prerestore-*.tar.gz`, которых нет в истории.
+Неудачный листинг возвращает `None` — в такой папке ничего не удаляется.
+
+## Статистика
+
+`stats.build_stats` разделяет записи `sync` и `prerestore`:
+
+- `totalSyncs`, `gamesCount`, `lastSync`, `syncsByDate` — только синхронизации;
+- `totalSize` — сумма всех файлов истории (все версии и страховочные копии,
+  реально занимаемое место).
 
 ## Состояние на диске
 
-| Файл | Содержимое |
-|---|---|
-| `~/.config/gamesync/storage_config.json` | провайдер, URL, креды (0600) |
-| `~/.config/gamesync/settings.json` | автосинхронизация и глобальные пути (0600) |
-| `~/.config/gamesync/games.json` | пути и исключения по играм |
-| `~/.config/gamesync/synced_games.json` | последняя синхронизация, fileId, размер |
-| `~/.config/gamesync/backups.json` | история версий (до 10 на игру) |
-| `~/.config/gamesync/learned_paths.json` | запомненные ручные пути |
-| `~/.config/gamesync/ludusavi_manifest.yaml` | кэш манифеста Ludusavi (30 дней) |
-| `~/.config/gamesync/cache.json` | кэш сканирования (5 минут) |
+- `~/.config/gamesync/settings.json` — настройки (автосинхронизация, лимит версий,
+  глобальные пути).
+- `~/.config/gamesync/storage_config.json` — провайдер и учётные данные.
+- `~/.config/gamesync/backups.json` — история версий.
+- `~/.config/gamesync/learned_paths.json` — изученные пути.
+- `~/.config/gamesync/ludusavi_manifest.yaml` + `ludusavi_index.json` — кэш Ludusavi.
+- `~/.config/gamesync/games.json` — кэш списка игр.
 
-## Боковое меню (QAM)
+## Интерфейс и геймпад
 
-Концепт «меньше информации — больше пользы» (0.5.0): в быстром меню только
-статус и три действия, без списков игр.
-
-1. `Field` — облако, «GameSync», описание `подключено · N игр · M в облаке · дата`.
-2. **Синхронизировать всё** — RPC `sync_all_games`: сканирует игры, для каждой
-   с путями вызывает `sync_game`, возвращает `synced`/`failed`, кнопка показывает
-   прогресс и итог.
-3. **Бэкапы и восстановление** и **Настройки** — открывают полноэкранную страницу
-   плагина с нужной вкладкой (событие `gamesync-switch-tab`).
-
-Метрики взяты с реального Deck: контент 268 px, строка 40 px, label 16 px,
-описание 12 px `#b8bcbf`; используются нативные `Field`/`ButtonItem`, поэтому
-панель не «съезжает» и выглядит как остальной интерфейс Deck.
-## Строка на странице игры
-
-Фича реализована патчем React-дерева страницы игры (`src/patches/appDetailsPatch.tsx`):
-
-1. `routerHook.addPatch("/library/app/:appid", ...)` перехватывает рендер страницы.
-2. `afterPatch` на `routeProps.renderFunc` получает готовое дерево; из него
-   берутся `overview.appid` и контейнер `appDetailsClasses.InnerContainer`.
-3. В контейнер вставляется `GameSyncGameRow` (позиция 2 — между Play и описанием).
-4. Компонент вызывает `get_game_sync_status`: бэкенд сопоставляет игру по appid
-   или названию и отдаёт последнюю синхронизацию из истории бэкапов.
-5. «Синхронизировать» вызывает `sync_game`, «Настроить» открывает маршрут
-   плагина на вкладке «Пути игр».
-
-Защита: `WeakSet` от повторного патча одного `renderFunc`, ключ `gamesync-status-<appid>`
-от дублей при ре-рендерах, `try/catch` вокруг всей инъекции, снятие патчей и
-`unpatch()` в `onDismount`. Если Steam изменит разметку, строка просто не появится —
-плагин продолжит работать.
-## Автосинхронизация
-
-1. `enable_auto_sync(true)` создаёт `GameMonitor` и сохраняет флаг в `settings.json`.
-2. Монитор раз в 5 секунд собирает Wine-процессы PortProton и группирует их по
-   префиксу (`collect_running_games`); префикс `DEFAULT` игнорируется.
-3. Когда у игры не осталось ни одного процесса (`finished_games`), вызывается
-   `sync_game`: пути берутся из конфига игры, изученных путей и глобальных настроек.
-4. После перезапуска Decky монитор поднимается из `settings.json` в `_main`.
-## Безопасность
-
-- секреты не попадают в `localStorage` фронтенда (там только URL, логин, провайдер);
-- конфиги создаются с правами `0600`, каталог — `0700`;
-- распаковка не использует `extractall`: запрещены абсолютные пути, `..`,
-  символические и жёсткие ссылки, устройства; проверяется, что путь остаётся
-  внутри целевой папки;
-- SFTP-провайдер использует `AutoAddPolicy` (принимает любой host key) — известное
-  ограничение, для домашнего сервера приемлемо, для чужого — нет.
-
-## Ограничения текущей версии
-
-- настройка автосинхронизации и глобальные пути хранятся на бэкенде и переживают
-  перезапуск Decky;
-- старые облачные версии не удаляются: индекс помнит 10 штук, файлы остаются;
-- блокирующие операции (сканирование игр, сборка архива, сеть) выполняются в
-  `asyncio.to_thread`, поэтому плагин не зависает;
-- восстановление перезаписывает файлы, но не удаляет локальные файлы, которых нет
-  в архиве;
-- пути берутся из манифеста: после переименования префикса файлы вернутся в старый путь.
+- Вкладки и контент — `Focusable` с `flow-children` row/column, активная вкладка
+  получает автофокус; кнопки — `ActionButton` (иконка и текст в одной строке).
+- Контент настроек имеет нижний отступ
+  `calc(var(--basicui-footer-height, 42px) + 6px)` = 48 px, чтобы панель Steam
+  (42 px) не перекрывала последние элементы.
+- QAM: `Field` со статусом, `ToggleField` автосинхронизации, `ActionButton`,
+  прогресс-бар (опрос `get_sync_progress` каждые 500 мс).
 
 ## Тесты и CI
 
-- `tests/test_backup_restore.py` — манифест, безопасная распаковка, индекс
-  (`python -m unittest discover -s tests -v`);
-- CI: pyflakes + `compileall` + unit-тесты, сборка и линт фронтенда, упаковка
-  плагина и коммит собранного архива.
+`tests/test_backup_restore.py` — 76 тестов: манифест, path traversal, симлинки,
+`allowed_root`, индекс, лимиты версий, автосинхронизация, Steam ID/эмуляторы,
+обучение по сессии, предпросмотр пути, статистика, чистка. CI: pyflakes,
+compileall, unittest, eslint/build фронтенда, упаковка ZIP.

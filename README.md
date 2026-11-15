@@ -6,128 +6,144 @@
 
 Плагин для Decky Loader, синхронизирующий сохранения игр PortProton с облачным хранилищем:
 
-- через **WebDAV** (Облако Mail.ru — есть бесплатный тариф, Яндекс Диск, Nextcloud/ownCloud, Fastmail и любой свой WebDAV-сервер)
+- через **WebDAV** (Облако Mail.ru — бесплатный тариф, Яндекс Диск, Nextcloud/ownCloud, Fastmail и любой свой WebDAV-сервер)
 - через **S3‑совместимые object storage** (Yandex Object Storage, VK Cloud, Cloud.ru, Backblaze B2, Wasabi, AWS S3, DigitalOcean Spaces и др.)
 - через **FTP/FTPS** или **SFTP** (собственный сервер/NAS)
 
-> **Что выбрать?** Если вы не уверены — берите «Облако (WebDAV) → Облако Mail.ru»: нужны
-> только адрес почты и пароль. Яндекс Диск по WebDAV с 22.06.2026 требует подписку
-> Яндекс 360. S3, FTP и SFTP — для тех, у кого уже есть сервер или бакет.
+> **Что выбрать?** Если не уверены — «Облако (WebDAV) → Облако Mail.ru»: нужны почта
+> и **пароль приложения**. Яндекс Диск по WebDAV требует подписку Яндекс 360
+> (на бесплатном тарифе запись отвечает HTTP 402). S3, FTP и SFTP — для тех,
+> у кого уже есть сервер или бакет.
 
 ### Установка
 
-#### Сборка на Windows:
+#### Сборка на Windows
 
-1. Установите Node.js (версия 20+):
-```bash
-node --version
-```
-
-2. Установите зависимости:
+1. Node.js 20+ и зависимости:
 ```bash
 npm install
-```
-
-3. Соберите проект:
-```bash
 npm run build
 ```
+2. Соберите архив (`build.bat`) — получится `gamesync-nonsteam.zip`.
 
-4. Создайте архив (запустите `build.bat` или вручную):
-- Создайте папку `dist-plugin`
-- Скопируйте: `dist/`, `backend/`, `plugin.json`, `requirements.txt`
-- Заархивируйте в `gamesync-nonsteam.zip`
+#### Установка на Steam Deck
 
-#### Установка на Steam Deck:
+1. Скопируйте `gamesync-nonsteam.zip` на Deck.
+2. Decky Loader → Developer → **Install from ZIP**.
+3. Плагин сам поставит Python-зависимости (requests, boto3, paramiko, psutil, PyYAML)
+   при первом запуске — нужен интернет один раз.
 
-1. Скопируйте `gamesync-nonsteam.zip` на Steam Deck
-2. Откройте Decky Loader → Developer → Install from ZIP
-3. Выберите архив и установите
+### Настройка хранилища
 
-Python‑зависимости (requests, boto3, paramiko, psutil) плагин устанавливает
-сам при первом запуске — отдельно ничего ставить не нужно. Нужен только
-доступ в интернет при первом запуске (один раз).
+1. Настройки плагина → «Тип хранилища».
+2. **WebDAV**: выберите сервис (URL подставится), введите логин и **пароль приложения**.
+   - Mail.ru: логин — полный адрес `name@mail.ru`; пароль приложения создаётся
+     в Настройках → Безопасность → Пароли для внешних приложений.
+   - Яндекс: логин — полный адрес `name@yandex.ru`; WebDAV пишет только с подпиской 360.
+   - OAuth-токен нужен только Яндексу; для остальных он не используется.
+3. **S3 / FTP / SFTP** — укажите параметры сервера и нажмите «Проверить и сохранить».
+4. Кнопка проверяет не только чтение, но и **создание папки**: «успех» без права
+   записи больше не показывается.
 
-### Настройка
+### Быстрое меню (QAM)
 
-1. Откройте настройки плагина в Decky Loader.
-2. В блоке **Тип хранилища** выберите:
-   - **Облако (WebDAV)** — если используете Облако Mail.ru, Яндекс Диск, Nextcloud/ownCloud, Fastmail и т.п. (рекомендуется);
-   - **Свой сервер: SFTP** — если у вас NAS/VPS с SSH (пароль или приватный ключ);
-   - **Свой сервер: FTP/FTPS** — для обычного FTP (при необходимости включите TLS и пассивный режим);
-   - **S3: для продвинутых** — если пользуетесь объектным хранилищем.
-3. Для **WebDAV**:
-   - выберите сервис — URL подставится автоматически, останется ввести логин и пароль;
-   - для Яндекс Диска пароль — пароль приложения «WebDAV», для Mail.ru — пароль аккаунта или приложения;
-   - нажмите «Проверить и сохранить»: плагин проверит подключение и только потом сохранит настройки.
-4. Для **S3**:
-   - выберите S3‑провайдера (например, Yandex Object Storage, VK Cloud, Backblaze B2);
-   - укажите **Bucket**, при необходимости поправьте Endpoint и Region;
-   - введите Access Key и Secret Key;
-   - нажмите «Проверить и сохранить».
-5. Для **FTP/FTPS**:
-   - укажите хост и порт (по умолчанию 21), логин и пароль;
-   - включите «Использовать TLS (FTPS)», если сервер поддерживает шифрование;
-   - нажмите «Проверить и сохранить».
-6. Для **SFTP**:
-   - укажите хост и порт (по умолчанию 22), логин и пароль или путь к приватному ключу;
-   - при необходимости укажите passphrase ключа;
-   - нажмите «Проверить и сохранить».
-7. Настройте пути сохранений для игр (авто‑поиск + ручные пути при необходимости).
+- Статус: `Облако Mail.ru · подключено · N игр · M в облаке` (иконка зелёная/красная).
+- Тумблер **«Автосинхронизация»** — сохранять игру после выхода.
+- **«Синхронизировать всё»** — прогресс-бар с этапами: сканирование → архивация →
+  загрузка → история версий, текущая игра и счётчик `N/M`, успешные/ошибочные.
+- **«Бэкапы и восстановление»** и **«Настройки»** — переход на полную страницу.
 
-### Использование
+### Страница игры в библиотеке
 
-- В быстром меню — статус и три действия: «Синхронизировать всё», «Бэкапы и восстановление», «Настройки»
-- Плагин автоматически сканирует игры PortProton
-- Для каждой игры можно настроить пути сохранений
-- Нажмите "Синхронизировать" для загрузки сохранений в облако
-- Каждая синхронизация создаёт версию бэкапа в облаке (последние 10 хранятся в истории)
-- На странице non-Steam игры в библиотеке видна строка GameSync: статус сохранений и кнопка синхронизации
-- Включите автосинхронизацию для автоматической загрузки при выходе из игры (настройка сохраняется после перезапуска Decky)
+- Строка GameSync под кнопкой «Играть»: дата последней синхронизации, размер,
+  число версий и путей.
+- Клик по облачку (или A на геймпаде) — синхронизировать игру; во время работы спиннер.
+- Зелёная точка — бэкап моложе 24 часов; статус обновляется раз в минуту.
 
-### Восстановление сохранений
+### Вкладки настроек
 
-Настройки → вкладка **Бэкапы**:
+- **Основные** — хранилище, автосинхронизация, глобальные пути, опасная зона.
+- **Пути игр** — карточка на игру, пути, кандидаты, добавление/исключение,
+  кнопка **«Проверить содержимое»**: показывает файлы, размеры, даты и сколько
+  из них похоже на сейвы (если только логи — предупреждение).
+- **Бэкапы** — список игр, боковая карточка версий, восстановление,
+  **«Скачать .tar.gz»** (в `/home/deck/Downloads`), выбор **«Хранить версий на игру»**
+  (3/5/10/20/50) и **«Удалить старые копии из облака»** (чистка «сирот»).
+- **Статистика** — синхронизации, игры в облаке, занятое место, последняя
+  синхронизация, график по датам и последние записи.
 
-1. Выберите игру — под ней появится список версий (дата, размер, тип).
-2. Нажмите «Восстановить» у нужной версии и подтвердите.
-3. Плагин скачает архив, распакует его по путям из манифеста и вернёт файлы в `drive_c`.
-4. Перед восстановлением текущие сейвы автоматически сохраняются в облако как
-   `prerestore-<дата>.tar.gz` — откатиться можно из этого же списка.
+Все вкладки управляются геймпадом: вкладки и контент — `Focusable`, активная
+вкладка получает фокус; подвал Steam не перекрывает контент (запас 48 px).
+
+### Как плагин находит пути сохранений
+
+Источники отсортированы по надёжности:
+
+1. **Точный Steam App ID**: `steam_appid.txt` / `steam_settings/steam_appid.txt`
+   рядом с игрой → поиск в Ludusavi и OpenCloudSaves **по ID**, а не по названию.
+2. **Эмуляторы**:
+   - `Documents/CPY_SAVES/CPY/<appid>` и `SKIDROW/...`;
+   - `AppData/Roaming/<HOODLUM|CODEX|RUNE|…>/<appid>/remote`;
+   - `users/Public/Documents/Steam/<EMU>/<appid>`;
+   - путь из `steam_emu.ini` (`Game data is stored at %SystemDrive%\…`).
+3. **Steam userdata** по реальному App ID: `userdata/<uid>/<appid>/remote`.
+4. **Папка игры**: `save/saves/profile/Data` рядом с exe, файлы `*save*`, `*.sav`.
+5. **Известные пути** Ludusavi/OpenCloudSaves по названию (с нормализацией:
+   годы и слова-изданий отбрасываются).
+6. **Эвристика** по `drive_c` (Documents, Saved Games, AppData, LocalLow).
+7. **Обучение**: после выхода из игры ищутся файлы, изменённые за сессию, —
+   это самый точный сигнал; пути запоминаются.
+8. **Ручные пути** пользователя.
+
+Защита от мусора:
+
+- логи, `.txt`, `.dll`, `.exe`, картинки, кэш и системные папки не считаются сейвами;
+- папка только из служебных файлов отбрасывается;
+- перед архивацией проверяется число «осмысленных» файлов: если 0 — синхронизация
+  возвращает ошибку, а не создаёт пустой архив на 3 КБ.
+
+### Синхронизация и автосинхронизация
+
+- Каждая синхронизация: `GameSync/<Игра>/backup-<дата>.tar.gz` (версия) +
+  `GameSync/<Игра>.tar.gz` (стабильная копия, перезаписывается).
+- Лимит версий настраивается (3/5/10/20/50); при превышении старые записи
+  удаляются из истории **и из облака**.
+- Автосинхронизация ловит игры в общем префиксе `DEFAULT` (по каталогу exe)
+  и игры с собственным префиксом; синхронизация запускается после выхода,
+  когда завершился последний Wine-процесс.
+- После автосинхронизации показывается тост «Сохранено: игра · размер».
+
+### Восстановление
+
+1. «Бэкапы» → выберите игру → «Восстановить» у нужной версии.
+2. Перед записью текущие сейвы уходят в облако как `prerestore-<дата>.tar.gz` —
+   откатиться можно из этого же списка.
+3. Если в архиве нет настоящих файлов (восстановлено 0), интерфейс предупредит:
+   вероятно, бэкап собран по неверному пути.
 
 Ограничения:
 
-- восстановить можно бэкапы, созданные версией плагина 0.3.0 и новее (в архиве есть манифест);
-  старые архивы нужно пересоздать повторной синхронизацией;
-- в истории хранятся последние 10 версий на игру, более старые записи удаляются из индекса
-  (сами файлы в облаке остаются);
-- файлы возвращаются по путям из манифеста: если префикс PortProton переименован или игра
-  переустановлена в другой префикс, архив восстановится в старый путь.
+- восстановление работает для архивов 0.3.0+ (с манифестом);
+- старые архивы нужно пересоздать синхронизацией;
+- файлы возвращаются по путям из манифеста (при переименовании префикса путь
+  останется прежним).
 
-### Как устроены бэкапы
+### Чистка облака
 
-- `GameSync/<Игра>/backup-<YYYYMMDD-HHMMSS>.tar.gz` — версии;
-- `GameSync/<Игра>.tar.gz` — стабильная копия последней синхронизации (для ручного доступа);
-- внутри архива — файлы сохранений и манифест `.gamesync/manifest.json` с исходными путями;
-- история версий хранится локально в `~/.config/gamesync/backups.json`.
-
-### Как плагин находит игры и сохранения
-
-- **Игры**: `.desktop`‑файлы PortProton (с локализованными именами), префиксы без ярлыков и сопоставление со **Steam‑ярлыками** (appid/StartDir).
-- **Сохранения**: база OpenCloudSaves + **Ludusavi** (манифест скачивается и кэшируется автоматически) + эвристический поиск по `drive_c` (Documents, Saved Games, AppData, ProgramData).
-- Для каждой игры показываются найденные **кандидаты с оценкой**; ненужные можно исключить из синхронизации.
-- **Ручные пути запоминаются** и предлагаются похожим играм.
-- Игры с общим префиксом помечаются предупреждением.
+Кнопка «Удалить старые копии из облака» сравнивает файлы в `GameSync/<Игра>/`
+с историей и удаляет только `backup-*.tar.gz` / `prerestore-*.tar.gz`,
+на которые нет ссылок. Текущие версии и посторонние файлы не трогаются.
+Листинг работает для WebDAV, S3, FTP и SFTP.
 
 ### Структура проекта
 
-- `backend/` - Python бэкенд (синхронизация, провайдеры, восстановление)
-- `src/` - React фронтенд
-- `tests/` - unit-тесты бэкенда (`python -m unittest discover -s tests`)
-- `docs/` - архитектура и описание API
-- `mockups/` - HTML-макеты интерфейса и скриншоты
-- `plugin.json` - конфигурация плагина
-- `requirements.txt` - Python зависимости
+- `backend/` — Python-бэкенд (сканирование путей, синхронизация, провайдеры,
+  восстановление, статистика, уборка)
+- `src/` — React-фронтенд
+- `tests/` — unit-тесты (`python -m unittest discover -s tests`)
+- `docs/` — архитектура, API, решение проблем
+- `mockups/` — HTML-макеты и скриншоты
+- `plugin.json`, `requirements.txt`
 
 Документация: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
@@ -135,126 +151,103 @@ Python‑зависимости (requests, boto3, paramiko, psutil) плагин
 
 ## 🇬🇧 English
 
-Plugin for Decky Loader that synchronizes PortProton game saves with cloud storage:
+Decky Loader plugin that syncs PortProton game saves to cloud storage:
 
-- via **WebDAV** (Mail.ru Cloud — has a free tier, Yandex Disk, Nextcloud/ownCloud, Fastmail and any custom WebDAV server)
-- via **S3‑compatible object storage** (Yandex Object Storage, VK Cloud, Cloud.ru, Backblaze B2, Wasabi, AWS S3, DigitalOcean Spaces, etc.)
-- via **FTP/FTPS** or **SFTP** (your own server/NAS)
+- **WebDAV** (Mail.ru Cloud — free tier, Yandex Disk, Nextcloud/ownCloud, Fastmail, custom)
+- **S3-compatible object storage**
+- **FTP/FTPS** or **SFTP**
 
-> **Not sure what to pick?** Choose “Cloud (WebDAV) → Mail.ru Cloud”: it only needs your
-> email and password. Yandex Disk WebDAV requires a Yandex 360 subscription since
-> 22.06.2026. S3, FTP and SFTP are for users who already have a server or a bucket.
+> **Not sure what to pick?** Use “Cloud (WebDAV) → Mail.ru Cloud”: an app password is
+> enough. Yandex Disk WebDAV requires Yandex 360 (free tier returns HTTP 402 on writes).
 
 ### Installation
 
-#### Building on Windows:
-
-1. Install Node.js:
-```bash
-npm --version
-```
-
-2. Install dependencies:
 ```bash
 npm install
-```
-
-3. Build the project:
-```bash
 npm run build
 ```
 
-4. Create archive (run `build.bat` or manually):
-- Create `dist-plugin` folder
-- Copy: `dist/`, `backend/`, `plugin.json`, `requirements.txt`
-- Archive into `gamesync-nonsteam.zip`
+Build `gamesync-nonsteam.zip` (`build.bat`), then Decky Loader → Developer →
+**Install from ZIP**. Python dependencies are installed automatically on first launch.
 
-#### Installation on Steam Deck:
+### Storage setup
 
-1. Copy `gamesync-nonsteam.zip` to Steam Deck
-2. Open Decky Loader → Developer → Install from ZIP
-3. Select archive and install
+1. Pick a storage type and a service preset.
+2. WebDAV: full login (e.g. `name@mail.ru`) and an **app password**.
+   Yandex requires a full `name@yandex.ru` login and a Yandex 360 subscription.
+3. The test button checks **write access** (creates the folder), so a read-only
+   cloud no longer reports a false success.
 
-The plugin installs its Python dependencies (requests, boto3, paramiko, psutil)
-automatically on first launch — no manual steps required. Only internet access
-is needed the first time.
+### Quick access menu
 
-### Configuration
+- Status line with provider and connection state (green/red).
+- **Auto-sync** toggle (sync the game after it exits).
+- **Sync all** with a progress bar and stages (scan → archive → upload → history),
+  current game, `N/M` counter, success/error counts.
+- Buttons to open Backups and Settings.
 
-1. Open plugin settings in Decky Loader.
-2. In the **Storage type** block choose:
-   - **Cloud (WebDAV)** if you use Mail.ru Cloud, Yandex Disk, Nextcloud/ownCloud, Fastmail, etc. (recommended);
-   - **Own server: SFTP** for an SSH-accessible NAS/VPS (password or private key);
-   - **Own server: FTP/FTPS** for a regular FTP server (enable TLS and passive mode if needed);
-   - **S3: advanced** if you already use object storage.
-3. For **WebDAV**:
-   - pick a service — the URL is filled in automatically, you only enter login and password;
-   - Yandex Disk uses a “WebDAV” app password, Mail.ru uses your account or app password;
-   - click “Test and save”: the plugin checks the connection first and only then stores the settings.
-4. For **S3**:
-   - choose an S3 provider (e.g. Yandex Object Storage, VK Cloud, Backblaze B2);
-   - enter **Bucket**, adjust Endpoint and Region if needed;
-   - enter Access Key and Secret Key;
-   - click “Test and save”.
-5. For **FTP/FTPS**:
-   - enter host and port (default 21), username and password;
-   - enable “Use TLS (FTPS)” if the server supports encryption;
-   - click “Test and save”.
-6. For **SFTP**:
-   - enter host and port (default 22), username and password or a private key path;
-   - provide the key passphrase if needed;
-   - click “Test SFTP connection” and ensure it succeeds.
-7. Configure save paths for games (auto‑detected or custom paths).
+### Game page row
 
-### Usage
+Under the Play button: last sync date, size, versions and path count. Click the
+cloud icon (or press A on a gamepad) to sync; green dot means a backup younger
+than 24 hours; the row refreshes every minute.
 
-- The quick access menu shows status and three actions: "Sync all", "Backups & restore", "Settings"
-- Plugin automatically scans PortProton games
-- Save paths can be configured for each game
-- Click "Synchronize" to upload saves to cloud
-- Every sync creates a versioned backup (the last 10 are kept in history)
-- Non-Steam game pages in the library show a GameSync row with save status and a sync button
-- Enable auto-sync for automatic upload when exiting game (the setting survives a Decky restart)
+### Settings tabs
 
-### Restoring saves
+- **General** — storage, auto-sync, global paths, danger zone.
+- **Game paths** — per-game cards, candidates, add/exclude, and **“Check contents”**
+  (files, sizes, dates, how many look like saves; warns if only logs are found).
+- **Backups** — games list, versions sidebar, restore, **download .tar.gz**
+  to `/home/deck/Downloads`, **versions to keep** (3/5/10/20/50) and
+  **“Delete old copies from cloud”** (orphan cleanup).
+- **Statistics** — syncs, games in cloud, used space, last sync, per-date chart.
 
-Settings → **Backups** tab:
+All tabs are gamepad-navigable (`Focusable`, active tab auto-focused), and the
+Steam footer does not cover the content.
 
-1. Pick a game — the list of versions appears below (date, size, kind).
-2. Click "Restore" on the version you need and confirm.
-3. The plugin downloads the archive, unpacks it using the manifest paths and puts files back into `drive_c`.
-4. Before restoring, the current saves are uploaded as `prerestore-<date>.tar.gz`, so you can roll back from the same list.
+### How save paths are found
 
-Limitations:
+1. **Exact Steam App ID** from `steam_appid.txt` / `steam_settings` → Ludusavi and
+   OpenCloudSaves lookups by ID.
+2. **Emulators**: `Documents/CPY_SAVES/CPY/<appid>`, `SKIDROW/...`,
+   `AppData/Roaming/<HOODLUM|CODEX|RUNE>/<appid>/remote`,
+   `users/Public/Documents/Steam/<EMU>/<appid>`, and the path from `steam_emu.ini`.
+3. **Steam userdata** by real App ID (`userdata/<uid>/<appid>/remote`).
+4. **Game folder**: `save/saves/profile/Data` next to the exe and `*save*` files.
+5. **Known paths** from Ludusavi/OpenCloudSaves by normalized name.
+6. **Heuristics** across `drive_c` (Documents, Saved Games, AppData, LocalLow).
+7. **Session learning**: files modified while the game ran become learned paths.
+8. **Manual paths** entered by the user.
 
-- only archives created by plugin 0.3.0+ can be restored (they contain a manifest);
-  old backups must be recreated by syncing again;
-- history keeps the last 10 versions per game; older entries are dropped from the index
-  (the files in cloud storage stay).
+Junk protection: logs/txt/dll/exe/images/cache are ignored; folders with only
+service files are dropped; before archiving the plugin counts meaningful files
+and refuses to create an empty backup.
 
-### How backups are stored
+### Sync & auto-sync
 
-- `GameSync/<Game>/backup-<YYYYMMDD-HHMMSS>.tar.gz` — versions;
-- `GameSync/<Game>.tar.gz` — stable copy of the latest sync (for manual access);
-- each archive contains save files and `.gamesync/manifest.json` with the original paths;
-- version history is stored locally in `~/.config/gamesync/backups.json`.
+- Every sync creates `GameSync/<Game>/backup-<date>.tar.gz` plus a stable
+  `GameSync/<Game>.tar.gz` (overwritten).
+- Retention is configurable (3/5/10/20/50); older versions are removed from the
+  history **and from the cloud**.
+- Auto-sync detects games in the shared `DEFAULT` prefix (by executable folder)
+  and named prefixes, and fires after the last Wine process exits.
+- A toast reports “Saved: game · size” after auto-sync.
 
-### How the plugin finds games and saves
+### Restore
 
-- **Games**: PortProton `.desktop` files (with localized names), prefixes without shortcuts, and matching against **Steam shortcuts** (appid/StartDir).
-- **Saves**: OpenCloudSaves database + **Ludusavi** (manifest downloaded and cached automatically) + heuristic search inside `drive_c` (Documents, Saved Games, AppData, ProgramData).
-- Each game shows detected **candidates with a score**; unwanted ones can be excluded from sync.
-- **Manual paths are remembered** and suggested for similar games.
-- Games sharing a prefix are flagged with a warning.
+Pick a game and version, confirm — current saves are uploaded as
+`prerestore-<date>.tar.gz` first. If an archive contains no real files, the UI
+warns instead of silently reporting success.
 
-### Project Structure
+### Cloud cleanup
 
-- `backend/` - Python backend (sync, providers, restore)
-- `src/` - React frontend
-- `tests/` - backend unit tests (`python -m unittest discover -s tests`)
-- `docs/` - architecture and API reference
-- `mockups/` - HTML UI mockups and screenshots
-- `plugin.json` - plugin configuration
-- `requirements.txt` - Python dependencies
+“Delete old copies from cloud” compares files in `GameSync/<Game>/` with the
+history and deletes only unreferenced `backup-*.tar.gz` / `prerestore-*.tar.gz`.
+Works for WebDAV, S3, FTP and SFTP.
+
+### Project structure
+
+`backend/` (scanning, sync, providers, restore, stats, cleanup), `src/` (React),
+`tests/`, `docs/`, `mockups/`, `plugin.json`, `requirements.txt`.
 
 Documentation: [CHANGELOG.md](CHANGELOG.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/API.md](docs/API.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
