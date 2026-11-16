@@ -14,6 +14,8 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from path_utils import strip_wildcards
+
 logger = logging.getLogger(__name__)
 
 MANIFEST_URL = os.environ.get(
@@ -24,12 +26,12 @@ CACHE_TTL = 30 * 24 * 3600  # 30 дней
 
 # Плейсхолдеры Ludusavi -> путь внутри drive_c префикса PortProton.
 _PLACEHOLDERS = {
-    "<home>": "users/deck",
-    "<winAppData>": "users/deck/AppData/Roaming",
-    "<winLocalAppData>": "users/deck/AppData/Local",
-    "<winLocalAppDataLow>": "users/deck/AppData/LocalLow",
-    "<winDocuments>": "users/deck/Documents",
-    "<winSavedGames>": "users/deck/Saved Games",
+    "<home>": "users/@user@",
+    "<winAppData>": "users/@user@/AppData/Roaming",
+    "<winLocalAppData>": "users/@user@/AppData/Local",
+    "<winLocalAppDataLow>": "users/@user@/AppData/LocalLow",
+    "<winDocuments>": "users/@user@/Documents",
+    "<winSavedGames>": "users/@user@/Saved Games",
     "<winProgramData>": "ProgramData",
 }
 
@@ -109,11 +111,15 @@ def _convert_placeholder(path: str) -> Optional[str]:
 
     p = p.lstrip("/")
 
-    # Если это файл/глоб — берём папку
+    # Маски могут стоять в любом сегменте (*.sav, */saves, profile?.dat):
+    # обрезаем путь до родительской папки, иначе pathlib ищет файл "*.sav".
+    p = strip_wildcards(p) or ""
+    if not p:
+        return None
+
+    # Если это файл — берём папку
     last = p.rsplit("/", 1)[-1]
-    if "*" in last:
-        p = p.rsplit("/", 1)[0] if "/" in p else ""
-    elif "." in last and Path(last).suffix.lower() in _FILE_EXTENSIONS:
+    if "." in last and Path(last).suffix.lower() in _FILE_EXTENSIONS:
         p = p.rsplit("/", 1)[0] if "/" in p else ""
 
     p = p.strip("/")
