@@ -22,8 +22,6 @@ frontend:
 package:
   stage: build
   image: node:20
-  dependencies:
-    - frontend
   script:
     - apt-get update -qq && apt-get install -y -qq zip
     - PLUGIN_DIR=gamesync-nonsteam
@@ -38,4 +36,3 @@ package:
   artifacts:
     paths:
       - gamesync-nonsteam.zip
-    expire_in: 1 week

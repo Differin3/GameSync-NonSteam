@@ -24,7 +24,7 @@
 ### Добавлено
 
 - **Зеркало на GitFlic**: `https://gitflic.ru/project/d1fferin/gamesync-nonsteam`.
-- **GitFlic CI** (`.gitflic-ci.yaml`): проверка Python (compileall, pyflakes,
+- **GitFlic CI** (`gitflic-ci.yaml`): проверка Python (compileall, pyflakes,
   тесты), сборка фронтенда и упаковка `gamesync-nonsteam.zip` артефактом.
 ## [0.10.15] — 2026-11-15
 
