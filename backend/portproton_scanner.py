@@ -32,17 +32,18 @@ SAVE_ROOT_TEMPLATES = [
 FALLBACK_WINDOWS_USERS = ["steamuser", "deck", "user", "Public"]
 
 # Стандартные пути (оставлено для обратной совместимости / внешнего использования).
+# Строится из списка типовых профилей, а не из одного жёстко заданного пользователя.
 STANDARD_SAVE_PATHS = [
-    "users/steamuser/Documents",
-    "users/steamuser/Documents/My Games",
-    "users/steamuser/Saved Games",
-    "users/steamuser/AppData/Local",
-    "users/steamuser/AppData/Roaming",
-    "users/deck/Documents",
-    "users/deck/Documents/My Games",
-    "users/deck/Saved Games",
-    "users/deck/AppData/Local",
-    "users/deck/AppData/Roaming",
+    f"users/{user}/{subdir}"
+    for user in FALLBACK_WINDOWS_USERS
+    if user != "Public"
+    for subdir in (
+        "Documents",
+        "Documents/My Games",
+        "Saved Games",
+        "AppData/Local",
+        "AppData/Roaming",
+    )
 ]
 
 # Расширения файлов сохранений

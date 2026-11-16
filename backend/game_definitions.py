@@ -2,6 +2,8 @@ import logging
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional
 
+from path_utils import normalize_rel_path
+
 from gamedef_loader import load_raw_gamedef_map
 
 logger = logging.getLogger(__name__)
@@ -13,16 +15,16 @@ LOCAL_GAME_SAVE_DEFINITIONS: Dict[str, List[str]] = {
     # Expedition 33 (по твоему примеру с Sandfall)
     # Учитываем варианты написания: с/без s и с/без пробела.
     "expedition 33": [
-        "users/deck/AppData/Local/Sandfall/Saved/SaveGames",
+        "users/@user@/AppData/Local/Sandfall/Saved/SaveGames",
     ],
     "expeditions 33": [
-        "users/deck/AppData/Local/Sandfall/Saved/SaveGames",
+        "users/@user@/AppData/Local/Sandfall/Saved/SaveGames",
     ],
     "expedition33": [
-        "users/deck/AppData/Local/Sandfall/Saved/SaveGames",
+        "users/@user@/AppData/Local/Sandfall/Saved/SaveGames",
     ],
     "expeditions33": [
-        "users/deck/AppData/Local/Sandfall/Saved/SaveGames",
+        "users/@user@/AppData/Local/Sandfall/Saved/SaveGames",
     ],
 }
 
@@ -64,43 +66,43 @@ def _convert_windows_path_to_portproton_rel(path: str) -> Optional[str]:
     # Нормализуем слэши
     p = path.replace("\\", "/")
 
-    # %LOCALAPPDATA%\Foo -> users/deck/AppData/Local/Foo
+    # %LOCALAPPDATA%\Foo -> users/@user@/AppData/Local/Foo
     for token in ("%LOCALAPPDATA%", "%LocalAppData%", "%localappdata%"):
         if token in p:
-            p = p.replace(token, "users/deck/AppData/Local")
+            p = p.replace(token, "users/@user@/AppData/Local")
             break
 
-    # %APPDATA%\Foo -> users/deck/AppData/Roaming/Foo
+    # %APPDATA%\Foo -> users/@user@/AppData/Roaming/Foo
     for token in ("%APPDATA%", "%AppData%", "%appdata%"):
         if token in p:
-            p = p.replace(token, "users/deck/AppData/Roaming")
+            p = p.replace(token, "users/@user@/AppData/Roaming")
             break
 
-    # %USERPROFILE%\Documents\My Games -> users/deck/Documents/My Games
+    # %USERPROFILE%\Documents\My Games -> users/@user@/Documents/My Games
     for token in ("%USERPROFILE%", "%HOMEPATH%", "%UserProfile%", "%HomePath%"):
         if token in p and "/Documents/My Games" in p:
-            p = p.replace(token + "/Documents/My Games", "users/deck/Documents/My Games")
+            p = p.replace(token + "/Documents/My Games", "users/@user@/Documents/My Games")
             break
 
-    # %USERPROFILE%\Documents -> users/deck/Documents
+    # %USERPROFILE%\Documents -> users/@user@/Documents
     for token in ("%USERPROFILE%", "%HOMEPATH%", "%UserProfile%", "%HomePath%"):
         if token in p and "/Documents" in p:
-            p = p.replace(token + "/Documents", "users/deck/Documents")
+            p = p.replace(token + "/Documents", "users/@user@/Documents")
             break
 
-    # %USERPROFILE%\Saved Games -> users/deck/Saved Games
+    # %USERPROFILE%\Saved Games -> users/@user@/Saved Games
     for token in ("%USERPROFILE%", "%HOMEPATH%", "%UserProfile%", "%HomePath%"):
         if token in p and "/Saved Games" in p:
-            p = p.replace(token + "/Saved Games", "users/deck/Saved Games")
+            p = p.replace(token + "/Saved Games", "users/@user@/Saved Games")
             break
 
     # Обрезаем возможный префикс вроде "C:/Users/..."
     if p.startswith("C:/Users/") or p.startswith("C:/users/"):
-        # Заменяем "C:/Users/XXX" на "users/deck"
+        # Заменяем "C:/Users/XXX" на "users/@user@"
         parts = p.split("/")
         # ["C:", "Users", "<Name>", ...]
         if len(parts) >= 4:
-            p = "users/deck/" + "/".join(parts[3:])
+            p = "users/@user@/" + "/".join(parts[3:])
 
     # Убираем начальные слэши
     while p.startswith("/"):
@@ -110,7 +112,8 @@ def _convert_windows_path_to_portproton_rel(path: str) -> Optional[str]:
         # Ничего внятного не смогли сконвертировать
         return None
 
-    return p
+    # Маски (*.sav, */saves) обрезаем до родительской папки: pathlib их не понимает.
+    return normalize_rel_path(p)
 
 
 def _title_score(a: str, b: str) -> float:

@@ -368,7 +368,7 @@ class SteamMatchingTest(unittest.TestCase):
             },
         })
         self.assertEqual(index["steam"].get("123"), 0)
-        self.assertIn("users/deck/AppData/Roaming/A", index["entries"][0]["paths"][0])
+        self.assertIn("users/@user@/AppData/Roaming/A", index["entries"][0]["paths"][0])
         self.assertEqual(len(index["entries"]), 2)
 
     def test_ludusavi_steam_id_of(self):
@@ -905,3 +905,50 @@ class StatsLogicTest(unittest.TestCase):
         self.assertEqual(result["lastSync"], "2026-11-14T12:00:00")
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class SavePathNormalizationTest(unittest.TestCase):
+    """Пути из баз: без жёсткого users/deck и без wildcard-масок."""
+
+    def test_windows_path_uses_user_placeholder(self):
+        rel = game_definitions._convert_windows_path_to_portproton_rel(
+            r"%APPDATA%\Game\Saves"
+        )
+        self.assertEqual(rel, "users/@user@/AppData/Roaming/Game/Saves")
+
+    def test_windows_path_documents_placeholder(self):
+        rel = game_definitions._convert_windows_path_to_portproton_rel(
+            r"C:\Users\SomeUser\Documents\My Games\Game"
+        )
+        self.assertEqual(rel, "users/@user@/Documents/My Games/Game")
+
+    def test_windows_path_wildcard_cut_to_parent(self):
+        rel = game_definitions._convert_windows_path_to_portproton_rel(
+            r"%USERPROFILE%\Documents\My Games\Game\*.sav"
+        )
+        self.assertEqual(rel, "users/@user@/Documents/My Games/Game")
+
+    def test_ludusavi_placeholder_user(self):
+        rel = ludusavi._convert_placeholder("<winDocuments>/Game/Saves")
+        self.assertEqual(rel, "users/@user@/Documents/Game/Saves")
+
+    def test_ludusavi_middle_wildcard_cut_to_parent(self):
+        rel = ludusavi._convert_placeholder("<winAppData>/Game/*/saves")
+        self.assertEqual(rel, "users/@user@/AppData/Roaming/Game")
+
+    def test_ludusavi_trailing_wildcard_cut_to_parent(self):
+        rel = ludusavi._convert_placeholder("<home>/Saves/Game/profile?.dat")
+        self.assertEqual(rel, "users/@user@/Saves/Game")
+
+    def test_scanner_resolves_placeholder_to_real_user(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            drive_c = Path(tmp) / "drive_c"
+            target = drive_c / "users" / "steamuser" / "Documents" / "My Games" / "Game"
+            target.mkdir(parents=True)
+
+            resolved = portproton_scanner._resolve_known_rel(
+                drive_c,
+                "users/@user@/Documents/My Games/Game",
+                ["steamuser"],
+            )
+
+            self.assertEqual(resolved, target)
