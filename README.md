@@ -3,6 +3,8 @@
 [![Release](https://img.shields.io/github/v/release/Differin3/GameSync-NonSteam)](https://github.com/Differin3/GameSync-NonSteam/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+Зеркало (Россия): [GitFlic](https://gitflic.ru/project/d1fferin/gamesync-nonsteam)
+
 ## Скриншоты / Screenshots
 
 | QAM | Строка на странице игры / Game page row | Пути игр / Save paths |
