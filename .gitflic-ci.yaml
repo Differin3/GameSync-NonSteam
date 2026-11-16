@@ -1,0 +1,41 @@
+stages:
+  - test
+  - build
+
+backend:
+  stage: test
+  image: python:3.11
+  script:
+    - python -m pip install --upgrade pip pyflakes==3.2.0
+    - python -m compileall -q backend main.py
+    - python -m pyflakes backend main.py
+    - python -m unittest discover -s tests -v
+
+frontend:
+  stage: test
+  image: node:20
+  script:
+    - npm ci
+    - npm run lint
+    - npm run build
+
+package:
+  stage: build
+  image: node:20
+  dependencies:
+    - frontend
+  script:
+    - apt-get update -qq && apt-get install -y -qq zip
+    - PLUGIN_DIR=gamesync-nonsteam
+    - rm -rf "$PLUGIN_DIR" && mkdir -p "$PLUGIN_DIR/dist"
+    - cp dist/index.js "$PLUGIN_DIR/dist/index.js"
+    - if [ -d dist/assets ]; then cp -r dist/assets "$PLUGIN_DIR/assets"; fi
+    - cp -r backend "$PLUGIN_DIR/backend"
+    - cp main.py plugin.json package.json requirements.txt LICENSE "$PLUGIN_DIR"/
+    - find "$PLUGIN_DIR" -name "__pycache__" -type d -prune -exec rm -rf {} +
+    - rm -f gamesync-nonsteam.zip
+    - zip -r gamesync-nonsteam.zip "$PLUGIN_DIR"
+  artifacts:
+    paths:
+      - gamesync-nonsteam.zip
+    expire_in: 1 week

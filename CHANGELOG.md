@@ -3,6 +3,13 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.10.16] — 2026-11-16
+
+### Добавлено
+
+- **Зеркало на GitFlic**: `https://gitflic.ru/project/d1fferin/gamesync-nonsteam`.
+- **GitFlic CI** (`.gitflic-ci.yaml`): проверка Python (compileall, pyflakes,
+  тесты), сборка фронтенда и упаковка `gamesync-nonsteam.zip` артефактом.
 ## [0.10.15] — 2026-11-15
 
 ### Исправлено
