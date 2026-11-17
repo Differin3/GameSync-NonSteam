@@ -384,7 +384,7 @@ class Plugin:
                 return
             # Не синхронизируем игру, пока в неё ещё пишется restore/pull:
             # иначе архив уйдёт в облако с недописанными файлами.
-            for _ in range(60):
+            for _ in range(240):
                 if resolved_name not in Plugin._active_restores:
                     break
                 await asyncio.sleep(0.5)
@@ -715,6 +715,24 @@ class Plugin:
 
             if not save_paths:
                 return {"success": False, "error": "Все пути сохранений исключены"}
+
+            # Не архивируем игру, пока в неё пишется restore/pull: иначе в облако
+            # уйдёт недописанное состояние.
+            for _ in range(240):
+                if game_name not in Plugin._active_restores:
+                    break
+                await asyncio.sleep(0.5)
+
+            # Архив пишется во временный каталог: без места backup оборвётся.
+            try:
+                free = shutil.disk_usage(tempfile.gettempdir()).free
+            except OSError:
+                free = None
+            if free is not None and free < 200 * 1024 * 1024:
+                return {
+                    "success": False,
+                    "error": "Мало свободного места для создания архива (нужно ≥ 200 МБ).",
+                }
 
             # Надёжность: не делаем бэкап, если в путях только служебные файлы
             # (логи, кэш) — иначе получается «пустой» архив на 3 КБ.

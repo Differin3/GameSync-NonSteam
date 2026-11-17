@@ -1002,6 +1002,17 @@ class PullOnLaunchTest(unittest.TestCase):
     def test_newest_local_mtime_missing_paths(self):
         self.assertIsNone(pull_engine.newest_local_mtime(["/nonexistent/path"]))
 
+    def test_newest_local_mtime_ignores_service_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            save = root / "save.dat"
+            log = root / "game.log"
+            save.write_text("save")
+            log.write_text("log")
+            os.utime(save, (1000, 1000))
+            os.utime(log, (2000, 2000))
+            self.assertEqual(pull_engine.newest_local_mtime([str(root)]), 1000)
+
     def test_should_attempt_pull_only_when_just_started(self):
         now = 1000.0
         self.assertTrue(pull_engine.should_attempt_pull(now - 3, now=now))

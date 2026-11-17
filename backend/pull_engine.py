@@ -65,7 +65,13 @@ def parse_timestamp(value) -> Optional[datetime]:
 
 
 def newest_local_mtime(paths: Iterable[str]) -> Optional[float]:
-    """Самое свежее время изменения среди файлов в путях сохранений."""
+    """Самое свежее время изменения среди файлов сохранений.
+
+    Служебные файлы (логи, картинки, кэш) не учитываются: игра пишет лог
+    при каждом запуске, и он не должен делать локальные сейвы «новее» облака.
+    """
+    from sync_engine import SERVICE_EXTENSIONS
+
     newest: Optional[float] = None
     for raw in paths or []:
         if not raw:
@@ -76,6 +82,8 @@ def newest_local_mtime(paths: Iterable[str]) -> Optional[float]:
             candidates = []
             for root, _dirs, files in os.walk(raw):
                 for name in files:
+                    if os.path.splitext(name)[1].lower() in SERVICE_EXTENSIONS:
+                        continue
                     candidates.append(os.path.join(root, name))
         else:
             continue

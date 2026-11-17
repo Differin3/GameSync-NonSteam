@@ -14,7 +14,7 @@ import logging
 import os
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import config_manager
@@ -80,7 +80,7 @@ def add_entry(
 
     entry = {
         "id": _make_id(),
-        "created": created or datetime.now().isoformat(timespec="seconds"),
+        "created": created or datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "remote": remote,
         "size": int(size) if size else None,
         "paths": list(paths or []),

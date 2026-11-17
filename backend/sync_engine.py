@@ -7,7 +7,7 @@ import re
 import tarfile
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -78,7 +78,7 @@ def build_manifest(
     manifest: Dict[str, Any] = {
         "version": MANIFEST_VERSION,
         "game": game_name,
-        "created": datetime.now().isoformat(timespec="seconds"),
+        "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "paths": [
             {"path": str(path), "root": root, "is_dir": path.is_dir()}
             for path, root in plan
