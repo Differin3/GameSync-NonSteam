@@ -16,7 +16,7 @@ import tarfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from sync_engine import MANIFEST_DIR, MANIFEST_NAME, MANIFEST_VERSION
+from sync_engine import MANIFEST_DIR, MANIFEST_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def read_manifest(archive_path: str) -> Optional[Dict[str, Any]]:
 
     if not isinstance(data, dict):
         return None
-    if data.get("version") != MANIFEST_VERSION:
+    if data.get("version") not in (1, 2):
         logger.warning(f"Unsupported manifest version: {data.get('version')!r}")
         return None
     return data
@@ -296,6 +296,37 @@ def collect_extra_files(
     return extras
 
 
+
+def verify_restored(manifest: Dict[str, Any], targets: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Сверить SHA256 восстановленных файлов с манифестом v2."""
+    files = manifest.get("files") or {}
+    if not files:
+        return {"verified": 0, "mismatched": [], "checksum_supported": False}
+
+    from integrity import sha256_file
+
+    verified = 0
+    mismatched: List[str] = []
+    for arcname, meta in files.items():
+        name = str(arcname).replace("\\", "/")
+        parts = name.split("/", 1)
+        root = parts[0]
+        rel = parts[1] if len(parts) > 1 else ""
+        target = targets.get(root)
+        if not target:
+            continue
+        base: Path = target["path"]
+        destination = base if not rel else Path(os.path.normpath(str(base / rel)))
+        if not destination.is_file():
+            mismatched.append(name)
+            continue
+        expected = (meta or {}).get("sha256") if isinstance(meta, dict) else None
+        if expected and sha256_file(str(destination)) != expected:
+            mismatched.append(name)
+        else:
+            verified += 1
+    return {"verified": verified, "mismatched": mismatched, "checksum_supported": True}
+
 def restore_archive(
     archive_path: str,
     manifest: Dict[str, Any],
@@ -326,6 +357,8 @@ def restore_archive(
             logger.warning(f"Quarantine failed, extras left in place: {e}")
 
     result = safe_extract(archive_path, targets)
+    verification = verify_restored(manifest, targets)
+    result.update(verification)
     removed: List[str] = []
     if remove_extra and quarantine_callback is None:
         try:

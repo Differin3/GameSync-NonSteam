@@ -72,6 +72,7 @@ def add_entry(
     kind: str = "sync",
     created: Optional[str] = None,
     keep: int = MAX_PER_GAME,
+    sha256: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Записывает бэкап в историю. ``kind``: sync | prerestore."""
     if not game_name or not remote:
@@ -84,6 +85,7 @@ def add_entry(
         "size": int(size) if size else None,
         "paths": list(paths or []),
         "kind": kind,
+        "sha256": sha256 or None,
     }
 
     with _lock:

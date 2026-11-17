@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import logging
@@ -14,7 +15,34 @@ logger = logging.getLogger(__name__)
 
 MANIFEST_DIR = ".gamesync"
 MANIFEST_NAME = f"{MANIFEST_DIR}/manifest.json"
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
+
+
+class _HashingReader:
+    """Обёртка над файлом: считает SHA256 по мере добавления в архив."""
+
+    def __init__(self, handle, digest):
+        self.handle = handle
+        self.digest = digest
+
+    def read(self, size: int = -1):
+        data = self.handle.read(size)
+        if data:
+            self.digest.update(data)
+        return data
+
+
+def _add_file_with_hash(tar: tarfile.TarFile, file_path: Path, arcname: str, files_meta: Dict[str, Dict[str, Any]]) -> None:
+    arcname = str(arcname).replace("\\", "/")
+    info = tar.gettarinfo(str(file_path), arcname=arcname)
+    digest = hashlib.sha256()
+    with open(file_path, "rb") as handle:
+        tar.addfile(info, _HashingReader(handle, digest))
+    try:
+        size = info.size
+    except AttributeError:
+        size = 0
+    files_meta[arcname] = {"sha256": digest.hexdigest(), "size": int(size or 0)}
 
 
 def sanitize_name(name: str) -> str:
@@ -42,8 +70,12 @@ def build_backup_plan(save_paths: List[str]) -> List[Tuple[Path, str]]:
     return plan
 
 
-def build_manifest(game_name: str, plan: List[Tuple[Path, str]]) -> Dict[str, Any]:
-    return {
+def build_manifest(
+    game_name: str,
+    plan: List[Tuple[Path, str]],
+    files: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    manifest: Dict[str, Any] = {
         "version": MANIFEST_VERSION,
         "game": game_name,
         "created": datetime.now().isoformat(timespec="seconds"),
@@ -52,6 +84,9 @@ def build_manifest(game_name: str, plan: List[Tuple[Path, str]]) -> Dict[str, An
             for path, root in plan
         ],
     }
+    if files is not None:
+        manifest["files"] = files
+    return manifest
 
 
 def create_backup(
@@ -81,19 +116,14 @@ def create_backup(
 
     try:
         files_added = 0
+        files_meta: Dict[str, Dict[str, Any]] = {}
         with tarfile.open(archive_path, "w:gz", compresslevel=6) as tar:
-            manifest = build_manifest(game_name, plan)
-            payload = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
-            info = tarfile.TarInfo(MANIFEST_NAME)
-            info.size = len(payload)
-            info.mtime = time.time()
-            tar.addfile(info, io.BytesIO(payload))
-
+            # Сначала файлы: их хеши попадут в манифест, который добавим в конец.
             for path, root in plan:
                 if path.is_file():
                     if incremental and last_backup_time and os.path.getmtime(path) <= last_backup_time:
                         continue
-                    tar.add(path, arcname=root)
+                    _add_file_with_hash(tar, path, root, files_meta)
                     files_added += 1
                 elif path.is_dir():
                     for current_dir, _dirs, files in os.walk(path):
@@ -101,9 +131,16 @@ def create_backup(
                             file_path = Path(current_dir) / file_name
                             if incremental and last_backup_time and os.path.getmtime(file_path) <= last_backup_time:
                                 continue
-                            arcname = Path(root) / file_path.relative_to(path)
-                            tar.add(file_path, arcname=str(arcname))
+                            arcname = str(Path(root) / file_path.relative_to(path))
+                            _add_file_with_hash(tar, file_path, arcname, files_meta)
                             files_added += 1
+
+            manifest = build_manifest(game_name, plan, files_meta)
+            payload = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
+            info = tarfile.TarInfo(MANIFEST_NAME)
+            info.size = len(payload)
+            info.mtime = time.time()
+            tar.addfile(info, io.BytesIO(payload))
 
         if files_added == 0 and incremental:
             logger.info("No new files to backup (incremental)")

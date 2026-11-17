@@ -7,6 +7,7 @@
 
 import asyncio
 import io
+import json
 import os
 import shutil
 import sys
@@ -429,6 +430,7 @@ class SteamMatchingTest(unittest.TestCase):
 import portproton_scanner  # noqa: E402
 import pull_engine  # noqa: E402
 import quarantine  # noqa: E402
+import integrity  # noqa: E402
 
 
 class SteamAppIdDetectionTest(unittest.TestCase):
@@ -1150,3 +1152,58 @@ class RestoreQuarantineTest(unittest.TestCase):
         self.assertFalse((self.dest / "slot2.sav").exists())
         self.assertTrue((self.dest / "screenshot.png").exists())
         self.assertIn("slot2.sav", moved)
+
+class IntegrityTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.saves = self.root / "saves"
+        self.saves.mkdir()
+        (self.saves / "slot1.sav").write_text("progress-1")
+        (self.saves / "slot2.sav").write_text("progress-2")
+        self.archive = sync_engine.create_backup("Game", [str(self.saves)])
+        self.assertIsNotNone(self.archive)
+        self.manifest = restore_engine.read_manifest(self.archive)
+        self.assertIsNotNone(self.manifest)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_manifest_contains_file_hashes(self):
+        files = self.manifest.get("files") or {}
+        self.assertEqual(len(files), 2)
+        meta = files["saves/slot1.sav"]
+        self.assertEqual(meta["sha256"], integrity.sha256_file(str(self.saves / "slot1.sav")))
+        self.assertEqual(meta["size"], len("progress-1"))
+
+    def test_verify_restored_detects_tampering(self):
+        targets = restore_engine.plan_targets(self.manifest, allowed_root=self.root)
+        (self.saves / "slot1.sav").write_text("tampered")
+        result = restore_engine.verify_restored(self.manifest, targets)
+        self.assertTrue(result["checksum_supported"])
+        self.assertEqual(result["verified"], 1)
+        self.assertEqual(len(result["mismatched"]), 1)
+
+    def test_archive_checksum_detects_corruption(self):
+        expected = integrity.sha256_file(self.archive)
+        self.assertTrue(integrity.verify_file(self.archive, expected))
+        data = Path(self.archive).read_bytes()
+        Path(self.archive).write_bytes(data[:-10])
+        self.assertFalse(integrity.verify_file(self.archive, expected))
+
+    def test_manifest_v1_still_readable(self):
+        archive = self.root / "v1.tar.gz"
+        manifest = {
+            "version": 1,
+            "game": "Old",
+            "created": "2026-01-01T00:00:00",
+            "paths": [{"path": str(self.saves), "root": "Game", "is_dir": True}],
+        }
+        payload = json.dumps(manifest).encode("utf-8")
+        with tarfile.open(archive, "w:gz") as tar:
+            info = tarfile.TarInfo(sync_engine.MANIFEST_NAME)
+            info.size = len(payload)
+            tar.addfile(info, io.BytesIO(payload))
+        parsed = restore_engine.read_manifest(str(archive))
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["version"], 1)

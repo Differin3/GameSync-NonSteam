@@ -91,13 +91,14 @@ Decky передаёт аргументы позиционно, поэтому `
 { "game_name": "Cyberpunk 2077", "backup_id": "20261114-001000-a1b2c3" }
 ```
 →
-{ "success": true, "message": "Восстановлено файлов: 1240, перемещено в резерв: 2", "files": 1240, "bytes": 44302336, "quarantined": 2, "quarantine_path": "/home/deck/.config/gamesync/quarantined/Cyberpunk 2077/20261117-224500", "skipped": [], "safety_backup": "GameSync/.../prerestore-....tar.gz" }
+{ "success": true, "message": "Восстановлено файлов: 1240, перемещено в резерв: 2", "files": 1240, "bytes": 44302336, "quarantined": 2, "verified": 1240, "quarantine_path": "/home/deck/.config/gamesync/quarantined/Cyberpunk 2077/20261117-224500", "skipped": [], "safety_backup": "GameSync/.../prerestore-....tar.gz" }
 ```
 
 Без `backup_id` берётся последняя версия. Архивы без манифеста (до 0.3.0) не
 восстанавливаются — вернётся ошибка с предложением пересинхронизировать игру.
 Файлы, которых нет в выбранной версии, переносятся в локальный карантин,
-а не удаляются.
+а не удаляются. Архив проверяется по SHA256 из истории (если он есть),
+а файлы — по хешам манифеста v2 (`verified` / `mismatched`).
 
 ### `delete_backup`
 

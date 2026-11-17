@@ -698,6 +698,11 @@ class Plugin:
             archive_path = await asyncio.to_thread(create_backup, game_name, save_paths)
             if not archive_path:
                 return {"success": False, "error": "Не удалось создать архив"}
+
+            from integrity import sha256_file
+            archive_sha = await asyncio.to_thread(sha256_file, archive_path)
+            if not archive_sha:
+                logger.warning(f"Cannot compute checksum for {archive_path}")
             
             # Загружаем провайдер хранилища
             try:
@@ -788,6 +793,7 @@ class Plugin:
                     paths=save_paths,
                     kind="sync",
                     keep=keep_versions,
+                    sha256=archive_sha,
                 )
                 for old_entry in to_prune:
                     old_remote = old_entry.get("remote")
@@ -1261,6 +1267,16 @@ class Plugin:
                     )
                     return {"success": False, "error": "Не удалось скачать бэкап из хранилища"}
 
+                expected_sha = entry.get("sha256")
+                if expected_sha:
+                    from integrity import verify_file
+
+                    checksum_ok = await asyncio.to_thread(verify_file, archive_path, expected_sha)
+                    if not checksum_ok:
+                        error = "Архив повреждён: контрольная сумма не совпала. Скачайте другую версию."
+                        Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
+                        return {"success": False, "error": error}
+
                 manifest = read_manifest(archive_path)
                 if not manifest:
                     Plugin.notify_event(
@@ -1277,6 +1293,9 @@ class Plugin:
                 if current_paths:
                     safety_path = await asyncio.to_thread(create_backup, game_name, current_paths)
                     if safety_path:
+                        from integrity import sha256_file as _sha256_file
+
+                        safety_sha = await asyncio.to_thread(_sha256_file, safety_path)
                         try:
                             safety_name = f"prerestore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
                             folder = f"GameSync/{sanitize_name(game_name)}"
@@ -1289,6 +1308,7 @@ class Plugin:
                                 size=os.path.getsize(safety_path),
                                 paths=current_paths,
                                 kind="prerestore",
+                                sha256=safety_sha,
                             )
                         except Exception as e:
                             logger.warning(f"Failed to upload pre-restore backup: {e}")
@@ -1308,6 +1328,20 @@ class Plugin:
                 )
                 removed = int(result.get("removed") or 0)
                 quarantined = int(result.get("quarantined") or 0)
+                verified = int(result.get("verified") or 0)
+                mismatched = result.get("mismatched") or []
+                if mismatched:
+                    error = (
+                        f"Проверка целостности не пройдена: {len(mismatched)} файлов "
+                        f"повреждены. Текущие сейвы сохранены в резервную копию."
+                    )
+                    Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
+                    return {
+                        "success": False,
+                        "error": error,
+                        "mismatched": mismatched[:20],
+                        "safety_backup": safety_remote,
+                    }
                 try:
                     await asyncio.to_thread(quarantine_prune)
                 except Exception as prune_error:
@@ -1333,6 +1367,8 @@ class Plugin:
                     logger.warning(f"Failed to emit restore-done event: {emit_error}")
 
                 message = f"Восстановлено файлов: {result['files']}"
+                if verified:
+                    message += f", проверено: {verified}"
                 if quarantined:
                     message += f", перемещено в резерв: {quarantined}"
                 if removed:
@@ -1344,6 +1380,7 @@ class Plugin:
                     "bytes": result["bytes"],
                     "removed": removed,
                     "quarantined": quarantined,
+                    "verified": verified,
                     "quarantine_path": quarantine_path,
                     "skipped": result["skipped"],
                     "safety_backup": safety_remote,
