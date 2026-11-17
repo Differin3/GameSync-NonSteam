@@ -456,6 +456,10 @@ class Plugin:
         Plugin._pull_attempts[game_name] = time.time()
 
         logger.info(f"Pulling cloud saves before launch: {game_name}")
+        try:
+            decky.emit("gamesync_pull_started", {"game": game_name})
+        except Exception as emit_error:
+            logger.warning(f"Failed to emit pull-start event: {emit_error}")
         result = await Plugin().restore_backup(game_name=game_name)
         try:
             decky.emit(
@@ -1264,6 +1268,19 @@ class Plugin:
                     f"skipped {len(result.get('skipped') or [])}"
                 )
 
+                try:
+                    decky.emit(
+                        "gamesync_restore_done",
+                        {
+                            "game": game_name,
+                            "success": True,
+                            "files": int(result["files"]),
+                            "quarantined": quarantined,
+                        },
+                    )
+                except Exception as emit_error:
+                    logger.warning(f"Failed to emit restore-done event: {emit_error}")
+
                 message = f"Восстановлено файлов: {result['files']}"
                 if quarantined:
                     message += f", перемещено в резерв: {quarantined}"
@@ -1309,6 +1326,10 @@ class Plugin:
                 return {"success": False, "error": "Не удалось удалить файл из облака"}
 
             remove_entry(game_name, entry.get("id"))
+            try:
+                decky.emit("gamesync_backup_deleted", {"game": game_name})
+            except Exception as emit_error:
+                logger.warning(f"Failed to emit backup-deleted event: {emit_error}")
             logger.info(f"Deleted backup {entry.get('id')} for {game_name}")
             return {"success": True, "message": "Версия удалена из облака"}
         except Exception as e:
