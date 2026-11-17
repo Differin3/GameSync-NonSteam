@@ -55,7 +55,15 @@ const IconAction = ({
   const [focused, setFocused] = useState(false);
   return (
     <Focusable
-      onClick={disabled ? undefined : onClick}
+      onClick={disabled ? undefined : (event: any) => {
+        event?.stopPropagation?.();
+        onClick();
+      }}
+      onTouchEnd={disabled ? undefined : (event: any) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        onClick();
+      }}
       onActivate={disabled ? undefined : onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -71,6 +79,7 @@ const IconAction = ({
         flex: "0 0 auto",
         borderRadius: "50%",
         cursor: disabled ? "default" : "pointer",
+        touchAction: "manipulation",
         background: active ? "rgba(91,216,138,0.20)" : focused || hovered ? "rgba(102,192,244,0.22)" : "rgba(102,192,244,0.10)",
         boxShadow: focused ? "0 0 0 2px rgba(102,192,244,0.65)" : "none",
         transition: "background 0.15s ease, box-shadow 0.15s ease",
@@ -240,6 +249,15 @@ export function GameSyncGameRow({ appId, title }: Props) {
   return (
     <Focusable
       flow-children="row"
+      onClick={(event: any) => {
+        event?.stopPropagation?.();
+        openSettings();
+      }}
+      onTouchEnd={(event: any) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        openSettings();
+      }}
       style={{
         display: "flex",
         alignItems: "center",
@@ -248,6 +266,8 @@ export function GameSyncGameRow({ appId, title }: Props) {
         boxSizing: "border-box",
         padding: "8px 12px",
         margin: "0 0 8px",
+        cursor: "pointer",
+        touchAction: "manipulation",
         background: "rgba(20, 32, 40, 0.72)",
         borderLeft: "3px solid #66c0f4",
         borderRadius: "4px",
@@ -256,7 +276,15 @@ export function GameSyncGameRow({ appId, title }: Props) {
       }}
     >
       <Focusable
-        onClick={syncNow}
+        onClick={(event: any) => {
+          event?.stopPropagation?.();
+          void syncNow();
+        }}
+        onTouchEnd={(event: any) => {
+          event?.preventDefault?.();
+          event?.stopPropagation?.();
+          void syncNow();
+        }}
         onActivate={syncNow}
         title={isSyncing ? "Синхронизация…" : recent ? "Синхронизировать ещё раз" : "Синхронизировать игру"}
         style={{
