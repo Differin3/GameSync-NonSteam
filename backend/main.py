@@ -1,5 +1,6 @@
 import decky
 import os
+import time
 import asyncio
 import functools
 import shutil
@@ -222,6 +223,8 @@ class Plugin:
     # Классовые переменные для состояния
     auto_sync_enabled = False
     game_monitor = None
+    # Не чаще одного pull на игру за 10 минут (процесс может мигать).
+    _pull_attempts: Dict[str, float] = {}
 
     # Прогресс синхронизации для QAM: этапы, проценты, текущая игра.
     sync_progress: Dict[str, Any] = {
@@ -363,10 +366,83 @@ class Plugin:
             else:
                 logger.error(f"Auto-sync failed for {resolved_name}: {result.get('error')}")
 
-        Plugin.game_monitor = GameMonitor(sync_callback)
+        async def start_callback(game_name: str):
+            """Перед запуском игры подтянуть облачные сейвы, если они новее."""
+            try:
+                await Plugin()._pull_before_launch(game_name)
+            except Exception as e:
+                logger.warning(f"Pull before launch failed for {game_name}: {e}")
+
+        Plugin.game_monitor = GameMonitor(sync_callback, start_callback)
         asyncio.create_task(Plugin.game_monitor.start_monitoring())
         Plugin.auto_sync_enabled = True
         return True
+
+    async def _pull_before_launch(self, game_name: str) -> None:
+        """Скачать облачный бэкап при старте игры, если он новее локального.
+
+        Точного хука «до запуска» в Steam нет, поэтому вызывается сразу после
+        появления процесса: Proton ещё несколько секунд инициализирует игру,
+        а безопасная копия текущих сейвов создаётся до перезаписи.
+        """
+        from config_manager import load_app_settings
+        from backup_index import get_entry
+        from pull_engine import newest_local_mtime, should_pull
+
+        if not load_app_settings().get("pull_on_launch"):
+            return
+
+        entry = get_entry(game_name)
+        if not entry and game_name.startswith("exe:"):
+            # Игры в общем префиксе DEFAULT приходят как "exe:<каталог>":
+            # сопоставляем с названием игры, чтобы найти её бэкап.
+            try:
+                from portproton_scanner import scan_portproton_games
+                want_dir = game_name[4:].replace("\\", "/").lower()
+                games = await asyncio.to_thread(scan_portproton_games, False)
+                for candidate in games:
+                    exec_norm = (candidate.get("exec") or "").replace("\\", "/").lower()
+                    if want_dir and want_dir in exec_norm:
+                        game_name = candidate.get("name") or game_name
+                        entry = get_entry(game_name)
+                        logger.info(f"Pull before launch matched {want_dir} -> {game_name}")
+                        break
+            except Exception as e:
+                logger.warning(f"Pull before launch match failed: {e}")
+        if not entry or not entry.get("remote"):
+            logger.debug(f"Pull before launch skipped for {game_name}: no cloud backup")
+            return
+
+        paths = entry.get("paths") or _resolve_save_paths_for_game(game_name)
+        local_mtime = await asyncio.to_thread(newest_local_mtime, paths)
+        if not should_pull(entry.get("created"), local_mtime):
+            logger.info(f"Pull before launch skipped for {game_name}: local saves are newer")
+            return
+
+        last_attempt = Plugin._pull_attempts.get(game_name, 0.0)
+        if time.time() - last_attempt < 600:
+            logger.debug(f"Pull before launch throttled for {game_name}")
+            return
+        Plugin._pull_attempts[game_name] = time.time()
+
+        logger.info(f"Pulling cloud saves before launch: {game_name}")
+        result = await Plugin().restore_backup(game_name=game_name)
+        try:
+            decky.emit(
+                "gamesync_pull_done",
+                {
+                    "game": game_name,
+                    "success": bool(result.get("success")),
+                    "files": int(result.get("files") or 0),
+                    "error": result.get("error") or "",
+                },
+            )
+        except Exception as emit_error:
+            logger.warning(f"Failed to emit pull event: {emit_error}")
+        if result.get("success"):
+            logger.info(f"Pulled {result.get('files', 0)} files before launch: {game_name}")
+        else:
+            logger.error(f"Pull before launch failed for {game_name}: {result.get('error')}")
 
     def _stop_auto_sync(self) -> None:
         if Plugin.game_monitor:
@@ -879,13 +955,27 @@ class Plugin:
             return {
                 "success": True,
                 "auto_sync": bool(settings.get("auto_sync")),
+                "pull_on_launch": bool(settings.get("pull_on_launch")),
                 "max_backup_versions": int(settings.get("max_backup_versions", 10) or 10),
                 "download_dir": str(__import__("pathlib").Path.home() / "Downloads"),
                 "default_save_paths": settings.get("default_save_paths") or [],
             }
         except Exception as e:
             logger.error(f"Error loading app settings: {e}")
-            return {"success": False, "error": str(e), "auto_sync": False, "max_backup_versions": 10, "download_dir": "~/Downloads", "default_save_paths": []}
+            return {"success": False, "error": str(e), "auto_sync": False, "pull_on_launch": False, "max_backup_versions": 10, "download_dir": "~/Downloads", "default_save_paths": []}
+
+    @decky_params
+    async def set_pull_on_launch(self, enabled: bool = True, *args, **kwargs) -> Dict[str, Any]:
+        """Включает/выключает загрузку облачных сейвов перед запуском игры."""
+        try:
+            from config_manager import save_app_settings
+            if enabled is None:
+                enabled = kwargs.get("enabled", True)
+            settings = save_app_settings(pull_on_launch=bool(enabled))
+            return {"success": True, "pull_on_launch": bool(settings.get("pull_on_launch"))}
+        except Exception as e:
+            logger.error(f"Error saving pull_on_launch: {e}")
+            return {"success": False, "error": str(e)}
 
     @decky_params
     async def set_default_save_paths(self, default_save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:

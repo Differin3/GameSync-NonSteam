@@ -121,9 +121,23 @@ Decky передаёт аргументы позиционно, поэтому `
 
 ### `get_app_settings`
 
-→ `{ "success": true, "auto_sync": false, "max_backup_versions": 10, "download_dir": "/home/deck/Downloads", "default_save_paths": ["..."] }`
+→ `{ "success": true, "auto_sync": false, "pull_on_launch": false, "max_backup_versions": 10, "download_dir": "/home/deck/Downloads", "default_save_paths": ["..."] }`
 
 Состояние, которое живёт на бэкенде и переживает перезапуск.
+
+### `set_pull_on_launch`
+
+```json
+{ "enabled": true }
+```
+
+→ `{ "success": true, "pull_on_launch": true }`
+
+Включает загрузку облачного бэкапа при старте игры. Скачивание выполняется
+только если бэкап новее локальных сейвов (допуск 2 секунды), не чаще раза
+в 10 минут на игру; перед перезаписью создаётся `prerestore`-копия.
+По завершении бэкенд отправляет событие `gamesync_pull_done`
+(`{ game, success, files, error }`).
 
 ### `set_default_save_paths`
 

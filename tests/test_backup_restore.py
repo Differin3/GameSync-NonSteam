@@ -5,6 +5,7 @@
     python -m unittest discover -s tests -v
 """
 
+import asyncio
 import io
 import os
 import shutil
@@ -13,6 +14,7 @@ import tarfile
 import tempfile
 import types
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1] / "backend"
@@ -261,6 +263,16 @@ class AppSettingsTest(unittest.TestCase):
         self.assertFalse(settings["auto_sync"])
         self.assertEqual(settings["default_save_paths"], [])
 
+    def test_pull_on_launch_defaults_false(self):
+        settings = config_manager.load_app_settings()
+        self.assertFalse(settings["pull_on_launch"])
+
+    def test_pull_on_launch_roundtrip(self):
+        config_manager.save_app_settings(pull_on_launch=True)
+        self.assertTrue(config_manager.load_app_settings()["pull_on_launch"])
+        config_manager.save_app_settings(pull_on_launch=False)
+        self.assertFalse(config_manager.load_app_settings()["pull_on_launch"])
+
     def test_roundtrip_filters_invalid_paths(self):
         config_manager.save_app_settings(auto_sync=True, default_save_paths=["/a", " ", 5])
         settings = config_manager.load_app_settings()
@@ -415,6 +427,7 @@ class SteamMatchingTest(unittest.TestCase):
         self.assertEqual(len(paths), 1)
         self.assertIn("Factorio", paths[0])
 import portproton_scanner  # noqa: E402
+import pull_engine  # noqa: E402
 
 
 class SteamAppIdDetectionTest(unittest.TestCase):
@@ -952,3 +965,64 @@ class SavePathNormalizationTest(unittest.TestCase):
             )
 
             self.assertEqual(resolved, target)
+
+class PullOnLaunchTest(unittest.TestCase):
+    """Скачивать облако перед игрой только если оно новее локальных сейвов."""
+
+    def test_cloud_newer_pulls(self):
+        local = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+        self.assertTrue(pull_engine.should_pull("2026-01-01T12:05:00+00:00", local))
+
+    def test_local_newer_skips(self):
+        local = datetime(2026, 1, 1, 12, 10, 0, tzinfo=timezone.utc).timestamp()
+        self.assertFalse(pull_engine.should_pull("2026-01-01T12:05:00+00:00", local))
+
+    def test_no_local_saves_pulls(self):
+        self.assertTrue(pull_engine.should_pull("2026-01-01T12:05:00Z", None))
+
+    def test_invalid_or_missing_time_skips(self):
+        self.assertFalse(pull_engine.should_pull("", 0))
+        self.assertFalse(pull_engine.should_pull(None, None))
+
+    def test_newest_local_mtime_walks_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old = root / "old.sav"
+            new = root / "sub" / "new.sav"
+            new.parent.mkdir()
+            old.write_text("a")
+            new.write_text("b")
+            os.utime(old, (1000, 1000))
+            os.utime(new, (2000, 2000))
+            self.assertEqual(pull_engine.newest_local_mtime([str(root)]), 2000)
+
+    def test_newest_local_mtime_missing_paths(self):
+        self.assertIsNone(pull_engine.newest_local_mtime(["/nonexistent/path"]))
+
+
+class GameMonitorStartTest(unittest.TestCase):
+    def test_new_game_triggers_start_callback(self):
+        started = []
+
+        async def on_start(game_name):
+            started.append(game_name)
+
+        async def on_sync(*_args, **_kwargs):
+            return None
+
+        monitor = auto_sync.GameMonitor(on_sync, on_start)
+        original = auto_sync.collect_running_games
+        auto_sync.collect_running_games = lambda _processes: {"GameX": {1}}
+
+        async def scenario():
+            await monitor._poll_once()
+            await asyncio.sleep(0)  # дать выполниться create_task
+            await monitor._poll_once()  # второй опрос не должен дублировать старт
+
+        try:
+            asyncio.run(scenario())
+        finally:
+            auto_sync.collect_running_games = original
+
+        self.assertEqual(started, ["GameX"])
+        self.assertIn("GameX", monitor.started_at)

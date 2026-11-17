@@ -26,6 +26,19 @@ addEventListener("gamesync_auto_saved", (data: any) => {
   }
 });
 
+addEventListener("gamesync_pull_done", (data: any) => {
+  try {
+    const game = data?.game || "игра";
+    if (data?.success) {
+      toaster.toast({ title: "GameSync", body: `Сохранения загружены: ${game}` });
+    } else if (data?.error) {
+      toaster.toast({ title: "GameSync", body: `Не удалось загрузить сейвы: ${game}` });
+    }
+  } catch (error) {
+    console.error("[GameSync] pull toast failed", error);
+  }
+});
+
 export default definePlugin(() => {
   // Строка статуса на странице non-Steam игры в библиотеке Steam
   const removeAppDetailsPatch = installAppDetailsPatch();

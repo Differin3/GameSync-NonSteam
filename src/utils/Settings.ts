@@ -36,6 +36,7 @@ export interface Settings {
   sftpKeyPassphrase: string;
   // Общие
   autoSync: boolean;
+  pullOnLaunch: boolean;
   defaultSavePaths: string[];
 }
 
@@ -69,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sftpKeyPath: "",
   sftpKeyPassphrase: "",
   autoSync: false,
+  pullOnLaunch: false,
   defaultSavePaths: [],
 };
 

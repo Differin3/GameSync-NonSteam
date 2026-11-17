@@ -140,8 +140,9 @@ def finished_games(previous: Dict[str, Set[int]], current: Dict[str, Set[int]]) 
 
 
 class GameMonitor:
-    def __init__(self, sync_callback):
+    def __init__(self, sync_callback, start_callback=None):
         self.sync_callback = sync_callback
+        self.start_callback = start_callback
         self.running_games: Dict[str, Set[int]] = {}
         self.started_at: Dict[str, float] = {}
         self.running = False
@@ -153,27 +154,39 @@ class GameMonitor:
 
         while self.running:
             try:
-                current = collect_running_games(find_portproton_processes())
-
-                # Запоминаем момент запуска: по нему видно, какие файлы игра
-                # реально писала во время сессии.
-                for key in current:
-                    if key not in self.running_games:
-                        self.started_at[key] = time.time()
-
-                for game_name in finished_games(self.running_games, current):
-                    logger.info(f"Game process ended: {game_name}")
-                    started_at = self.started_at.pop(game_name, None)
-                    try:
-                        await self.sync_callback(game_name, [], started_at)
-                    except Exception as e:
-                        logger.error(f"Auto-sync callback failed for {game_name}: {e}")
-
-                self.running_games = current
+                await self._poll_once()
                 await asyncio.sleep(5)  # Проверяем каждые 5 секунд
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
                 await asyncio.sleep(5)
+
+    async def _poll_once(self) -> None:
+        """Один опрос процессов: старт-колбэк для новых игр, sync для завершённых."""
+        current = collect_running_games(find_portproton_processes())
+
+        # Запоминаем момент запуска: по нему видно, какие файлы игра
+        # реально писала во время сессии.
+        for key in current:
+            if key not in self.running_games:
+                self.started_at[key] = time.time()
+                # Подтягиваем облачные сейвы, пока Proton ещё
+                # запускает игру (лучшее, что доступно без хука
+                # непосредственно перед запуском).
+                if self.start_callback:
+                    try:
+                        asyncio.create_task(self.start_callback(key))
+                    except Exception as e:
+                        logger.error(f"Start callback failed for {key}: {e}")
+
+        for game_name in finished_games(self.running_games, current):
+            logger.info(f"Game process ended: {game_name}")
+            started_at = self.started_at.pop(game_name, None)
+            try:
+                await self.sync_callback(game_name, [], started_at)
+            except Exception as e:
+                logger.error(f"Auto-sync callback failed for {game_name}: {e}")
+
+        self.running_games = current
 
     def stop_monitoring(self):
         """Остановка мониторинга"""

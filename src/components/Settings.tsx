@@ -110,6 +110,8 @@ export function Settings() {
           setSettings((prev) => ({
             ...prev,
             autoSync: typeof app.auto_sync === "boolean" ? app.auto_sync : prev.autoSync,
+            pullOnLaunch:
+              typeof app.pull_on_launch === "boolean" ? app.pull_on_launch : prev.pullOnLaunch,
             defaultSavePaths:
               Array.isArray(app.default_save_paths) && app.default_save_paths.length > 0
                 ? app.default_save_paths
@@ -556,7 +558,24 @@ export function Settings() {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <Hint>Настройка хранится на бэкенде и восстанавливается после перезапуска Decky.</Hint>
+          <ToggleField
+            label="Скачивать облачные сейвы перед запуском"
+            checked={settings.pullOnLaunch}
+            onChange={async (value) => {
+              update({ pullOnLaunch: value });
+              try {
+                await call("set_pull_on_launch", { enabled: value });
+              } catch (error) {
+                console.error("Error setting pull-on-launch:", error);
+              }
+            }}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <Hint>
+            Скачивание сработает только если облачный бэкап новее локальных сейвов; перед
+            перезаписью создаётся страховочная копия. Нужна включённая автосинхронизация.
+          </Hint>
         </PanelSectionRow>
       </PanelSection>
 
