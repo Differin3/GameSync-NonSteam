@@ -1002,12 +1002,22 @@ class PullOnLaunchTest(unittest.TestCase):
     def test_newest_local_mtime_missing_paths(self):
         self.assertIsNone(pull_engine.newest_local_mtime(["/nonexistent/path"]))
 
+    def test_should_attempt_pull_only_when_just_started(self):
+        now = 1000.0
+        self.assertTrue(pull_engine.should_attempt_pull(now - 3, now=now))
+        self.assertFalse(pull_engine.should_attempt_pull(now - 30, now=now))
+        self.assertTrue(pull_engine.should_attempt_pull(None, now=now))
+
+    def test_pull_deadline(self):
+        self.assertEqual(pull_engine.pull_deadline(100.0, max_seconds=20), 120.0)
+        self.assertIsNone(pull_engine.pull_deadline(None))
+
 
 class GameMonitorStartTest(unittest.TestCase):
     def test_new_game_triggers_start_callback(self):
         started = []
 
-        async def on_start(game_name):
+        async def on_start(game_name, started_at=None):
             started.append(game_name)
 
         async def on_sync(*_args, **_kwargs):

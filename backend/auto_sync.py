@@ -174,7 +174,7 @@ class GameMonitor:
                 # непосредственно перед запуском).
                 if self.start_callback:
                     try:
-                        asyncio.create_task(self.start_callback(key))
+                        asyncio.create_task(self.start_callback(key, self.started_at.get(key)))
                     except Exception as e:
                         logger.error(f"Start callback failed for {key}: {e}")
 

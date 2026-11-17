@@ -423,7 +423,7 @@ class Plugin:
         Plugin.auto_sync_enabled = True
         return True
 
-    async def _pull_before_launch(self, game_name: str) -> None:
+    async def _pull_before_launch(self, game_name: str, started_at: float = None) -> None:
         """Скачать облачный бэкап при старте игры, если он новее локального.
 
         Точного хука «до запуска» в Steam нет, поэтому вызывается сразу после
@@ -432,9 +432,13 @@ class Plugin:
         """
         from config_manager import load_app_settings
         from backup_index import get_entry
-        from pull_engine import newest_local_mtime, should_pull
+        from pull_engine import newest_local_mtime, pull_deadline, should_attempt_pull, should_pull
 
         if not load_app_settings().get("pull_on_launch"):
+            return
+
+        if not should_attempt_pull(started_at):
+            logger.info(f"Pull before launch skipped for {game_name}: game is already running")
             return
 
         entry = get_entry(game_name)
@@ -475,7 +479,12 @@ class Plugin:
             Plugin.notify_event("gamesync_pull_started", {"game": game_name})
         except Exception as emit_error:
             logger.warning(f"Failed to emit pull-start event: {emit_error}")
-        result = await Plugin().restore_backup(game_name=game_name)
+        result = await Plugin().restore_backup(
+            game_name=game_name,
+            allow_running=True,
+            upload_safety_cloud=False,
+            deadline_ts=pull_deadline(started_at),
+        )
         try:
             Plugin.notify_event(
                 "gamesync_pull_done",
@@ -1244,11 +1253,32 @@ class Plugin:
             return {"success": False, "error": str(e), "games": []}
 
     @decky_params
-    async def restore_backup(self, game_name: str = None, backup_id: str = None, *args, **kwargs) -> Dict[str, Any]:
+    async def restore_backup(self, game_name: str = None, backup_id: str = None, allow_running: bool = False, upload_safety_cloud: bool = True, deadline_ts: float = None, *args, **kwargs) -> Dict[str, Any]:
         """Восстановление сохранений игры из облачного бэкапа."""
         try:
             if not game_name:
                 return {"success": False, "error": "Не указан game_name"}
+
+            if deadline_ts and time.time() > deadline_ts:
+                logger.info(f"Restore skipped for {game_name}: deadline passed")
+                return {
+                    "success": False,
+                    "error": "Игра уже запущена — восстановление отменено, чтобы не писать в работающие сейвы",
+                    "skipped": True,
+                }
+
+            if not allow_running:
+                try:
+                    from auto_sync import find_portproton_processes
+
+                    running = await asyncio.to_thread(find_portproton_processes)
+                except Exception:
+                    running = []
+                if running:
+                    return {
+                        "success": False,
+                        "error": "Игра запущена — закройте её перед восстановлением сохранений",
+                    }
 
             from backup_index import add_entry, get_entry
             from config_manager import load_storage_config, load_synced_games
@@ -1296,6 +1326,7 @@ class Plugin:
             workdir = tempfile.mkdtemp(prefix="gamesync-restore-")
             archive_path = os.path.join(workdir, "backup.tar.gz")
             safety_remote = None
+            safety_local = None
 
             try:
                 downloaded = await asyncio.to_thread(provider.download_file, entry["remote"], archive_path)
@@ -1335,27 +1366,57 @@ class Plugin:
                         from integrity import sha256_file as _sha256_file
 
                         safety_sha = await asyncio.to_thread(_sha256_file, safety_path)
-                        try:
-                            safety_name = f"prerestore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
-                            folder = f"GameSync/{sanitize_name(game_name)}"
-                            safety_remote = await asyncio.to_thread(
-                                provider.upload_file, safety_path, folder, safety_name
+                        if not upload_safety_cloud:
+                            # Быстрый путь для pull: локальная страховка без сети.
+                            from pathlib import Path as _Path
+
+                            local_dir = _Path.home() / ".config" / "gamesync" / "restores"
+                            local_dir.mkdir(parents=True, exist_ok=True)
+                            local_name = (
+                                f"{sanitize_name(game_name)}-"
+                                f"{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
                             )
-                            add_entry(
-                                game_name,
-                                remote=safety_remote or "",
-                                size=os.path.getsize(safety_path),
-                                paths=current_paths,
-                                kind="prerestore",
-                                sha256=safety_sha,
-                            )
-                        except Exception as e:
-                            logger.warning(f"Failed to upload pre-restore backup: {e}")
-                        finally:
+                            local_path = local_dir / local_name
+                            shutil.move(safety_path, str(local_path))
+                            safety_local = str(local_path)
+                            safety_path = None
                             try:
-                                os.remove(safety_path)
+                                copies = sorted(local_dir.glob(f"{sanitize_name(game_name)}-*.tar.gz"))
+                                for old in copies[:-3]:
+                                    old.unlink(missing_ok=True)
                             except OSError:
                                 pass
+                        else:
+                            try:
+                                safety_name = f"prerestore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
+                                folder = f"GameSync/{sanitize_name(game_name)}"
+                                safety_remote = await asyncio.to_thread(
+                                    provider.upload_file, safety_path, folder, safety_name
+                                )
+                                add_entry(
+                                    game_name,
+                                    remote=safety_remote or "",
+                                    size=os.path.getsize(safety_path),
+                                    paths=current_paths,
+                                    kind="prerestore",
+                                    sha256=safety_sha,
+                                )
+                            except Exception as e:
+                                logger.warning(f"Failed to upload pre-restore backup: {e}")
+                            finally:
+                                try:
+                                    if safety_path:
+                                        os.remove(safety_path)
+                                except OSError:
+                                    pass
+
+                if deadline_ts and time.time() > deadline_ts:
+                    logger.info(f"Restore skipped before extraction for {game_name}: game is running")
+                    return {
+                        "success": False,
+                        "error": "Игра уже запущена — восстановление отменено",
+                        "skipped": True,
+                    }
 
                 from quarantine import move_files as quarantine_move, prune as quarantine_prune
 
@@ -1423,6 +1484,7 @@ class Plugin:
                     "quarantine_path": quarantine_path,
                     "skipped": result["skipped"],
                     "safety_backup": safety_remote,
+                    "safety_local": safety_local,
                 }
             finally:
                 shutil.rmtree(workdir, ignore_errors=True)

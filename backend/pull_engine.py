@@ -7,6 +7,7 @@
 
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
@@ -14,6 +15,30 @@ logger = logging.getLogger(__name__)
 
 #: Насколько облачный бэкап должен быть новее локальных сейвов.
 DEFAULT_GRACE_SECONDS = 2.0
+
+#: Если игра запущена дольше этого — pull не начинаем (поздно, только помешаем).
+MAX_PULL_START_AGE_SECONDS = 10.0
+
+#: Сколько времени от старта процесса даётся на скачивание и распаковку.
+MAX_PULL_SECONDS = 25.0
+
+
+def should_attempt_pull(
+    started_at: Optional[float],
+    now: Optional[float] = None,
+    max_age: float = MAX_PULL_START_AGE_SECONDS,
+) -> bool:
+    """Не поздно ли начинать pull: игра не должна уже работать."""
+    if not started_at:
+        return True
+    return (now if now is not None else time.time()) - started_at <= max_age
+
+
+def pull_deadline(started_at: Optional[float], max_seconds: float = MAX_PULL_SECONDS) -> Optional[float]:
+    """Момент, после которого писать сейвы в запущенную игру уже нельзя."""
+    if not started_at:
+        return None
+    return started_at + max_seconds
 
 
 def parse_timestamp(value) -> Optional[datetime]:
