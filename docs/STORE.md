@@ -6,12 +6,14 @@
 ## Короткое описание (EN, для карточки)
 
 > Sync PortProton save files to WebDAV, S3, FTP or SFTP. Automatic save-path
-> detection, versioned backups, one-click restore and auto-sync after game exit.
+> detection, versioned backups, one-click restore, pull-before-launch and
+> auto-sync after game exit.
 
 ## Короткое описание (RU)
 
 > Синхронизация сохранений игр PortProton с облаком: WebDAV, S3, FTP, SFTP.
-> Автопоиск путей, версии бэкапов, восстановление и автосинхронизация после игры.
+> Автопоиск путей, версии бэкапов, восстановление, загрузка перед запуском
+> и автосинхронизация после игры.
 
 ## Полное описание (EN)
 
@@ -30,6 +32,9 @@ PortProton backed up and in sync, without rclone or a PC.
   Old versions are removed from the cloud automatically.
 - Restore from any version with a safety copy (`prerestore`) made first.
   “Check contents” shows what is inside a save path before syncing.
+- Pull-before-launch: downloads the cloud save before a game starts when it is
+  newer than local saves, with a local safety copy and race protection.
+- Sync modes: two-way (recommended), upload-only, download-only, or off.
 - Auto-sync: the plugin watches PortProton processes and uploads the game right
   after it exits, including games in the shared `DEFAULT` prefix.
 - Compact quick-access menu with storage status, auto-sync toggle, progress bar
@@ -53,6 +58,11 @@ PortProton backed up and in sync, without rclone or a PC.
 - PortProton with non-Steam games.
 - Internet access on first launch (dependencies).
 
+**Support the project**
+
+GameSync is free and ad-free. If it saves you time, you can support development
+on Boosty: https://boosty.to/gamesync.nonsteam/single-payment/donation/842705/target?share=target_link
+
 **Open source** — MIT.
 
 ## Полное описание (RU)
@@ -72,6 +82,10 @@ PortProton backed up and in sync, without rclone or a PC.
   удаляются из облака автоматически.
 - Восстановление любой версии с предварительной страховочной копией
   (`prerestore`). Кнопка «Проверить содержимое» показывает файлы до синхронизации.
+- Загрузка перед запуском: облачные сейвы подтягиваются, если они новее
+  локальных, с локальной страховкой и защитой от гонок.
+- Режимы: двусторонняя (рекомендуется), только выгрузка, только загрузка или
+  выключено.
 - Автосинхронизация: плагин следит за процессами PortProton и сохраняет игру
   сразу после выхода, включая игры в общем префиксе `DEFAULT`.
 - Компактное быстрое меню: статус хранилища, тумблер автосинхронизации,
@@ -94,6 +108,12 @@ PortProton backed up and in sync, without rclone or a PC.
 - SteamOS / Steam Deck с Decky Loader.
 - PortProton с не-Steam играми.
 - Интернет при первом запуске (зависимости).
+
+**Поддержать проект**
+
+GameSync бесплатный и без рекламы. Если он экономит вам время, можно
+поддержать разработку на Boosty:
+https://boosty.to/gamesync.nonsteam/single-payment/donation/842705/target?share=target_link
 
 **Открытый исходный код** — MIT.
 
