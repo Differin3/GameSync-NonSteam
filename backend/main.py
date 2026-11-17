@@ -544,6 +544,20 @@ class Plugin:
         return {"success": True, "items": items, "last_id": Plugin._notification_seq}
 
     @decky_params
+    async def get_running_games(self, *args, **kwargs) -> Dict[str, Any]:
+        """Есть ли запущенные игры PortProton (для отложенных уведомлений)."""
+        try:
+            from auto_sync import collect_running_games, find_portproton_processes
+
+            current = await asyncio.to_thread(
+                lambda: collect_running_games(find_portproton_processes())
+            )
+            return {"success": True, "games": list(current.keys())}
+        except Exception as e:
+            logger.warning(f"get_running_games failed: {e}")
+            return {"success": True, "games": []}
+
+    @decky_params
     async def get_sync_state(self, *args, **kwargs) -> Dict[str, Any]:
         """Какие игры синхронизируются прямо сейчас (для спиннера в UI)."""
         now = time.time()

@@ -160,6 +160,28 @@ const startNotifications = () => {
   notificationsStarted = true;
 
   let lastId = -1;
+  let gameRunning = false;
+  const pending: Array<{ event: string; data: any }> = [];
+  const deferredEvents = new Set(["gamesync_pull_done", "gamesync_auto_saved"]);
+
+  const flushPending = () => {
+    if (!pending.length) return;
+    const items = pending.splice(0, pending.length);
+    for (const item of items) handleEvent(item.event, item.data);
+  };
+
+  const dispatch = (event: string, data: any) => {
+    if (!deferredEvents.has(event)) {
+      handleEvent(event, data);
+      return;
+    }
+    // Событие о сейвах приходит в момент запуска/игры — Steam скрывает тосты.
+    setTimeout(() => {
+      if (gameRunning) pending.push({ event, data });
+      else handleEvent(event, data);
+    }, 2500);
+  };
+
   const poll = async () => {
     try {
       const response: any = await call("get_notifications", {
@@ -167,21 +189,39 @@ const startNotifications = () => {
       });
       if (!response?.success) return;
       if (lastId < 0) {
-        // Первый опрос: запоминаем позицию, старые уведомления не показываем.
         lastId = Number(response.last_id || 0);
         return;
       }
       lastId = Number(response.last_id || lastId);
       for (const item of response.items || []) {
-        handleEvent(String(item?.event || ""), item?.data || {});
+        dispatch(String(item?.event || ""), item?.data || {});
       }
     } catch (error) {
       // Бэкенд может быть занят синхронизацией — повторим на следующем тике.
     }
   };
 
+  const pollRunning = async () => {
+    try {
+      const response: any = await call("get_running_games", {});
+      if (!response?.success) return;
+      const running = (response.games || []).length > 0;
+      if (gameRunning && !running) {
+        gameRunning = false;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        flushPending();
+      } else {
+        gameRunning = running;
+      }
+    } catch (error) {
+      // Игнорируем: следующий тик повторит.
+    }
+  };
+
   poll();
+  pollRunning();
   setInterval(poll, 1500);
+  setInterval(pollRunning, 1500);
 };
 
 export default definePlugin(() => {
