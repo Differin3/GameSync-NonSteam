@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
-import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
+import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, Spinner, showModal } from "@decky/ui";
 import { FaBroom, FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
 import { ActionButton, Badge, EmptyState, ErrorState, Hint, Loading, Pager, StatusMessage } from "./ui";
@@ -396,13 +396,23 @@ export function BackupsTab() {
               })}
             </div>
 
-            <ActionButton icon={<FaUndoAlt />} onClick={() => askRestore(selectedGame.game, selectedEntry)} disabled={restoring}>
-              Восстановить выбранную версию
+            <ActionButton
+              icon={restoring ? <Spinner /> : <FaUndoAlt />}
+              onClick={() => askRestore(selectedGame.game, selectedEntry)}
+              disabled={restoring}
+            >
+              {restoring ? "Восстановление…" : "Восстановить выбранную версию"}
             </ActionButton>
             <ActionButton icon={<FaDownload />} onClick={() => download(selectedGame.game, selectedEntry)} disabled={downloading}>
               {downloading ? "Скачивание…" : "Скачать выбранную"}
             </ActionButton>
 
+            {restoring && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: colors.muted }}>
+                <Spinner />
+                <span>Скачиваем бэкап, создаём страховку и распаковываем…</span>
+              </div>
+            )}
             <Hint>Скачивается в {downloadDir}</Hint>
             <Hint>Восстановление вернёт состояние выбранной версии. Текущие сейвы сохраняются в резервный архив.</Hint>
           </aside>

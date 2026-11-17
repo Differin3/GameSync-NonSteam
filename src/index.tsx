@@ -26,6 +26,16 @@ addEventListener("gamesync_auto_saved", (data: any) => {
   }
 });
 
+addEventListener("gamesync_sync_started", (data: any) => {
+  try {
+    if (data?.source !== "auto") return;
+    const game = data?.game || "игра";
+    toaster.toast({ title: "GameSync", body: `Синхронизация сохранений: ${game}` });
+  } catch (error) {
+    console.error("[GameSync] sync-start toast failed", error);
+  }
+});
+
 addEventListener("gamesync_pull_done", (data: any) => {
   try {
     const game = data?.game || "игра";

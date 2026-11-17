@@ -348,11 +348,35 @@ class Plugin:
                 except Exception as e:
                     logger.warning(f"Session learning failed: {e}")
 
+            try:
+                decky.emit("gamesync_sync_started", {"game": resolved_name, "source": "auto"})
+            except Exception as emit_error:
+                logger.warning(f"Failed to emit sync-start event: {emit_error}")
+
             if not resolved_paths:
                 logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
+                try:
+                    decky.emit(
+                        "gamesync_sync_finished",
+                        {"game": resolved_name, "success": False, "error": "Не найдены пути сохранений"},
+                    )
+                except Exception as emit_error:
+                    logger.warning(f"Failed to emit sync-finish event: {emit_error}")
                 return
             plugin_instance = Plugin()
             result = await plugin_instance.sync_game(resolved_name, resolved_paths)
+            try:
+                decky.emit(
+                    "gamesync_sync_finished",
+                    {
+                        "game": resolved_name,
+                        "success": bool(result.get("success")),
+                        "error": result.get("error") or "",
+                        "size": int(result.get("file_size") or 0),
+                    },
+                )
+            except Exception as emit_error:
+                logger.warning(f"Failed to emit sync-finish event: {emit_error}")
             if result.get("success"):
                 logger.info(f"Auto-sync completed for {resolved_name}")
                 # Тост в Steam UI: уведомление «сохранено»

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { call } from "@decky/api";
+import { useEffect, useRef, useState } from "react";
+import { addEventListener, call } from "@decky/api";
 import { Focusable, Router, Spinner } from "@decky/ui";
 import { FaCloud, FaCog, FaSyncAlt } from "react-icons/fa";
 
@@ -92,6 +92,8 @@ export function GameSyncGameRow({ appId, title }: Props) {
   const [status, setStatus] = useState<GameSyncStatus | null>(null);
   const [checked, setChecked] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
+  const [autoBusy, setAutoBusy] = useState<boolean>(false);
+  const statusRef = useRef<GameSyncStatus | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const load = async () => {
@@ -110,20 +112,51 @@ export function GameSyncGameRow({ appId, title }: Props) {
     setChecked(false);
     setStatus(null);
     load();
+
     // Автосинхронизация после выхода из игры должна отражаться без перезахода.
     const timer = setInterval(load, 60000);
-    return () => clearInterval(timer);
-  }, [appId]);
+
+    const matches = (eventGame?: string): boolean => {
+      const current = (statusRef.current?.game || title || "").toLowerCase().trim();
+      const incoming = (eventGame || "").toLowerCase().trim();
+      if (!current || !incoming) return false;
+      return current === incoming || incoming.includes(current) || current.includes(incoming);
+    };
+
+    const offStarted = addEventListener("gamesync_sync_started", (data: any) => {
+      if (matches(data?.game)) {
+        setAutoBusy(true);
+        setMessage(null);
+      }
+    });
+    const offFinished = addEventListener("gamesync_sync_finished", (data: any) => {
+      if (!matches(data?.game)) return;
+      setAutoBusy(false);
+      if (!data?.success && data?.error) setMessage(String(data.error));
+      load();
+    });
+
+    return () => {
+      clearInterval(timer);
+      if (typeof offStarted === "function") (offStarted as () => void)();
+      if (typeof offFinished === "function") (offFinished as () => void)();
+    };
+  }, [appId, title]);
+
+  statusRef.current = status;
 
   if (!checked || !status) {
     return null;
   }
+
+  const isSyncing = busy || autoBusy;
 
   const recent = Boolean(
     status.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000
   );
 
   const syncNow = async () => {
+    if (isSyncing) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -149,14 +182,18 @@ export function GameSyncGameRow({ appId, title }: Props) {
     }
   };
 
-  const details = [
-    status.last_sync ? `сохранено ${formatDate(status.last_sync)}` : "ещё не синхронизировалось",
-    formatBytes(status.size),
-    status.versions && status.versions > 1 ? `${status.versions} версий` : "",
-    status.save_paths ? `${status.save_paths} путей` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const details = isSyncing
+    ? autoBusy
+      ? "Синхронизация сохранений после игры…"
+      : "Синхронизация…"
+    : [
+        status.last_sync ? `сохранено ${formatDate(status.last_sync)}` : "ещё не синхронизировалось",
+        formatBytes(status.size),
+        status.versions && status.versions > 1 ? `${status.versions} версий` : "",
+        status.save_paths ? `${status.save_paths} путей` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
 
   return (
     <Focusable
@@ -172,12 +209,14 @@ export function GameSyncGameRow({ appId, title }: Props) {
         background: "rgba(20, 32, 40, 0.72)",
         borderLeft: "3px solid #66c0f4",
         borderRadius: "4px",
+        boxShadow: isSyncing ? "0 0 0 1px rgba(102,192,244,0.45), 0 0 18px rgba(102,192,244,0.18)" : "none",
+        transition: "box-shadow 0.25s ease",
       }}
     >
       <Focusable
         onClick={syncNow}
         onActivate={syncNow}
-        title={busy ? "Синхронизация…" : recent ? "Синхронизировать ещё раз" : "Синхронизировать игру"}
+        title={isSyncing ? "Синхронизация…" : recent ? "Синхронизировать ещё раз" : "Синхронизировать игру"}
         style={{
           position: "relative",
           display: "flex",
@@ -191,8 +230,8 @@ export function GameSyncGameRow({ appId, title }: Props) {
           background: "rgba(102,192,244,0.10)",
         }}
       >
-        {busy ? <Spinner /> : <FaCloud style={{ fontSize: "19px", color: "#7fd0ff" }} />}
-        {recent && !busy && (
+        {isSyncing ? <Spinner /> : <FaCloud style={{ fontSize: "19px", color: "#7fd0ff" }} />}
+        {recent && !isSyncing && (
           <span
             style={{
               position: "absolute",
@@ -228,8 +267,8 @@ export function GameSyncGameRow({ appId, title }: Props) {
         {message && <div style={{ fontSize: "11px", color: "#f0a0a0" }}>{message}</div>}
       </div>
 
-      <IconAction title={busy ? "Синхронизация…" : "Синхронизировать"} onClick={syncNow} disabled={busy}>
-        {busy ? <Spinner /> : <FaSyncAlt style={{ fontSize: "15px", color: "#bcd8ea" }} />}
+      <IconAction title={isSyncing ? "Синхронизация…" : "Синхронизировать"} onClick={syncNow} disabled={isSyncing}>
+        {isSyncing ? <Spinner /> : <FaSyncAlt style={{ fontSize: "15px", color: "#bcd8ea" }} />}
       </IconAction>
       <IconAction title="Настроить пути сохранений" onClick={openSettings}>
         <FaCog style={{ fontSize: "15px", color: "#bcd8ea" }} />
