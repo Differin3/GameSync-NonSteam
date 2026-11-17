@@ -227,6 +227,10 @@ class Plugin:
     _pull_attempts: Dict[str, float] = {}
     # Активные синхронизации: имя игры -> время начала (для индикатора в UI).
     _active_syncs: Dict[str, float] = {}
+    # Очередь уведомлений для фронтенда: события могут теряться, поэтому
+    # UI забирает их опросом get_notifications.
+    _notification_seq: int = 0
+    _notifications: List[Dict[str, Any]] = []
 
     # Прогресс синхронизации для QAM: этапы, проценты, текущая игра.
     sync_progress: Dict[str, Any] = {
@@ -351,14 +355,14 @@ class Plugin:
                     logger.warning(f"Session learning failed: {e}")
 
             try:
-                decky.emit("gamesync_sync_started", {"game": resolved_name, "source": "auto"})
+                Plugin.notify_event("gamesync_sync_started", {"game": resolved_name, "source": "auto"})
             except Exception as emit_error:
                 logger.warning(f"Failed to emit sync-start event: {emit_error}")
 
             if not resolved_paths:
                 logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
                 try:
-                    decky.emit(
+                    Plugin.notify_event(
                         "gamesync_sync_finished",
                         {"game": resolved_name, "success": False, "error": "Не найдены пути сохранений"},
                     )
@@ -372,7 +376,7 @@ class Plugin:
             finally:
                 Plugin._active_syncs.pop(resolved_name, None)
             try:
-                decky.emit(
+                Plugin.notify_event(
                     "gamesync_sync_finished",
                     {
                         "game": resolved_name,
@@ -387,7 +391,7 @@ class Plugin:
                 logger.info(f"Auto-sync completed for {resolved_name}")
                 # Тост в Steam UI: уведомление «сохранено»
                 try:
-                    decky.emit(
+                    Plugin.notify_event(
                         "gamesync_auto_saved",
                         {"game": resolved_name, "size": int(result.get("file_size") or 0)},
                     )
@@ -402,6 +406,12 @@ class Plugin:
                 await Plugin()._pull_before_launch(game_name)
             except Exception as e:
                 logger.warning(f"Pull before launch failed for {game_name}: {e}")
+
+        # TEMP-DEBUG: проверка очереди уведомлений через 12 секунд после старта.
+        async def _debug_notify():
+            await asyncio.sleep(12)
+            Plugin.notify_event("gamesync_pull_done", {"game": "DEBUG", "success": True, "files": 1})
+        asyncio.create_task(_debug_notify())
 
         Plugin.game_monitor = GameMonitor(sync_callback, start_callback)
         asyncio.create_task(Plugin.game_monitor.start_monitoring())
@@ -457,12 +467,12 @@ class Plugin:
 
         logger.info(f"Pulling cloud saves before launch: {game_name}")
         try:
-            decky.emit("gamesync_pull_started", {"game": game_name})
+            Plugin.notify_event("gamesync_pull_started", {"game": game_name})
         except Exception as emit_error:
             logger.warning(f"Failed to emit pull-start event: {emit_error}")
         result = await Plugin().restore_backup(game_name=game_name)
         try:
-            decky.emit(
+            Plugin.notify_event(
                 "gamesync_pull_done",
                 {
                     "game": game_name,
@@ -513,6 +523,31 @@ class Plugin:
     async def get_sync_progress(self, *args, **kwargs) -> Dict[str, Any]:
         """Текущий прогресс синхронизации для прогресс-бара в QAM."""
         return dict(Plugin.sync_progress)
+
+    @classmethod
+    def notify_event(cls, event: str, data: Dict[str, Any] = None) -> None:
+        """Записать уведомление в очередь и продублировать событием Decky."""
+        cls._notification_seq += 1
+        payload = dict(data or {})
+        cls._notifications.append(
+            {"id": cls._notification_seq, "ts": time.time(), "event": event, "data": payload}
+        )
+        if len(cls._notifications) > 200:
+            del cls._notifications[:-100]
+        try:
+            getattr(decky, "emit")(event, payload)
+        except Exception as e:
+            logger.warning(f"emit {event} failed: {e}")
+
+    @decky_params
+    async def get_notifications(self, after_id: int = 0, *args, **kwargs) -> Dict[str, Any]:
+        """Уведомления после last_id (опрос из UI)."""
+        try:
+            after = int(after_id or kwargs.get("after_id") or 0)
+        except (TypeError, ValueError):
+            after = 0
+        items = [item for item in Plugin._notifications if item["id"] > after][-50:]
+        return {"success": True, "items": items, "last_id": Plugin._notification_seq}
 
     @decky_params
     async def get_sync_state(self, *args, **kwargs) -> Dict[str, Any]:
@@ -1269,7 +1304,7 @@ class Plugin:
                 )
 
                 try:
-                    decky.emit(
+                    Plugin.notify_event(
                         "gamesync_restore_done",
                         {
                             "game": game_name,
@@ -1327,7 +1362,7 @@ class Plugin:
 
             remove_entry(game_name, entry.get("id"))
             try:
-                decky.emit("gamesync_backup_deleted", {"game": game_name})
+                Plugin.notify_event("gamesync_backup_deleted", {"game": game_name})
             except Exception as emit_error:
                 logger.warning(f"Failed to emit backup-deleted event: {emit_error}")
             logger.info(f"Deleted backup {entry.get('id')} for {game_name}")
