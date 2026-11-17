@@ -279,14 +279,19 @@ class Plugin:
         except Exception as e:
             logger.warning(f"Dependency bootstrap failed: {e}")
 
-        # Восстанавливаем автосинхронизацию, если она была включена до перезапуска.
+        # Монитор процессов нужен и для автосинхронизации, и для pull перед запуском.
         try:
             from config_manager import load_app_settings
-            if load_app_settings().get("auto_sync"):
+            settings = load_app_settings()
+            if settings.get("auto_sync") or settings.get("pull_on_launch"):
                 await Plugin()._start_auto_sync()
-                logger.info("Auto-sync restored from settings")
+                logger.info(
+                    "Process monitor restored (auto_sync=%s, pull_on_launch=%s)",
+                    bool(settings.get("auto_sync")),
+                    bool(settings.get("pull_on_launch")),
+                )
         except Exception as e:
-            logger.warning(f"Failed to restore auto-sync: {e}")
+            logger.warning(f"Failed to restore process monitor: {e}")
 
     async def _start_auto_sync(self) -> bool:
         """Создаёт и запускает монитор процессов (идемпотентно)."""
@@ -303,6 +308,12 @@ class Plugin:
 
         async def sync_callback(game_name: str, save_paths: List[str], started_at: float = None):
             """Callback для автосинхронизации после выхода из игры."""
+            from config_manager import load_app_settings
+
+            if not load_app_settings().get("auto_sync"):
+                logger.info(f"Auto-sync disabled, skip exit sync for {game_name}")
+                return
+
             logger.info(f"Auto-syncing game: {game_name}")
             resolved_name = game_name
             resolved_paths = save_paths or _resolve_save_paths_for_game(game_name)
@@ -483,10 +494,18 @@ class Plugin:
             logger.error(f"Pull before launch failed for {game_name}: {result.get('error')}")
 
     def _stop_auto_sync(self) -> None:
+        Plugin.auto_sync_enabled = False
+        # Если включён pull перед запуском, монитор процессов должен остаться.
+        try:
+            from config_manager import load_app_settings
+
+            if load_app_settings().get("pull_on_launch"):
+                return
+        except Exception:
+            pass
         if Plugin.game_monitor:
             Plugin.game_monitor.stop_monitoring()
             Plugin.game_monitor = None
-        Plugin.auto_sync_enabled = False
 
     @decky_params
     async def install_dependencies(self, *args, **kwargs) -> Dict[str, Any]:
@@ -1069,6 +1088,12 @@ class Plugin:
             if enabled is None:
                 enabled = kwargs.get("enabled", True)
             settings = save_app_settings(pull_on_launch=bool(enabled))
+            from config_manager import load_app_settings
+
+            if settings.get("pull_on_launch"):
+                await self._start_auto_sync()
+            elif not load_app_settings().get("auto_sync"):
+                self._stop_auto_sync()
             return {"success": True, "pull_on_launch": bool(settings.get("pull_on_launch"))}
         except Exception as e:
             logger.error(f"Error saving pull_on_launch: {e}")
