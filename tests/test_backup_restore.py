@@ -1026,3 +1026,44 @@ class GameMonitorStartTest(unittest.TestCase):
 
         self.assertEqual(started, ["GameX"])
         self.assertIn("GameX", monitor.started_at)
+
+class RestoreCleanupTest(unittest.TestCase):
+    """Восстановление откатывает прогресс: лишние новые сейвы удаляются."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.dest = self.root / "saves"
+        self.dest.mkdir()
+        (self.dest / "slot1.sav").write_text("old-progress")
+        self.archive = sync_engine.create_backup("Game", [str(self.dest)])
+        self.assertIsNotNone(self.archive)
+        self.manifest = restore_engine.read_manifest(self.archive)
+        self.assertIsNotNone(self.manifest)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_new_save_is_removed_on_restore(self):
+        (self.dest / "slot1.sav").write_text("new-progress")
+        (self.dest / "slot2.sav").write_text("created-after-backup")
+        (self.dest / "readme.txt").write_text("not a save")
+
+        result = restore_engine.restore_archive(
+            self.archive, self.manifest, allowed_root=self.root
+        )
+
+        self.assertEqual((self.dest / "slot1.sav").read_text(), "old-progress")
+        self.assertFalse((self.dest / "slot2.sav").exists())
+        self.assertTrue((self.dest / "readme.txt").exists())
+        self.assertEqual(result["removed"], 1)
+
+    def test_cleanup_can_be_disabled(self):
+        (self.dest / "slot2.sav").write_text("created-after-backup")
+
+        result = restore_engine.restore_archive(
+            self.archive, self.manifest, allowed_root=self.root, remove_extra=False
+        )
+
+        self.assertTrue((self.dest / "slot2.sav").exists())
+        self.assertEqual(result["removed"], 0)

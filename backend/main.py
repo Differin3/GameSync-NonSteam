@@ -1200,16 +1200,22 @@ class Plugin:
                                 pass
 
                 result = await asyncio.to_thread(restore_archive, archive_path, manifest)
+                removed = int(result.get("removed") or 0)
                 logger.info(
                     f"Restore {game_name}: {result.get('files', 0)} files, "
-                    f"{result.get('bytes', 0)} bytes, skipped {len(result.get('skipped') or [])}"
+                    f"{result.get('bytes', 0)} bytes, removed {removed}, "
+                    f"skipped {len(result.get('skipped') or [])}"
                 )
 
+                message = f"Восстановлено файлов: {result['files']}"
+                if removed:
+                    message += f", удалено лишних: {removed}"
                 return {
                     "success": True,
-                    "message": f"Восстановлено файлов: {result['files']}",
+                    "message": message,
                     "files": result["files"],
                     "bytes": result["bytes"],
+                    "removed": removed,
                     "skipped": result["skipped"],
                     "safety_backup": safety_remote,
                 }
