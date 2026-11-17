@@ -407,12 +407,6 @@ class Plugin:
             except Exception as e:
                 logger.warning(f"Pull before launch failed for {game_name}: {e}")
 
-        # TEMP-DEBUG: проверка очереди уведомлений через 12 секунд после старта.
-        async def _debug_notify():
-            await asyncio.sleep(12)
-            Plugin.notify_event("gamesync_pull_done", {"game": "DEBUG", "success": True, "files": 1})
-        asyncio.create_task(_debug_notify())
-
         Plugin.game_monitor = GameMonitor(sync_callback, start_callback)
         asyncio.create_task(Plugin.game_monitor.start_monitoring())
         Plugin.auto_sync_enabled = True
