@@ -14,7 +14,7 @@ import logging
 import os
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import config_manager
@@ -72,6 +72,7 @@ def add_entry(
     kind: str = "sync",
     created: Optional[str] = None,
     keep: int = MAX_PER_GAME,
+    sha256: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Записывает бэкап в историю. ``kind``: sync | prerestore."""
     if not game_name or not remote:
@@ -79,11 +80,12 @@ def add_entry(
 
     entry = {
         "id": _make_id(),
-        "created": created or datetime.now().isoformat(timespec="seconds"),
+        "created": created or datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "remote": remote,
         "size": int(size) if size else None,
         "paths": list(paths or []),
         "kind": kind,
+        "sha256": sha256 or None,
     }
 
     with _lock:
@@ -140,3 +142,22 @@ def clear() -> None:
                 path.unlink()
         except OSError:
             pass
+
+def remove_entry(game_name: str, entry_id: Optional[str] = None) -> bool:
+    """Удалить запись из истории бэкапов. Файл в облаке удаляет вызывающий."""
+    if not game_name:
+        return False
+    data = _load()
+    entries = data.get(game_name) or []
+    if not entries:
+        return False
+    target = entry_id or (entries[0].get("id") if entries else None)
+    kept = [entry for entry in entries if entry.get("id") != target]
+    if len(kept) == len(entries):
+        return False
+    if kept:
+        data[game_name] = kept
+    else:
+        data.pop(game_name, None)
+    _save(data)
+    return True

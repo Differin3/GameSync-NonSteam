@@ -44,6 +44,7 @@ export function GameSyncMain() {
   const [syncing, setSyncing] = useState<boolean>(false);
   const [progress, setProgress] = useState<SyncProgress | null>(null);
   const [autoSync, setAutoSync] = useState<boolean>(false);
+  const [pullOnLaunch, setPullOnLaunch] = useState<boolean>(false);
   const [message, setMessage] = useState<{ tone: Tone; text: string } | null>(null);
 
   const loadStorage = async () => {
@@ -69,6 +70,7 @@ export function GameSyncMain() {
       ]);
       setPluginOk(Boolean((test as any)?.success));
       setAutoSync(Boolean((appSettings as any)?.auto_sync));
+      setPullOnLaunch(Boolean((appSettings as any)?.pull_on_launch));
       setSummary({
         games: Array.isArray((scan as any)?.games) ? (scan as any).games.length : 0,
         synced: Number((stats as any)?.stats?.gamesCount || 0),
@@ -105,16 +107,23 @@ export function GameSyncMain() {
     };
   }, [syncing]);
 
-  const toggleAutoSync = async (enabled: boolean) => {
+  const toggleCloudSync = async (enabled: boolean) => {
     setAutoSync(enabled);
+    setPullOnLaunch(enabled);
     try {
-      const result: any = await call("enable_auto_sync", { enabled });
-      if (!result?.success) {
+      const pullResult: any = await call("set_pull_on_launch", { enabled });
+      const autoResult: any = await call("enable_auto_sync", { enabled });
+      if (!pullResult?.success || !autoResult?.success) {
         setAutoSync(!enabled);
-        setMessage({ tone: "error", text: result?.error || "Не удалось переключить автосинхронизацию" });
+        setPullOnLaunch(!enabled);
+        setMessage({
+          tone: "error",
+          text: pullResult?.error || autoResult?.error || "Не удалось переключить синхронизацию",
+        });
       }
     } catch (error: any) {
       setAutoSync(!enabled);
+      setPullOnLaunch(!enabled);
       setMessage({ tone: "error", text: error?.message || String(error) });
     }
   };
@@ -172,18 +181,30 @@ export function GameSyncMain() {
 
       <PanelSectionRow>
         <ToggleField
-          label="Автосинхронизация"
+          label="Синхронизация с облаком"
           description={
-            autoSync
-              ? "Сохранять игру после выхода — включено"
-              : "Выключена: игра не сохраняется автоматически"
+            autoSync && pullOnLaunch
+              ? "Двусторонняя: сохранять после выхода и скачивать перед запуском"
+              : autoSync
+                ? "Только выгрузка: после выхода, без загрузки перед запуском"
+                : pullOnLaunch
+                  ? "Только загрузка: прогресс не уходит в облако"
+                  : "Выключена: игра не синхронизируется автоматически"
           }
-          checked={autoSync}
+          checked={autoSync && pullOnLaunch}
           onChange={(value) => {
-            void toggleAutoSync(value);
+            void toggleCloudSync(value);
           }}
         />
       </PanelSectionRow>
+
+      {pullOnLaunch && !autoSync && (
+        <PanelSectionRow>
+          <StatusMessage tone="warning">
+            Включена только загрузка: новые сохранения не будут уходить в облако.
+          </StatusMessage>
+        </PanelSectionRow>
+      )}
 
       <PanelSectionRow>
         <ActionButton
@@ -251,9 +272,13 @@ export function GameSyncMain() {
 
       <PanelSectionRow>
         <Hint>
-        {autoSync
-          ? "Автосинхронизация включена: плагин отслеживает запуск игр и сохраняет игру после выхода."
-          : "Автосинхронизация выключена — включите её в настройках, чтобы игра сохранялась после выхода."}
+        {autoSync && pullOnLaunch
+          ? "Двусторонняя синхронизация: сейвы скачиваются перед запуском (если облако новее) и сохраняются после выхода."
+          : autoSync
+            ? "Только выгрузка: после выхода сейвы сохраняются в облако, перед запуском ничего не скачивается."
+            : pullOnLaunch
+              ? "Только загрузка: перед запуском сейвы подтягиваются из облака, но новые сохранения не загружаются."
+              : "Синхронизация выключена — включите её, чтобы сейвы сохранялись и подтягивались автоматически."}
         {" "}Пути и история — на полной странице.
       </Hint>
       </PanelSectionRow>

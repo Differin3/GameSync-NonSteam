@@ -168,6 +168,7 @@ def _app_settings_file() -> Path:
 
 DEFAULT_APP_SETTINGS: Dict[str, Any] = {
     "auto_sync": False,
+    "pull_on_launch": False,
     "max_backup_versions": 10,
     "default_save_paths": [],
 }
@@ -189,6 +190,7 @@ def load_app_settings() -> Dict[str, Any]:
             logger.error(f"Error loading app settings: {e}")
 
     data["auto_sync"] = bool(data.get("auto_sync"))
+    data["pull_on_launch"] = bool(data.get("pull_on_launch"))
     paths = data.get("default_save_paths") or []
     data["default_save_paths"] = [p for p in paths if isinstance(p, str) and p.strip()]
     return data
@@ -199,6 +201,8 @@ def save_app_settings(**kwargs) -> Dict[str, Any]:
     data = load_app_settings()
     if "auto_sync" in kwargs:
         data["auto_sync"] = bool(kwargs["auto_sync"])
+    if "pull_on_launch" in kwargs:
+        data["pull_on_launch"] = bool(kwargs["pull_on_launch"])
     if "default_save_paths" in kwargs:
         paths = kwargs.get("default_save_paths") or []
         data["default_save_paths"] = [p for p in paths if isinstance(p, str) and p.strip()]

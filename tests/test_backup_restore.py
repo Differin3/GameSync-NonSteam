@@ -5,7 +5,9 @@
     python -m unittest discover -s tests -v
 """
 
+import asyncio
 import io
+import json
 import os
 import shutil
 import sys
@@ -13,6 +15,7 @@ import tarfile
 import tempfile
 import types
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1] / "backend"
@@ -261,6 +264,16 @@ class AppSettingsTest(unittest.TestCase):
         self.assertFalse(settings["auto_sync"])
         self.assertEqual(settings["default_save_paths"], [])
 
+    def test_pull_on_launch_defaults_false(self):
+        settings = config_manager.load_app_settings()
+        self.assertFalse(settings["pull_on_launch"])
+
+    def test_pull_on_launch_roundtrip(self):
+        config_manager.save_app_settings(pull_on_launch=True)
+        self.assertTrue(config_manager.load_app_settings()["pull_on_launch"])
+        config_manager.save_app_settings(pull_on_launch=False)
+        self.assertFalse(config_manager.load_app_settings()["pull_on_launch"])
+
     def test_roundtrip_filters_invalid_paths(self):
         config_manager.save_app_settings(auto_sync=True, default_save_paths=["/a", " ", 5])
         settings = config_manager.load_app_settings()
@@ -415,6 +428,9 @@ class SteamMatchingTest(unittest.TestCase):
         self.assertEqual(len(paths), 1)
         self.assertIn("Factorio", paths[0])
 import portproton_scanner  # noqa: E402
+import pull_engine  # noqa: E402
+import quarantine  # noqa: E402
+import integrity  # noqa: E402
 
 
 class SteamAppIdDetectionTest(unittest.TestCase):
@@ -952,3 +968,291 @@ class SavePathNormalizationTest(unittest.TestCase):
             )
 
             self.assertEqual(resolved, target)
+
+class PullOnLaunchTest(unittest.TestCase):
+    """Скачивать облако перед игрой только если оно новее локальных сейвов."""
+
+    def test_cloud_newer_pulls(self):
+        local = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+        self.assertTrue(pull_engine.should_pull("2026-01-01T12:05:00+00:00", local))
+
+    def test_local_newer_skips(self):
+        local = datetime(2026, 1, 1, 12, 10, 0, tzinfo=timezone.utc).timestamp()
+        self.assertFalse(pull_engine.should_pull("2026-01-01T12:05:00+00:00", local))
+
+    def test_no_local_saves_pulls(self):
+        self.assertTrue(pull_engine.should_pull("2026-01-01T12:05:00Z", None))
+
+    def test_invalid_or_missing_time_skips(self):
+        self.assertFalse(pull_engine.should_pull("", 0))
+        self.assertFalse(pull_engine.should_pull(None, None))
+
+    def test_newest_local_mtime_walks_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old = root / "old.sav"
+            new = root / "sub" / "new.sav"
+            new.parent.mkdir()
+            old.write_text("a")
+            new.write_text("b")
+            os.utime(old, (1000, 1000))
+            os.utime(new, (2000, 2000))
+            self.assertEqual(pull_engine.newest_local_mtime([str(root)]), 2000)
+
+    def test_newest_local_mtime_missing_paths(self):
+        self.assertIsNone(pull_engine.newest_local_mtime(["/nonexistent/path"]))
+
+    def test_newest_local_mtime_ignores_service_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            save = root / "save.dat"
+            log = root / "game.log"
+            save.write_text("save")
+            log.write_text("log")
+            os.utime(save, (1000, 1000))
+            os.utime(log, (2000, 2000))
+            self.assertEqual(pull_engine.newest_local_mtime([str(root)]), 1000)
+
+    def test_should_attempt_pull_only_when_just_started(self):
+        now = 1000.0
+        self.assertTrue(pull_engine.should_attempt_pull(now - 3, now=now))
+        self.assertFalse(pull_engine.should_attempt_pull(now - 30, now=now))
+        self.assertTrue(pull_engine.should_attempt_pull(None, now=now))
+
+    def test_pull_deadline(self):
+        self.assertEqual(pull_engine.pull_deadline(100.0, max_seconds=20), 120.0)
+        self.assertIsNone(pull_engine.pull_deadline(None))
+
+    def test_naive_timestamp_is_treated_as_local(self):
+        naive = datetime.now().replace(microsecond=0)
+        parsed = pull_engine.parse_timestamp(naive.isoformat())
+        self.assertIsNotNone(parsed)
+        self.assertIsNotNone(parsed.tzinfo)
+        self.assertAlmostEqual(parsed.timestamp(), naive.timestamp(), delta=2)
+
+
+class GameMonitorStartTest(unittest.TestCase):
+    def test_new_game_triggers_start_callback(self):
+        started = []
+
+        async def on_start(game_name, started_at=None):
+            started.append(game_name)
+
+        async def on_sync(*_args, **_kwargs):
+            return None
+
+        monitor = auto_sync.GameMonitor(on_sync, on_start)
+        original = auto_sync.collect_running_games
+        auto_sync.collect_running_games = lambda _processes: {"GameX": {1}}
+
+        async def scenario():
+            await monitor._poll_once()
+            await asyncio.sleep(0)  # дать выполниться create_task
+            await monitor._poll_once()  # второй опрос не должен дублировать старт
+
+        try:
+            asyncio.run(scenario())
+        finally:
+            auto_sync.collect_running_games = original
+
+        self.assertEqual(started, ["GameX"])
+        self.assertIn("GameX", monitor.started_at)
+
+class RestoreCleanupTest(unittest.TestCase):
+    """Восстановление откатывает прогресс: лишние новые сейвы удаляются."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.dest = self.root / "saves"
+        self.dest.mkdir()
+        (self.dest / "slot1.sav").write_text("old-progress")
+        self.archive = sync_engine.create_backup("Game", [str(self.dest)])
+        self.assertIsNotNone(self.archive)
+        self.manifest = restore_engine.read_manifest(self.archive)
+        self.assertIsNotNone(self.manifest)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_new_save_is_removed_on_restore(self):
+        (self.dest / "slot1.sav").write_text("new-progress")
+        (self.dest / "slot2.sav").write_text("created-after-backup")
+        (self.dest / "readme.txt").write_text("not a save")
+
+        result = restore_engine.restore_archive(
+            self.archive, self.manifest, allowed_root=self.root
+        )
+
+        self.assertEqual((self.dest / "slot1.sav").read_text(), "old-progress")
+        self.assertFalse((self.dest / "slot2.sav").exists())
+        self.assertTrue((self.dest / "readme.txt").exists())
+        self.assertEqual(result["removed"], 1)
+
+    def test_cleanup_can_be_disabled(self):
+        (self.dest / "slot2.sav").write_text("created-after-backup")
+
+        result = restore_engine.restore_archive(
+            self.archive, self.manifest, allowed_root=self.root, remove_extra=False
+        )
+
+        self.assertTrue((self.dest / "slot2.sav").exists())
+        self.assertEqual(result["removed"], 0)
+
+class QuarantineTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self._old_config = config_manager.CONFIG_DIR
+        config_manager.CONFIG_DIR = self.root / "config"
+
+    def tearDown(self):
+        config_manager.CONFIG_DIR = self._old_config
+        self._tmp.cleanup()
+
+    def test_move_files_keeps_data(self):
+        source = self.root / "saves" / "slot2.sav"
+        source.parent.mkdir(parents=True)
+        source.write_text("new progress")
+
+        result = quarantine.move_files(
+            "Game", [{"source": str(source), "root": "Game", "rel": "slot2.sav"}]
+        )
+
+        self.assertEqual(result["moved"], 1)
+        self.assertFalse(source.exists())
+        stored = Path(result["path"]) / "Game" / "slot2.sav"
+        self.assertTrue(stored.exists())
+        self.assertEqual(stored.read_text(), "new progress")
+        self.assertTrue((Path(result["path"]) / "meta.json").exists())
+
+    def test_prune_removes_by_size_limit(self):
+        source = self.root / "saves" / "slot.sav"
+        source.parent.mkdir(parents=True)
+        source.write_text("x" * 100)
+        result = quarantine.move_files(
+            "Game", [{"source": str(source), "root": "Game", "rel": "slot.sav"}]
+        )
+        self.assertTrue(Path(result["path"]).exists())
+
+        quarantine.prune(max_bytes=1)
+
+        self.assertFalse(Path(result["path"]).exists())
+
+
+class RestoreQuarantineTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.dest = self.root / "saves"
+        self.dest.mkdir()
+        (self.dest / "slot1.sav").write_text("old")
+        self.archive = sync_engine.create_backup("Game", [str(self.dest)])
+        self.manifest = restore_engine.read_manifest(self.archive)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_extra_save_moved_to_quarantine_callback(self):
+        (self.dest / "slot1.sav").write_text("new")
+        (self.dest / "slot2.sav").write_text("fresh")
+        (self.dest / "screenshot.png").write_text("image")
+        moved = []
+
+        def fake_quarantine(extras):
+            for item in extras:
+                target = Path(self.root) / "q" / item["rel"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(item["source"], target)
+                moved.append(item["rel"])
+            return {"moved": len(moved), "path": str(Path(self.root) / "q")}
+
+        result = restore_engine.restore_archive(
+            self.archive,
+            self.manifest,
+            allowed_root=self.root,
+            remove_extra=False,
+            quarantine_callback=fake_quarantine,
+        )
+
+        self.assertEqual(result["quarantined"], 1)
+        self.assertEqual((self.dest / "slot1.sav").read_text(), "old")
+        self.assertFalse((self.dest / "slot2.sav").exists())
+        self.assertTrue((self.dest / "screenshot.png").exists())
+        self.assertIn("slot2.sav", moved)
+
+    def test_rollback_from_safety_restores_original(self):
+        (self.dest / "slot1.sav").write_text("broken")
+        (self.dest / "extra.sav").write_text("extra")
+        moved = []
+
+        def fake_quarantine(extras):
+            for item in extras:
+                target = Path(self.root) / "q" / item["rel"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(item["source"], target)
+                moved.append(item["rel"])
+            return {"moved": len(moved), "path": str(Path(self.root) / "q")}
+
+        result = restore_engine.rollback_from_safety(
+            self.archive, allowed_root=self.root, quarantine_callback=fake_quarantine
+        )
+        self.assertTrue(result["success"])
+        self.assertEqual((self.dest / "slot1.sav").read_text(), "old")
+        self.assertFalse((self.dest / "extra.sav").exists())
+        self.assertIn("extra.sav", moved)
+
+class IntegrityTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.saves = self.root / "saves"
+        self.saves.mkdir()
+        (self.saves / "slot1.sav").write_text("progress-1")
+        (self.saves / "slot2.sav").write_text("progress-2")
+        self.archive = sync_engine.create_backup("Game", [str(self.saves)])
+        self.assertIsNotNone(self.archive)
+        self.manifest = restore_engine.read_manifest(self.archive)
+        self.assertIsNotNone(self.manifest)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_manifest_contains_file_hashes(self):
+        files = self.manifest.get("files") or {}
+        self.assertEqual(len(files), 2)
+        meta = files["saves/slot1.sav"]
+        self.assertEqual(meta["sha256"], integrity.sha256_file(str(self.saves / "slot1.sav")))
+        self.assertEqual(meta["size"], len("progress-1"))
+
+    def test_verify_restored_detects_tampering(self):
+        targets = restore_engine.plan_targets(self.manifest, allowed_root=self.root)
+        (self.saves / "slot1.sav").write_text("tampered")
+        result = restore_engine.verify_restored(self.manifest, targets)
+        self.assertTrue(result["checksum_supported"])
+        self.assertEqual(result["verified"], 1)
+        self.assertEqual(len(result["mismatched"]), 1)
+
+    def test_archive_checksum_detects_corruption(self):
+        expected = integrity.sha256_file(self.archive)
+        self.assertTrue(integrity.verify_file(self.archive, expected))
+        data = Path(self.archive).read_bytes()
+        Path(self.archive).write_bytes(data[:-10])
+        self.assertFalse(integrity.verify_file(self.archive, expected))
+
+    def test_manifest_v1_still_readable(self):
+        archive = self.root / "v1.tar.gz"
+        manifest = {
+            "version": 1,
+            "game": "Old",
+            "created": "2026-01-01T00:00:00",
+            "paths": [{"path": str(self.saves), "root": "Game", "is_dir": True}],
+        }
+        payload = json.dumps(manifest).encode("utf-8")
+        with tarfile.open(archive, "w:gz") as tar:
+            info = tarfile.TarInfo(sync_engine.MANIFEST_NAME)
+            info.size = len(payload)
+            tar.addfile(info, io.BytesIO(payload))
+        parsed = restore_engine.read_manifest(str(archive))
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["version"], 1)

@@ -1,5 +1,6 @@
 import decky
 import os
+import time
 import asyncio
 import functools
 import shutil
@@ -222,6 +223,16 @@ class Plugin:
     # Классовые переменные для состояния
     auto_sync_enabled = False
     game_monitor = None
+    # Не чаще одного pull на игру за 10 минут (процесс может мигать).
+    _pull_attempts: Dict[str, float] = {}
+    # Активные синхронизации: имя игры -> время начала (для индикатора в UI).
+    _active_syncs: Dict[str, float] = {}
+    # Игры, в которые прямо сейчас пишется restore/pull.
+    _active_restores: set = set()
+    # Очередь уведомлений для фронтенда: события могут теряться, поэтому
+    # UI забирает их опросом get_notifications.
+    _notification_seq: int = 0
+    _notifications: List[Dict[str, Any]] = []
 
     # Прогресс синхронизации для QAM: этапы, проценты, текущая игра.
     sync_progress: Dict[str, Any] = {
@@ -270,14 +281,19 @@ class Plugin:
         except Exception as e:
             logger.warning(f"Dependency bootstrap failed: {e}")
 
-        # Восстанавливаем автосинхронизацию, если она была включена до перезапуска.
+        # Монитор процессов нужен и для автосинхронизации, и для pull перед запуском.
         try:
             from config_manager import load_app_settings
-            if load_app_settings().get("auto_sync"):
+            settings = load_app_settings()
+            if settings.get("auto_sync") or settings.get("pull_on_launch"):
                 await Plugin()._start_auto_sync()
-                logger.info("Auto-sync restored from settings")
+                logger.info(
+                    "Process monitor restored (auto_sync=%s, pull_on_launch=%s)",
+                    bool(settings.get("auto_sync")),
+                    bool(settings.get("pull_on_launch")),
+                )
         except Exception as e:
-            logger.warning(f"Failed to restore auto-sync: {e}")
+            logger.warning(f"Failed to restore process monitor: {e}")
 
     async def _start_auto_sync(self) -> bool:
         """Создаёт и запускает монитор процессов (идемпотентно)."""
@@ -294,6 +310,12 @@ class Plugin:
 
         async def sync_callback(game_name: str, save_paths: List[str], started_at: float = None):
             """Callback для автосинхронизации после выхода из игры."""
+            from config_manager import load_app_settings
+
+            if not load_app_settings().get("auto_sync"):
+                logger.info(f"Auto-sync disabled, skip exit sync for {game_name}")
+                return
+
             logger.info(f"Auto-syncing game: {game_name}")
             resolved_name = game_name
             resolved_paths = save_paths or _resolve_save_paths_for_game(game_name)
@@ -345,16 +367,51 @@ class Plugin:
                 except Exception as e:
                     logger.warning(f"Session learning failed: {e}")
 
+            try:
+                Plugin.notify_event("gamesync_sync_started", {"game": resolved_name, "source": "auto"})
+            except Exception as emit_error:
+                logger.warning(f"Failed to emit sync-start event: {emit_error}")
+
             if not resolved_paths:
                 logger.warning(f"Auto-sync skipped for {game_name}: no save paths found")
+                try:
+                    Plugin.notify_event(
+                        "gamesync_sync_finished",
+                        {"game": resolved_name, "success": False, "error": "Не найдены пути сохранений"},
+                    )
+                except Exception as emit_error:
+                    logger.warning(f"Failed to emit sync-finish event: {emit_error}")
                 return
+            # Не синхронизируем игру, пока в неё ещё пишется restore/pull:
+            # иначе архив уйдёт в облако с недописанными файлами.
+            for _ in range(240):
+                if resolved_name not in Plugin._active_restores:
+                    break
+                await asyncio.sleep(0.5)
+
             plugin_instance = Plugin()
-            result = await plugin_instance.sync_game(resolved_name, resolved_paths)
+            Plugin._active_syncs[resolved_name] = time.time()
+            try:
+                result = await plugin_instance.sync_game(resolved_name, resolved_paths)
+            finally:
+                Plugin._active_syncs.pop(resolved_name, None)
+            try:
+                Plugin.notify_event(
+                    "gamesync_sync_finished",
+                    {
+                        "game": resolved_name,
+                        "success": bool(result.get("success")),
+                        "error": result.get("error") or "",
+                        "size": int(result.get("file_size") or 0),
+                    },
+                )
+            except Exception as emit_error:
+                logger.warning(f"Failed to emit sync-finish event: {emit_error}")
             if result.get("success"):
                 logger.info(f"Auto-sync completed for {resolved_name}")
                 # Тост в Steam UI: уведомление «сохранено»
                 try:
-                    decky.emit(
+                    Plugin.notify_event(
                         "gamesync_auto_saved",
                         {"game": resolved_name, "size": int(result.get("file_size") or 0)},
                     )
@@ -363,16 +420,110 @@ class Plugin:
             else:
                 logger.error(f"Auto-sync failed for {resolved_name}: {result.get('error')}")
 
-        Plugin.game_monitor = GameMonitor(sync_callback)
+        async def start_callback(game_name: str, started_at: float = None):
+            """Перед запуском игры подтянуть облачные сейвы, если они новее."""
+            try:
+                await Plugin()._pull_before_launch(game_name, started_at)
+            except Exception as e:
+                logger.warning(f"Pull before launch failed for {game_name}: {e}")
+
+        Plugin.game_monitor = GameMonitor(sync_callback, start_callback)
         asyncio.create_task(Plugin.game_monitor.start_monitoring())
         Plugin.auto_sync_enabled = True
         return True
 
+    async def _pull_before_launch(self, game_name: str, started_at: float = None) -> None:
+        """Скачать облачный бэкап при старте игры, если он новее локального.
+
+        Точного хука «до запуска» в Steam нет, поэтому вызывается сразу после
+        появления процесса: Proton ещё несколько секунд инициализирует игру,
+        а безопасная копия текущих сейвов создаётся до перезаписи.
+        """
+        from config_manager import load_app_settings
+        from backup_index import get_entry
+        from pull_engine import newest_local_mtime, pull_deadline, should_attempt_pull, should_pull
+
+        if not load_app_settings().get("pull_on_launch"):
+            return
+
+        if not should_attempt_pull(started_at):
+            logger.info(f"Pull before launch skipped for {game_name}: game is already running")
+            return
+
+        entry = get_entry(game_name)
+        if not entry and game_name.startswith("exe:"):
+            # Игры в общем префиксе DEFAULT приходят как "exe:<каталог>":
+            # сопоставляем с названием игры, чтобы найти её бэкап.
+            try:
+                from portproton_scanner import scan_portproton_games
+                want_dir = game_name[4:].replace("\\", "/").lower()
+                games = await asyncio.to_thread(scan_portproton_games, False)
+                for candidate in games:
+                    exec_norm = (candidate.get("exec") or "").replace("\\", "/").lower()
+                    if want_dir and want_dir in exec_norm:
+                        game_name = candidate.get("name") or game_name
+                        entry = get_entry(game_name)
+                        logger.info(f"Pull before launch matched {want_dir} -> {game_name}")
+                        break
+            except Exception as e:
+                logger.warning(f"Pull before launch match failed: {e}")
+        if not entry or not entry.get("remote"):
+            logger.debug(f"Pull before launch skipped for {game_name}: no cloud backup")
+            return
+
+        paths = entry.get("paths") or _resolve_save_paths_for_game(game_name)
+        local_mtime = await asyncio.to_thread(newest_local_mtime, paths)
+        if not should_pull(entry.get("created"), local_mtime):
+            logger.info(f"Pull before launch skipped for {game_name}: local saves are newer")
+            return
+
+        last_attempt = Plugin._pull_attempts.get(game_name, 0.0)
+        if time.time() - last_attempt < 600:
+            logger.debug(f"Pull before launch throttled for {game_name}")
+            return
+        Plugin._pull_attempts[game_name] = time.time()
+
+        logger.info(f"Pulling cloud saves before launch: {game_name}")
+        try:
+            Plugin.notify_event("gamesync_pull_started", {"game": game_name})
+        except Exception as emit_error:
+            logger.warning(f"Failed to emit pull-start event: {emit_error}")
+        result = await Plugin().restore_backup(
+            game_name=game_name,
+            allow_running=True,
+            upload_safety_cloud=False,
+            deadline_ts=pull_deadline(started_at),
+        )
+        try:
+            Plugin.notify_event(
+                "gamesync_pull_done",
+                {
+                    "game": game_name,
+                    "success": bool(result.get("success")),
+                    "files": int(result.get("files") or 0),
+                    "error": result.get("error") or "",
+                },
+            )
+        except Exception as emit_error:
+            logger.warning(f"Failed to emit pull event: {emit_error}")
+        if result.get("success"):
+            logger.info(f"Pulled {result.get('files', 0)} files before launch: {game_name}")
+        else:
+            logger.error(f"Pull before launch failed for {game_name}: {result.get('error')}")
+
     def _stop_auto_sync(self) -> None:
+        Plugin.auto_sync_enabled = False
+        # Если включён pull перед запуском, монитор процессов должен остаться.
+        try:
+            from config_manager import load_app_settings
+
+            if load_app_settings().get("pull_on_launch"):
+                return
+        except Exception:
+            pass
         if Plugin.game_monitor:
             Plugin.game_monitor.stop_monitoring()
             Plugin.game_monitor = None
-        Plugin.auto_sync_enabled = False
 
     @decky_params
     async def install_dependencies(self, *args, **kwargs) -> Dict[str, Any]:
@@ -403,6 +554,59 @@ class Plugin:
     async def get_sync_progress(self, *args, **kwargs) -> Dict[str, Any]:
         """Текущий прогресс синхронизации для прогресс-бара в QAM."""
         return dict(Plugin.sync_progress)
+
+    @classmethod
+    def notify_event(cls, event: str, data: Dict[str, Any] = None) -> None:
+        """Записать уведомление в очередь и продублировать событием Decky."""
+        cls._notification_seq += 1
+        payload = dict(data or {})
+        cls._notifications.append(
+            {"id": cls._notification_seq, "ts": time.time(), "event": event, "data": payload}
+        )
+        if len(cls._notifications) > 200:
+            del cls._notifications[:-100]
+        try:
+            getattr(decky, "emit")(event, payload)
+        except Exception as e:
+            logger.warning(f"emit {event} failed: {e}")
+
+    @decky_params
+    async def get_notifications(self, after_id: int = 0, *args, **kwargs) -> Dict[str, Any]:
+        """Уведомления после last_id (опрос из UI)."""
+        try:
+            after = int(after_id or kwargs.get("after_id") or 0)
+        except (TypeError, ValueError):
+            after = 0
+        items = [item for item in Plugin._notifications if item["id"] > after][-50:]
+        return {"success": True, "items": items, "last_id": Plugin._notification_seq}
+
+    @decky_params
+    async def get_running_games(self, *args, **kwargs) -> Dict[str, Any]:
+        """Есть ли запущенные игры PortProton (для отложенных уведомлений)."""
+        try:
+            from auto_sync import collect_running_games, find_portproton_processes
+
+            current = await asyncio.to_thread(
+                lambda: collect_running_games(find_portproton_processes() or [])
+            )
+            return {"success": True, "games": list(current.keys())}
+        except Exception as e:
+            logger.warning(f"get_running_games failed: {e}")
+            return {"success": True, "games": []}
+
+    @decky_params
+    async def get_sync_state(self, *args, **kwargs) -> Dict[str, Any]:
+        """Какие игры синхронизируются прямо сейчас (для спиннера в UI)."""
+        now = time.time()
+        # Чистим зависшие записи, чтобы индикатор не горел вечно.
+        for name, started in list(Plugin._active_syncs.items()):
+            if now - started > 600:
+                Plugin._active_syncs.pop(name, None)
+        active = [
+            {"game": name, "since": started}
+            for name, started in Plugin._active_syncs.items()
+        ]
+        return {"success": True, "active": active}
 
     @decky_params
     async def get_storage_status(self, *args, **kwargs) -> Dict[str, Any]:
@@ -512,6 +716,24 @@ class Plugin:
             if not save_paths:
                 return {"success": False, "error": "Все пути сохранений исключены"}
 
+            # Не архивируем игру, пока в неё пишется restore/pull: иначе в облако
+            # уйдёт недописанное состояние.
+            for _ in range(240):
+                if game_name not in Plugin._active_restores:
+                    break
+                await asyncio.sleep(0.5)
+
+            # Архив пишется во временный каталог: без места backup оборвётся.
+            try:
+                free = shutil.disk_usage(tempfile.gettempdir()).free
+            except OSError:
+                free = None
+            if free is not None and free < 200 * 1024 * 1024:
+                return {
+                    "success": False,
+                    "error": "Мало свободного места для создания архива (нужно ≥ 200 МБ).",
+                }
+
             # Надёжность: не делаем бэкап, если в путях только служебные файлы
             # (логи, кэш) — иначе получается «пустой» архив на 3 КБ.
             try:
@@ -545,6 +767,11 @@ class Plugin:
             archive_path = await asyncio.to_thread(create_backup, game_name, save_paths)
             if not archive_path:
                 return {"success": False, "error": "Не удалось создать архив"}
+
+            from integrity import sha256_file
+            archive_sha = await asyncio.to_thread(sha256_file, archive_path)
+            if not archive_sha:
+                logger.warning(f"Cannot compute checksum for {archive_path}")
             
             # Загружаем провайдер хранилища
             try:
@@ -635,6 +862,7 @@ class Plugin:
                     paths=save_paths,
                     kind="sync",
                     keep=keep_versions,
+                    sha256=archive_sha,
                 )
                 for old_entry in to_prune:
                     old_remote = old_entry.get("remote")
@@ -879,13 +1107,33 @@ class Plugin:
             return {
                 "success": True,
                 "auto_sync": bool(settings.get("auto_sync")),
+                "pull_on_launch": bool(settings.get("pull_on_launch")),
                 "max_backup_versions": int(settings.get("max_backup_versions", 10) or 10),
                 "download_dir": str(__import__("pathlib").Path.home() / "Downloads"),
                 "default_save_paths": settings.get("default_save_paths") or [],
             }
         except Exception as e:
             logger.error(f"Error loading app settings: {e}")
-            return {"success": False, "error": str(e), "auto_sync": False, "max_backup_versions": 10, "download_dir": "~/Downloads", "default_save_paths": []}
+            return {"success": False, "error": str(e), "auto_sync": False, "pull_on_launch": False, "max_backup_versions": 10, "download_dir": "~/Downloads", "default_save_paths": []}
+
+    @decky_params
+    async def set_pull_on_launch(self, enabled: bool = True, *args, **kwargs) -> Dict[str, Any]:
+        """Включает/выключает загрузку облачных сейвов перед запуском игры."""
+        try:
+            from config_manager import save_app_settings
+            if enabled is None:
+                enabled = kwargs.get("enabled", True)
+            settings = save_app_settings(pull_on_launch=bool(enabled))
+            from config_manager import load_app_settings
+
+            if settings.get("pull_on_launch"):
+                await self._start_auto_sync()
+            elif not load_app_settings().get("auto_sync"):
+                self._stop_auto_sync()
+            return {"success": True, "pull_on_launch": bool(settings.get("pull_on_launch"))}
+        except Exception as e:
+            logger.error(f"Error saving pull_on_launch: {e}")
+            return {"success": False, "error": str(e)}
 
     @decky_params
     async def set_default_save_paths(self, default_save_paths: List[str] = None, *args, **kwargs) -> Dict[str, Any]:
@@ -949,6 +1197,10 @@ class Plugin:
                 ok=len(synced),
                 failed=len(failed),
             )
+            Plugin.notify_event(
+                "gamesync_sync_all_done",
+                {"success": True, "total": total, "ok": len(synced), "failed": len(failed)},
+            )
             return {
                 "success": True,
                 "total": total,
@@ -957,6 +1209,7 @@ class Plugin:
             }
         except Exception as e:
             logger.error(f"Error syncing all games: {e}")
+            Plugin.notify_event("gamesync_sync_all_done", {"success": False, "error": str(e)})
             self._set_sync_progress(active=False, stage="Ошибка", currentGame="")
             return {"success": False, "error": str(e), "synced": [], "failed": []}
 
@@ -1027,15 +1280,43 @@ class Plugin:
             return {"success": False, "error": str(e), "games": []}
 
     @decky_params
-    async def restore_backup(self, game_name: str = None, backup_id: str = None, *args, **kwargs) -> Dict[str, Any]:
+    async def restore_backup(self, game_name: str = None, backup_id: str = None, allow_running: bool = False, upload_safety_cloud: bool = True, deadline_ts: float = None, *args, **kwargs) -> Dict[str, Any]:
         """Восстановление сохранений игры из облачного бэкапа."""
         try:
             if not game_name:
                 return {"success": False, "error": "Не указан game_name"}
 
+            if game_name in Plugin._active_restores:
+                return {
+                    "success": False,
+                    "error": "Восстановление этой игры уже выполняется",
+                }
+            Plugin._active_restores.add(game_name)
+
+            if deadline_ts and time.time() > deadline_ts:
+                logger.info(f"Restore skipped for {game_name}: deadline passed")
+                return {
+                    "success": False,
+                    "error": "Игра уже запущена — восстановление отменено, чтобы не писать в работающие сейвы",
+                    "skipped": True,
+                }
+
+            if not allow_running:
+                try:
+                    from auto_sync import has_running_game
+
+                    running = await asyncio.to_thread(has_running_game)
+                except Exception:
+                    running = False
+                if running:
+                    return {
+                        "success": False,
+                        "error": "Игра запущена — закройте её перед восстановлением сохранений",
+                    }
+
             from backup_index import add_entry, get_entry
             from config_manager import load_storage_config, load_synced_games
-            from restore_engine import read_manifest, restore_archive
+            from restore_engine import read_manifest, restore_archive, rollback_from_safety
             from sync_engine import create_backup, sanitize_name
 
             entry = get_entry(game_name, backup_id)
@@ -1051,7 +1332,13 @@ class Plugin:
                         "paths": [],
                     }
             if not entry or not entry.get("remote"):
+                Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": "Бэкап не найден"})
                 return {"success": False, "error": "Бэкап не найден — сначала синхронизируйте игру"}
+
+            Plugin.notify_event(
+                "gamesync_restore_started",
+                {"game": game_name, "created": entry.get("created") or ""},
+            )
 
             storage_config = load_storage_config()
 
@@ -1059,25 +1346,48 @@ class Plugin:
                 import dependencies
                 dep = await dependencies.ensure_dependencies_async(storage_config.get("provider", "webdav"))
                 if not dep.get("success"):
-                    return {"success": False, "error": "Не удалось установить зависимости: " + ", ".join(dep.get("missing", []))}
+                    error = "Не удалось установить зависимости: " + ", ".join(dep.get("missing", []))
+                    Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
+                    return {"success": False, "error": error}
             except Exception as e:
                 logger.warning(f"Dependency check failed: {e}")
 
             provider, error = _build_provider(storage_config)
             if error:
+                Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
                 return {"success": False, "error": error}
 
             workdir = tempfile.mkdtemp(prefix="gamesync-restore-")
             archive_path = os.path.join(workdir, "backup.tar.gz")
             safety_remote = None
+            safety_local = None
+            safety_temp_path = None
 
             try:
                 downloaded = await asyncio.to_thread(provider.download_file, entry["remote"], archive_path)
                 if not downloaded:
+                    Plugin.notify_event(
+                        "gamesync_restore_failed",
+                        {"game": game_name, "error": "Не удалось скачать бэкап"},
+                    )
                     return {"success": False, "error": "Не удалось скачать бэкап из хранилища"}
+
+                expected_sha = entry.get("sha256")
+                if expected_sha:
+                    from integrity import verify_file
+
+                    checksum_ok = await asyncio.to_thread(verify_file, archive_path, expected_sha)
+                    if not checksum_ok:
+                        error = "Архив повреждён: контрольная сумма не совпала. Скачайте другую версию."
+                        Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
+                        return {"success": False, "error": error}
 
                 manifest = read_manifest(archive_path)
                 if not manifest:
+                    Plugin.notify_event(
+                        "gamesync_restore_failed",
+                        {"game": game_name, "error": "Старый архив без манифеста"},
+                    )
                     return {
                         "success": False,
                         "error": "Бэкап создан старой версией плагина (без манифеста). Синхронизируйте игру заново.",
@@ -1088,45 +1398,202 @@ class Plugin:
                 if current_paths:
                     safety_path = await asyncio.to_thread(create_backup, game_name, current_paths)
                     if safety_path:
-                        try:
-                            safety_name = f"prerestore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
-                            folder = f"GameSync/{sanitize_name(game_name)}"
-                            safety_remote = await asyncio.to_thread(
-                                provider.upload_file, safety_path, folder, safety_name
+                        safety_temp_path = safety_path
+                        from integrity import sha256_file as _sha256_file
+
+                        safety_sha = await asyncio.to_thread(_sha256_file, safety_path)
+                        if not upload_safety_cloud:
+                            # Быстрый путь для pull: локальная страховка без сети.
+                            from pathlib import Path as _Path
+
+                            local_dir = _Path.home() / ".config" / "gamesync" / "restores"
+                            local_dir.mkdir(parents=True, exist_ok=True)
+                            local_name = (
+                                f"{sanitize_name(game_name)}-"
+                                f"{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
                             )
-                            add_entry(
-                                game_name,
-                                remote=safety_remote or "",
-                                size=os.path.getsize(safety_path),
-                                paths=current_paths,
-                                kind="prerestore",
-                            )
-                        except Exception as e:
-                            logger.warning(f"Failed to upload pre-restore backup: {e}")
-                        finally:
+                            local_path = local_dir / local_name
+                            shutil.move(safety_path, str(local_path))
+                            safety_local = str(local_path)
+                            safety_path = None
                             try:
-                                os.remove(safety_path)
+                                copies = sorted(local_dir.glob(f"{sanitize_name(game_name)}-*.tar.gz"))
+                                for old in copies[:-3]:
+                                    old.unlink(missing_ok=True)
                             except OSError:
                                 pass
+                        else:
+                            try:
+                                safety_name = f"prerestore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
+                                folder = f"GameSync/{sanitize_name(game_name)}"
+                                safety_remote = await asyncio.to_thread(
+                                    provider.upload_file, safety_path, folder, safety_name
+                                )
+                                add_entry(
+                                    game_name,
+                                    remote=safety_remote or "",
+                                    size=os.path.getsize(safety_path),
+                                    paths=current_paths,
+                                    kind="prerestore",
+                                    sha256=safety_sha,
+                                )
+                            except Exception as e:
+                                logger.warning(f"Failed to upload pre-restore backup: {e}")
 
-                result = await asyncio.to_thread(restore_archive, archive_path, manifest)
+                if deadline_ts and time.time() > deadline_ts:
+                    logger.info(f"Restore skipped before extraction for {game_name}: game is running")
+                    return {
+                        "success": False,
+                        "error": "Игра уже запущена — восстановление отменено",
+                        "skipped": True,
+                    }
+
+                from quarantine import move_files as quarantine_move, prune as quarantine_prune
+
+                def _quarantine(extras):
+                    return quarantine_move(game_name, extras, reason="restore")
+
+                result = await asyncio.to_thread(
+                    restore_archive, archive_path, manifest, None, False, _quarantine
+                )
+                removed = int(result.get("removed") or 0)
+                quarantined = int(result.get("quarantined") or 0)
+                verified = int(result.get("verified") or 0)
+                mismatched = result.get("mismatched") or []
+                if mismatched:
+                    rollback_ok = False
+                    rollback_archive = safety_local or safety_temp_path
+                    if rollback_archive and os.path.isfile(rollback_archive):
+                        try:
+                            rollback = await asyncio.to_thread(
+                                rollback_from_safety,
+                                rollback_archive,
+                                None,
+                                _quarantine,
+                            )
+                            rollback_ok = bool(rollback.get("success"))
+                            logger.info(
+                                f"Rollback {game_name}: {rollback.get('files', 0)} files, ok={rollback_ok}"
+                            )
+                        except Exception as rollback_error:
+                            logger.error(f"Rollback failed for {game_name}: {rollback_error}")
+                    error = (
+                        f"Проверка целостности не пройдена: {len(mismatched)} файлов повреждены. "
+                        + (
+                            "Выполнен автоматический откат из страховочной копии."
+                            if rollback_ok
+                            else "Откат не удался — восстановите страховочную копию вручную."
+                        )
+                    )
+                    Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
+                    return {
+                        "success": False,
+                        "error": error,
+                        "mismatched": mismatched[:20],
+                        "rolled_back": rollback_ok,
+                        "safety_backup": safety_remote,
+                        "safety_local": safety_local,
+                    }
+                try:
+                    await asyncio.to_thread(quarantine_prune)
+                except Exception as prune_error:
+                    logger.warning(f"Quarantine prune failed: {prune_error}")
+                quarantine_path = result.get("quarantine_path") or ""
                 logger.info(
                     f"Restore {game_name}: {result.get('files', 0)} files, "
-                    f"{result.get('bytes', 0)} bytes, skipped {len(result.get('skipped') or [])}"
+                    f"{result.get('bytes', 0)} bytes, quarantined {quarantined}, "
+                    f"skipped {len(result.get('skipped') or [])}"
                 )
 
+                try:
+                    Plugin.notify_event(
+                        "gamesync_restore_done",
+                        {
+                            "game": game_name,
+                            "success": True,
+                            "files": int(result["files"]),
+                            "quarantined": quarantined,
+                        },
+                    )
+                except Exception as emit_error:
+                    logger.warning(f"Failed to emit restore-done event: {emit_error}")
+
+                message = f"Восстановлено файлов: {result['files']}"
+                if verified:
+                    message += f", проверено: {verified}"
+                if quarantined:
+                    message += f", перемещено в резерв: {quarantined}"
+                if removed:
+                    message += f", удалено лишних: {removed}"
                 return {
                     "success": True,
-                    "message": f"Восстановлено файлов: {result['files']}",
+                    "message": message,
                     "files": result["files"],
                     "bytes": result["bytes"],
+                    "removed": removed,
+                    "quarantined": quarantined,
+                    "verified": verified,
+                    "quarantine_path": quarantine_path,
                     "skipped": result["skipped"],
                     "safety_backup": safety_remote,
+                    "safety_local": safety_local,
                 }
             finally:
                 shutil.rmtree(workdir, ignore_errors=True)
+                if safety_temp_path:
+                    try:
+                        os.remove(safety_temp_path)
+                    except OSError:
+                        pass
         except Exception as e:
             logger.error(f"Error restoring backup: {e}")
+            Plugin.notify_event("gamesync_restore_failed", {"game": game_name or "игра", "error": str(e)})
+            return {"success": False, "error": str(e)}
+        finally:
+            Plugin._active_restores.discard(game_name or "")
+
+    @decky_params
+    async def delete_backup(self, game_name: str = None, backup_id: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Удалить выбранную версию бэкапа из облака и истории."""
+        try:
+            if not game_name:
+                return {"success": False, "error": "Не указан game_name"}
+
+            def _delete_fail(message: str) -> Dict[str, Any]:
+                Plugin.notify_event(
+                    "gamesync_backup_delete_failed",
+                    {"game": game_name or "игра", "error": message},
+                )
+                return {"success": False, "error": message}
+
+            from backup_index import get_entry, remove_entry
+            from config_manager import load_storage_config
+
+            entry = get_entry(game_name, backup_id)
+            if not entry or not entry.get("remote"):
+                return _delete_fail("Бэкап не найден")
+
+            provider, error = _build_provider(load_storage_config())
+            if error or provider is None:
+                return _delete_fail(error or "Хранилище не настроено")
+
+            deleted = await asyncio.to_thread(provider.delete_file, entry["remote"])
+            if not deleted:
+                return _delete_fail("Не удалось удалить файл из облака")
+
+            remove_entry(game_name, entry.get("id"))
+            try:
+                Plugin.notify_event("gamesync_backup_deleted", {"game": game_name})
+            except Exception as emit_error:
+                logger.warning(f"Failed to emit backup-deleted event: {emit_error}")
+            logger.info(f"Deleted backup {entry.get('id')} for {game_name}")
+            return {"success": True, "message": "Версия удалена из облака"}
+        except Exception as e:
+            logger.error(f"Error deleting backup: {e}")
+            Plugin.notify_event(
+                "gamesync_backup_delete_failed",
+                {"game": game_name or "игра", "error": str(e)},
+            )
             return {"success": False, "error": str(e)}
 
     @decky_params

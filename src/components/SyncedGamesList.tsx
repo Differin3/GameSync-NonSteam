@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { call } from "@decky/api";
+import { call, toaster } from "@decky/api";
 import { ButtonItem, PanelSection, PanelSectionRow, Spinner } from "@decky/ui";
 import { FaCloud, FaRedo } from "react-icons/fa";
 import { SyncedGame } from "../utils/types";
@@ -54,9 +54,11 @@ export function SyncedGamesList() {
           const uniquePaths = Array.from(new Set([...settings.defaultSavePaths, ...gameInfo.savePaths]));
           const syncResult: any = await call("sync_game", { game_name: game.gameName, save_paths: uniquePaths });
           if (syncResult.success) {
+            toaster.toast({ title: "GameSync", body: `Сохранено: ${game.gameName}`, subtext: "Ручная синхронизация" } as any);
             await loadSyncedGames();
           } else {
             setStatus(syncResult.error || "Ошибка синхронизации");
+            toaster.toast({ title: "GameSync", body: `Ошибка синхронизации: ${game.gameName}`, subtext: String(syncResult.error || "").slice(0, 160) } as any);
           }
         } else {
           setStatus(`Для «${game.gameName}» не найдены пути сохранений`);

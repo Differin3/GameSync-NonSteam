@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
-import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
-import { FaBroom, FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaUndoAlt } from "react-icons/fa";
+import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, Spinner, showModal } from "@decky/ui";
+import { FaBroom, FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaTrash, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
 import { ActionButton, Badge, EmptyState, ErrorState, Hint, Loading, Pager, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
@@ -38,9 +38,11 @@ export function BackupsTab() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
   const [restoring, setRestoring] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
   const [cleaning, setCleaning] = useState<boolean>(false);
   const [maxVersions, setMaxVersions] = useState<number>(10);
   const [providerName, setProviderName] = useState<string>("хранилище");
@@ -89,6 +91,18 @@ export function BackupsTab() {
   }, [games.length, page]);
 
   const selectedGame = games.find((item) => item.game === selected) || games[0] || null;
+
+  // Выбранная версия: по умолчанию последняя, но пользователь может выбрать любую.
+  const selectedEntry =
+    selectedGame?.entries.find((entry) => entry.id === selectedVersionId) ||
+    selectedGame?.entries[0] ||
+    null;
+
+  useEffect(() => {
+    if (!selectedGame) return;
+    const exists = selectedGame.entries.some((entry) => entry.id === selectedVersionId);
+    if (!exists) setSelectedVersionId(selectedGame.entries[0]?.id ?? null);
+  }, [selectedGame?.game, games, selectedVersionId]);
 
   const changeMaxVersions = async (value: number) => {
     setMaxVersions(value);
@@ -140,8 +154,10 @@ export function BackupsTab() {
           <>
             Бэкап от {formatDate(entry.created)} · {formatBytes(entry.size)}.
             <br />
-            Сохранения будут распакованы в папки этой игры и заменят текущие файлы. Перед заменой плагин
-            сохранит их в резервный архив.
+            Папки сохранений будут приведены к состоянию бэкапа: новые файлы сохранений,
+            созданные после него, не удаляются, а перемещаются в локальный резерв
+            (~/.config/gamesync/quarantined). Перед заменой плагин сохранит текущие файлы
+            в резервный архив.
           </>
         }
         strOKButtonText="Восстановить"
@@ -219,13 +235,54 @@ export function BackupsTab() {
     }
   };
 
+  const removeSelected = async (gameName: string, entry: BackupEntry) => {
+    setDeleting(true);
+    setStatus(null);
+    try {
+      const result: any = await call("delete_backup", { game_name: gameName, backup_id: entry.id });
+      if (result?.success) {
+        setStatus({ tone: "success", text: result.message || "Версия удалена" });
+        setSelectedVersionId(null);
+        await load(true);
+      } else {
+        setStatus({ tone: "error", text: result?.error || "Не удалось удалить версию" });
+      }
+    } catch (err: any) {
+      setStatus({ tone: "error", text: err?.message || String(err) });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const askDelete = (gameName: string, entry: BackupEntry) => {
+    let modal: { Close: () => void } | null = null;
+    modal = showModal(
+      <ConfirmModal
+        strTitle={`Удалить версию «${gameName}»?`}
+        strDescription={
+          <>
+            Версия от {formatDate(entry.created)} ({formatBytes(entry.size)}) будет удалена из облака
+            и из истории. Это действие нельзя отменить.
+          </>
+        }
+        strOKButtonText="Удалить"
+        strCancelButtonText="Отмена"
+        bDestructiveWarning
+        onOK={() => {
+          modal?.Close();
+          removeSelected(gameName, entry);
+        }}
+        onCancel={() => modal?.Close()}
+      />
+    );
+  };
+
   if (loading) return <Loading text="Загрузка бэкапов..." />;
   if (error) return <ErrorState text={error} onRetry={load} />;
   if (games.length === 0) return <EmptyState text="В облаке пока нет бэкапов — синхронизируйте игру" />;
 
   const totalBackups = games.reduce((sum, item) => sum + item.entries.length, 0);
   const totalSize = games.reduce((sum, item) => sum + item.entries.reduce((acc, entry) => acc + (entry.size || 0), 0), 0);
-  const latest = selectedGame?.entries[0];
   const pages = Math.max(1, Math.ceil(games.length / PAGE_SIZE));
   const visibleGames = games.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -307,8 +364,15 @@ export function BackupsTab() {
                     <FaCloud style={{ marginRight: "4px" }} />в облаке
                   </Badge>
                 </div>
-                <ActionButton icon={<FaUndoAlt />} onClick={() => last && askRestore(item.game, last)} disabled={!last || restoring}>
-                  Восстановить
+                <ActionButton
+                  icon={<FaUndoAlt />}
+                  onClick={() => {
+                    setSelected(item.game);
+                    setSelectedVersionId(item.entries[0]?.id ?? null);
+                  }}
+                  disabled={item.entries.length === 0}
+                >
+                  Выбрать версию
                 </ActionButton>
               </div>
             );
@@ -316,58 +380,92 @@ export function BackupsTab() {
           <Pager page={page} pages={pages} onChange={setPage} totalLabel={`${games.length} игр`} />
         </div>
 
-        {selectedGame && latest && (
+        {selectedGame && selectedEntry && (
           <aside style={{ ...card, width: "296px", flex: "0 0 296px", display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
             <div style={{ fontSize: "14px", fontWeight: 600, color: colors.text }}>{selectedGame.game}</div>
-            <div style={dimText}>последний бэкап: {formatDate(latest.created)}</div>
+            <div style={dimText}>
+              выбрано: {formatDate(selectedEntry.created)}
+              {selectedEntry.kind === "prerestore" ? " · резервная копия" : ""}
+            </div>
 
             <div style={{ fontSize: "24px", fontWeight: 600, color: colors.text }}>
-              {formatBytes(latest.size)}{" "}
+              {formatBytes(selectedEntry.size)}{" "}
               <span style={{ fontSize: "11px", fontWeight: 400, color: colors.dim }}>· {selectedGame.entries.length} версий</span>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "11px", color: colors.muted }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
                 <span>Путей сохранений</span>
-                <span style={{ color: colors.text }}>{(latest.paths || []).length}</span>
+                <span style={{ color: colors.text }}>{(selectedEntry.paths || []).length}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", minWidth: 0 }}>
                 <span>В облаке</span>
                 <span style={{ color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: "0 1 auto" }}>
-                  {String(latest.remote || "").split("/").slice(-2).join("/")}
+                  {String(selectedEntry.remote || "").split("/").slice(-2).join("/")}
                 </span>
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
-              {selectedGame.entries.slice(0, 6).map((entry) => (
-                <div
-                  key={entry.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "8px",
-                    fontSize: "10.5px",
-                    color: colors.dim,
-                    padding: "3px 0",
-                    borderTop: "1px solid rgba(255,255,255,0.05)",
-                  }}
-                >
-                  <span>{formatDate(entry.created)}</span>
-                  <span>{formatBytes(entry.size)}</span>
-                </div>
-              ))}
+            <div style={{ fontSize: "10.5px", color: colors.dim }}>Выберите версию:</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "190px", overflowY: "auto", paddingRight: "2px" }}>
+              {selectedGame.entries.map((entry) => {
+                const active = entry.id === selectedEntry.id;
+                return (
+                  <div
+                    key={entry.id}
+                    onClick={() => setSelectedVersionId(entry.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "10.5px",
+                      color: active ? colors.text : colors.dim,
+                      padding: "5px 6px",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      border: `1px solid ${active ? "rgba(102,192,244,0.45)" : "transparent"}`,
+                      background: active ? "rgba(102,192,244,0.10)" : "transparent",
+                    }}
+                  >
+                    <span style={{ color: active ? "#66c0f4" : "rgba(255,255,255,0.25)", fontSize: "12px" }}>
+                      {active ? "◉" : "○"}
+                    </span>
+                    <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {formatDate(entry.created)}
+                      {entry.kind === "prerestore" ? " · резерв" : ""}
+                    </span>
+                    <span>{formatBytes(entry.size)}</span>
+                  </div>
+                );
+              })}
             </div>
 
-            <ActionButton icon={<FaUndoAlt />} onClick={() => askRestore(selectedGame.game, latest)} disabled={restoring}>
-              Восстановить из облака
+            <ActionButton
+              icon={restoring ? <Spinner /> : <FaUndoAlt />}
+              onClick={() => askRestore(selectedGame.game, selectedEntry)}
+              disabled={restoring}
+            >
+              {restoring ? "Восстановление…" : "Восстановить выбранную версию"}
             </ActionButton>
-            <ActionButton icon={<FaDownload />} onClick={() => download(selectedGame.game, latest)} disabled={downloading}>
-              {downloading ? "Скачивание…" : "Скачать .tar.gz"}
+            <ActionButton icon={<FaDownload />} onClick={() => download(selectedGame.game, selectedEntry)} disabled={downloading}>
+              {downloading ? "Скачивание…" : "Скачать выбранную"}
+            </ActionButton>
+            <ActionButton
+              icon={deleting ? <Spinner /> : <FaTrash />}
+              onClick={() => askDelete(selectedGame.game, selectedEntry)}
+              disabled={deleting || restoring}
+            >
+              {deleting ? "Удаление…" : "Удалить выбранную версию"}
             </ActionButton>
 
+            {restoring && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: colors.muted }}>
+                <Spinner />
+                <span>Скачиваем бэкап, создаём страховку и распаковываем…</span>
+              </div>
+            )}
             <Hint>Скачивается в {downloadDir}</Hint>
-            <Hint>Восстановление перезапишет локальные сейвы. Текущая версия будет сохранена как резервная.</Hint>
+            <Hint>Восстановление вернёт состояние выбранной версии. Текущие сейвы сохраняются в резервный архив.</Hint>
           </aside>
         )}
       </div>

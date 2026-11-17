@@ -110,6 +110,8 @@ export function Settings() {
           setSettings((prev) => ({
             ...prev,
             autoSync: typeof app.auto_sync === "boolean" ? app.auto_sync : prev.autoSync,
+            pullOnLaunch:
+              typeof app.pull_on_launch === "boolean" ? app.pull_on_launch : prev.pullOnLaunch,
             defaultSavePaths:
               Array.isArray(app.default_save_paths) && app.default_save_paths.length > 0
                 ? app.default_save_paths
@@ -539,11 +541,46 @@ export function Settings() {
 
       <PanelSection>
         <PanelSectionRow>
-          <SectionHeader icon={<FaSyncAlt />} title="Автосинхронизация" />
+          <SectionHeader icon={<FaSyncAlt />} title="Синхронизация с облаком" />
         </PanelSectionRow>
         <PanelSectionRow>
           <ToggleField
-            label="Синхронизировать при выходе из игры"
+            label="Двусторонняя синхронизация"
+            description="Сохранять после выхода и скачивать перед запуском"
+            checked={settings.autoSync && settings.pullOnLaunch}
+            onChange={async (value) => {
+              update({ autoSync: value, pullOnLaunch: value });
+              try {
+                await call("set_pull_on_launch", { enabled: value });
+                await call("enable_auto_sync", { enabled: value });
+              } catch (error) {
+                console.error("Error toggling cloud sync:", error);
+              }
+            }}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <Hint>
+            Режим:{" "}
+            {settings.autoSync && settings.pullOnLaunch
+              ? "двусторонняя"
+              : settings.autoSync
+                ? "только выгрузка"
+                : settings.pullOnLaunch
+                  ? "только загрузка"
+                  : "выключено"}
+          </Hint>
+        </PanelSectionRow>
+        {settings.pullOnLaunch && !settings.autoSync && (
+          <PanelSectionRow>
+            <StatusMessage tone="warning">
+              Включена только загрузка: новые сохранения не будут уходить в облако.
+            </StatusMessage>
+          </PanelSectionRow>
+        )}
+        <PanelSectionRow>
+          <ToggleField
+            label="Сохранять в облако после выхода"
             checked={settings.autoSync}
             onChange={async (value) => {
               update({ autoSync: value });
@@ -556,7 +593,24 @@ export function Settings() {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <Hint>Настройка хранится на бэкенде и восстанавливается после перезапуска Decky.</Hint>
+          <ToggleField
+            label="Загружать из облака перед запуском"
+            checked={settings.pullOnLaunch}
+            onChange={async (value) => {
+              update({ pullOnLaunch: value });
+              try {
+                await call("set_pull_on_launch", { enabled: value });
+              } catch (error) {
+                console.error("Error setting pull-on-launch:", error);
+              }
+            }}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <Hint>
+            Загрузка сработает только если облачный бэкап новее локальных сейвов; перед
+            записью создаётся локальная страховочная копия.
+          </Hint>
         </PanelSectionRow>
       </PanelSection>
 

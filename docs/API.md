@@ -91,12 +91,35 @@ Decky передаёт аргументы позиционно, поэтому `
 { "game_name": "Cyberpunk 2077", "backup_id": "20261114-001000-a1b2c3" }
 ```
 →
-```json
-{ "success": true, "message": "Восстановлено файлов: 1240", "files": 1240, "bytes": 44302336, "skipped": [], "safety_backup": "GameSync/.../prerestore-....tar.gz" }
+{ "success": true, "message": "Восстановлено файлов: 1240, перемещено в резерв: 2", "files": 1240, "bytes": 44302336, "quarantined": 2, "verified": 1240, "quarantine_path": "/home/deck/.config/gamesync/quarantined/Cyberpunk 2077/20261117-224500", "skipped": [], "safety_backup": "GameSync/.../prerestore-....tar.gz" }
 ```
 
 Без `backup_id` берётся последняя версия. Архивы без манифеста (до 0.3.0) не
 восстанавливаются — вернётся ошибка с предложением пересинхронизировать игру.
+При ручном восстановлении, если запущена игра PortProton, вернётся ошибка.
+В режиме pull используются `allow_running`, `upload_safety_cloud=False`
+и `deadline_ts`: запись отменяется, если игра уже работает.
+
+Файлы, которых нет в выбранной версии, переносятся в локальный карантин,
+а не удаляются. Архив проверяется по SHA256 из истории (если он есть),
+а файлы — по хешам манифеста v2 (`verified` / `mismatched`).
+
+### `delete_backup`
+
+```json
+{ "game_name": "Cyberpunk 2077", "backup_id": "20261114-001000-a1b2c3" }
+```
+
+→ `{ "success": true, "message": "Версия удалена из облака" }`
+
+Удаляет выбранную версию из облака и из истории бэкапов. Необратимо.
+
+### `get_sync_state`
+
+→ `{ "success": true, "active": [{ "game": "Cyberpunk 2077", "since": 1763400000.0 }] }`
+
+Какие игры синхронизируются прямо сейчас. Используется строкой на странице игры,
+чтобы показывать спиннер, даже если событие `gamesync_sync_started` потерялось.
 
 ### `get_game_sync_status`
 
@@ -121,9 +144,23 @@ Decky передаёт аргументы позиционно, поэтому `
 
 ### `get_app_settings`
 
-→ `{ "success": true, "auto_sync": false, "max_backup_versions": 10, "download_dir": "/home/deck/Downloads", "default_save_paths": ["..."] }`
+→ `{ "success": true, "auto_sync": false, "pull_on_launch": false, "max_backup_versions": 10, "download_dir": "/home/deck/Downloads", "default_save_paths": ["..."] }`
 
 Состояние, которое живёт на бэкенде и переживает перезапуск.
+
+### `set_pull_on_launch`
+
+```json
+{ "enabled": true }
+```
+
+→ `{ "success": true, "pull_on_launch": true }`
+
+Включает загрузку облачного бэкапа при старте игры. Скачивание выполняется
+только если бэкап новее локальных сейвов (допуск 2 секунды), не чаще раза
+в 10 минут на игру; перед перезаписью создаётся `prerestore`-копия.
+По завершении бэкенд отправляет событие `gamesync_pull_done`
+(`{ game, success, files, error }`).
 
 ### `set_default_save_paths`
 
