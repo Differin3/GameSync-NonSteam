@@ -1,6 +1,7 @@
 import psutil
 import logging
 import asyncio
+import os
 import time
 from typing import Dict, List, Optional, Set
 from pathlib import Path
@@ -8,7 +9,23 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Процессы PortProton
-PORTPROTON_PROCESSES = ["portproton", "wine", "proton"]
+# Важно: обычные Steam-игры тоже запускаются через Proton/Wine, поэтому
+# недостаточно искать «proton»/«wine» — иначе плагин ловит Witcher 3 и
+# другие Steam-игры. Считаем процесс PortProton только если в имени,
+# командной строке или рабочем каталоге есть путь PortProton.
+PORTPROTON_MARKER = "portproton"
+
+
+def is_portproton_process(name: str, cmdline: List[str], cwd: Optional[str] = None) -> bool:
+    """Относится ли процесс именно к PortProton (а не к Proton из Steam)."""
+    name_l = (name or "").strip().lower()
+    if name_l.startswith("gamesync"):
+        # Заголовок процесса Decky: «GameSync PortProton ...» — это не игра.
+        return False
+    path_text = " ".join([*(cmdline or []), cwd or ""]).lower()
+    if name_l in {"portproton", "portproton.exe", "portproton.bin"}:
+        return True
+    return PORTPROTON_MARKER in path_text
 
 # Служебные префиксы, для которых не имеет смысла искать игру
 IGNORED_PREFIXES = {"DEFAULT"}
@@ -21,16 +38,20 @@ def find_portproton_processes() -> List[Dict[str, any]]:
     for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'cwd']):
         try:
             proc_info = proc.info
-            name = proc_info.get('name', '').lower()
-            cmdline = ' '.join(proc_info.get('cmdline') or []).lower()
+            if proc_info.get('pid') == os.getpid():
+                # Decky выставляет заголовок процесса «GameSync PortProton ...»,
+                # он содержит PortProton и иначе попадал бы в выдачу.
+                continue
+            name = proc_info.get('name', '')
+            cmdline_list = proc_info.get('cmdline') or []
+            cwd = proc_info.get('cwd')
 
-            # Проверяем, является ли процесс связанным с PortProton
-            if any(pp_proc in name or pp_proc in cmdline for pp_proc in PORTPROTON_PROCESSES):
+            if is_portproton_process(name, cmdline_list, cwd):
                 processes.append({
                     "pid": proc_info['pid'],
-                    "name": proc_info['name'],
-                    "cmdline": proc_info.get('cmdline') or [],
-                    "cwd": proc_info.get('cwd')
+                    "name": name,
+                    "cmdline": cmdline_list,
+                    "cwd": cwd
                 })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue

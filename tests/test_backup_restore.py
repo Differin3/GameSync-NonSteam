@@ -289,6 +289,63 @@ class AppSettingsTest(unittest.TestCase):
 
 
 class AutoSyncTest(unittest.TestCase):
+    def test_native_steam_proton_game_is_not_portproton(self):
+        witcher = {
+            "name": "wine64-preloader",
+            "cmdline": [
+                "/home/deck/.local/share/Steam/steamapps/common/Proton - Experimental/files/bin/wine64",
+                "/home/deck/.local/share/Steam/steamapps/common/The Witcher 3/bin/x64_dx12/witcher3.exe",
+            ],
+            "cwd": "/home/deck/.local/share/Steam/steamapps/common/The Witcher 3",
+        }
+        self.assertFalse(
+            auto_sync.is_portproton_process(
+                witcher["name"], witcher["cmdline"], witcher["cwd"]
+            )
+        )
+
+    def test_portproton_launcher_is_detected(self):
+        self.assertTrue(
+            auto_sync.is_portproton_process(
+                "bash",
+                ["/home/deck/PortProton/data/scripts/start.sh", "/games/game.exe"],
+                "/home/deck",
+            )
+        )
+        self.assertTrue(
+            auto_sync.is_portproton_process(
+                "wine64-preloader",
+                ["/home/deck/PortProton/data/dist/PROTON/bin/wine", "/games/game.exe"],
+                None,
+            )
+        )
+
+    def test_plugin_own_process_is_not_portproton(self):
+        self.assertFalse(
+            auto_sync.is_portproton_process(
+                "GameSync PortProton",
+                ["/home/deck/homebrew/plugins/gamesync-nonsteam/main.py"],
+                "/home/deck/homebrew/plugins/gamesync-nonsteam",
+            )
+        )
+        # Decky переименовывает процесс и кладёт заголовок в cmdline.
+        self.assertFalse(
+            auto_sync.is_portproton_process(
+                "GameSync PortPr",
+                ["GameSync PortProton (/home/deck/homebrew/plugins/gamesync-nonsteam/main.py)"],
+                None,
+            )
+        )
+
+    def test_portproton_gui_alone_is_not_running_game(self):
+        gui = {
+            "pid": 1,
+            "name": "portproton",
+            "cmdline": ["/home/deck/PortProton/PortProton"],
+            "cwd": "/home/deck/PortProton",
+        }
+        self.assertFalse(auto_sync.has_running_game([gui]))
+
     def test_collect_groups_processes_by_game(self):
         processes = [
             {"pid": 10, "cwd": "/home/deck/PortProton/prefixes/GameA/drive_c"},
