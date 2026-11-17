@@ -1012,6 +1012,13 @@ class PullOnLaunchTest(unittest.TestCase):
         self.assertEqual(pull_engine.pull_deadline(100.0, max_seconds=20), 120.0)
         self.assertIsNone(pull_engine.pull_deadline(None))
 
+    def test_naive_timestamp_is_treated_as_local(self):
+        naive = datetime.now().replace(microsecond=0)
+        parsed = pull_engine.parse_timestamp(naive.isoformat())
+        self.assertIsNotNone(parsed)
+        self.assertIsNotNone(parsed.tzinfo)
+        self.assertAlmostEqual(parsed.timestamp(), naive.timestamp(), delta=2)
+
 
 class GameMonitorStartTest(unittest.TestCase):
     def test_new_game_triggers_start_callback(self):

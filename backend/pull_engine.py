@@ -57,7 +57,10 @@ def parse_timestamp(value) -> Optional[datetime]:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        # В истории бэкапов время хранится локальным (datetime.now()).
+        # Раньше naive-время считалось UTC — облако «уезжало» в будущее
+        # на величину часового пояса, и pull срабатывал всегда.
+        parsed = parsed.astimezone()
     return parsed
 
 
