@@ -1116,6 +1116,10 @@ class Plugin:
                 ok=len(synced),
                 failed=len(failed),
             )
+            Plugin.notify_event(
+                "gamesync_sync_all_done",
+                {"success": True, "total": total, "ok": len(synced), "failed": len(failed)},
+            )
             return {
                 "success": True,
                 "total": total,
@@ -1124,6 +1128,7 @@ class Plugin:
             }
         except Exception as e:
             logger.error(f"Error syncing all games: {e}")
+            Plugin.notify_event("gamesync_sync_all_done", {"success": False, "error": str(e)})
             self._set_sync_progress(active=False, stage="Ошибка", currentGame="")
             return {"success": False, "error": str(e), "synced": [], "failed": []}
 
@@ -1218,7 +1223,13 @@ class Plugin:
                         "paths": [],
                     }
             if not entry or not entry.get("remote"):
+                Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": "Бэкап не найден"})
                 return {"success": False, "error": "Бэкап не найден — сначала синхронизируйте игру"}
+
+            Plugin.notify_event(
+                "gamesync_restore_started",
+                {"game": game_name, "created": entry.get("created") or ""},
+            )
 
             storage_config = load_storage_config()
 
@@ -1226,12 +1237,15 @@ class Plugin:
                 import dependencies
                 dep = await dependencies.ensure_dependencies_async(storage_config.get("provider", "webdav"))
                 if not dep.get("success"):
-                    return {"success": False, "error": "Не удалось установить зависимости: " + ", ".join(dep.get("missing", []))}
+                    error = "Не удалось установить зависимости: " + ", ".join(dep.get("missing", []))
+                    Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
+                    return {"success": False, "error": error}
             except Exception as e:
                 logger.warning(f"Dependency check failed: {e}")
 
             provider, error = _build_provider(storage_config)
             if error:
+                Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
                 return {"success": False, "error": error}
 
             workdir = tempfile.mkdtemp(prefix="gamesync-restore-")
@@ -1241,10 +1255,18 @@ class Plugin:
             try:
                 downloaded = await asyncio.to_thread(provider.download_file, entry["remote"], archive_path)
                 if not downloaded:
+                    Plugin.notify_event(
+                        "gamesync_restore_failed",
+                        {"game": game_name, "error": "Не удалось скачать бэкап"},
+                    )
                     return {"success": False, "error": "Не удалось скачать бэкап из хранилища"}
 
                 manifest = read_manifest(archive_path)
                 if not manifest:
+                    Plugin.notify_event(
+                        "gamesync_restore_failed",
+                        {"game": game_name, "error": "Старый архив без манифеста"},
+                    )
                     return {
                         "success": False,
                         "error": "Бэкап создан старой версией плагина (без манифеста). Синхронизируйте игру заново.",
@@ -1330,6 +1352,7 @@ class Plugin:
                 shutil.rmtree(workdir, ignore_errors=True)
         except Exception as e:
             logger.error(f"Error restoring backup: {e}")
+            Plugin.notify_event("gamesync_restore_failed", {"game": game_name or "игра", "error": str(e)})
             return {"success": False, "error": str(e)}
 
     @decky_params
@@ -1339,20 +1362,27 @@ class Plugin:
             if not game_name:
                 return {"success": False, "error": "Не указан game_name"}
 
+            def _delete_fail(message: str) -> Dict[str, Any]:
+                Plugin.notify_event(
+                    "gamesync_backup_delete_failed",
+                    {"game": game_name or "игра", "error": message},
+                )
+                return {"success": False, "error": message}
+
             from backup_index import get_entry, remove_entry
             from config_manager import load_storage_config
 
             entry = get_entry(game_name, backup_id)
             if not entry or not entry.get("remote"):
-                return {"success": False, "error": "Бэкап не найден"}
+                return _delete_fail("Бэкап не найден")
 
             provider, error = _build_provider(load_storage_config())
             if error or provider is None:
-                return {"success": False, "error": error or "Хранилище не настроено"}
+                return _delete_fail(error or "Хранилище не настроено")
 
             deleted = await asyncio.to_thread(provider.delete_file, entry["remote"])
             if not deleted:
-                return {"success": False, "error": "Не удалось удалить файл из облака"}
+                return _delete_fail("Не удалось удалить файл из облака")
 
             remove_entry(game_name, entry.get("id"))
             try:
@@ -1363,6 +1393,10 @@ class Plugin:
             return {"success": True, "message": "Версия удалена из облака"}
         except Exception as e:
             logger.error(f"Error deleting backup: {e}")
+            Plugin.notify_event(
+                "gamesync_backup_delete_failed",
+                {"game": game_name or "игра", "error": str(e)},
+            )
             return {"success": False, "error": str(e)}
 
     @decky_params

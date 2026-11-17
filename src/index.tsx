@@ -106,6 +106,44 @@ const handleEvent = (event: string, data: any) => {
       });
       break;
     }
+    case "gamesync_restore_started": {
+      const created = data?.created ? new Date(data.created).toLocaleString("ru-RU") : "";
+      notify(`Восстанавливаем: ${data?.game || "игра"}`, {
+        icon: <FaUndoAlt style={{ color: "#66c0f4" }} />,
+        subtext: created ? `Версия от ${created}` : "Скачиваем бэкап из облака",
+      });
+      break;
+    }
+    case "gamesync_restore_failed": {
+      notify(`Не удалось восстановить: ${data?.game || "игра"}`, {
+        icon: <FaExclamationTriangle style={{ color: "#f0a0a0" }} />,
+        subtext: String(data?.error || "").slice(0, 160),
+      });
+      break;
+    }
+    case "gamesync_backup_delete_failed": {
+      notify(`Не удалось удалить версию: ${data?.game || "игра"}`, {
+        icon: <FaExclamationTriangle style={{ color: "#f0a0a0" }} />,
+        subtext: String(data?.error || "").slice(0, 160),
+      });
+      break;
+    }
+    case "gamesync_sync_all_done": {
+      if (data?.success) {
+        const ok = Number(data?.ok || 0);
+        const failed = Number(data?.failed || 0);
+        notify("Синхронизация завершена", {
+          icon: <FaCloudUploadAlt style={{ color: failed ? "#f0c674" : "#5fd88a" }} />,
+          subtext: failed ? `${ok} игр, ${failed} с ошибкой` : `${ok} игр синхронизировано`,
+        });
+      } else {
+        notify("Синхронизация всех игр не удалась", {
+          icon: <FaExclamationTriangle style={{ color: "#f0a0a0" }} />,
+          subtext: String(data?.error || "").slice(0, 160),
+        });
+      }
+      break;
+    }
     default:
       break;
   }

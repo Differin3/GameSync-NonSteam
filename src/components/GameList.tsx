@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { call } from "@decky/api";
+import { call, toaster } from "@decky/api";
 import { ButtonItem, PanelSection, PanelSectionRow, Router, Spinner } from "@decky/ui";
 import { FaFolderOpen, FaGamepad, FaRedo } from "react-icons/fa";
 import { GameInfo, SyncStatus } from "../utils/types";
@@ -71,6 +71,11 @@ export function GameList() {
           message: result.success ? result.message || "Синхронизация завершена" : result.error || "Ошибка синхронизации",
         },
       }));
+      if (result.success) {
+        toaster.toast({ title: "GameSync", body: `Сохранено: ${game.name}`, subtext: "Ручная синхронизация" } as any);
+      } else {
+        toaster.toast({ title: "GameSync", body: `Ошибка синхронизации: ${game.name}`, subtext: String(result.error || "").slice(0, 160) } as any);
+      }
     } catch (err) {
       setSyncStatus((prev) => ({
         ...prev,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { addEventListener, call } from "@decky/api";
+import { addEventListener, call, toaster } from "@decky/api";
 import { Focusable, Router, Spinner } from "@decky/ui";
 import { FaCloud, FaCog, FaSyncAlt } from "react-icons/fa";
 
@@ -186,12 +186,29 @@ export function GameSyncGameRow({ appId, title }: Props) {
     setMessage(null);
     try {
       const response: any = await call("sync_game", { game_name: status.game });
-      if (!response?.success) {
-        setMessage(response?.error || "Не удалось синхронизировать");
+      if (response?.success) {
+        toaster.toast({
+          title: "GameSync",
+          body: `Сохранено: ${status.game}`,
+          subtext: "Ручная синхронизация",
+        } as any);
+      } else {
+        const error = response?.error || "Не удалось синхронизировать";
+        setMessage(error);
+        toaster.toast({
+          title: "GameSync",
+          body: `Ошибка синхронизации: ${status.game}`,
+          subtext: String(error).slice(0, 160),
+        } as any);
       }
       await load();
     } catch (error: any) {
       setMessage(error?.message || String(error));
+      toaster.toast({
+        title: "GameSync",
+        body: `Ошибка синхронизации: ${status.game}`,
+        subtext: String(error?.message || error).slice(0, 160),
+      } as any);
     } finally {
       setBusy(false);
     }
