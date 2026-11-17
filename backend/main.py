@@ -411,10 +411,10 @@ class Plugin:
             else:
                 logger.error(f"Auto-sync failed for {resolved_name}: {result.get('error')}")
 
-        async def start_callback(game_name: str):
+        async def start_callback(game_name: str, started_at: float = None):
             """Перед запуском игры подтянуть облачные сейвы, если они новее."""
             try:
-                await Plugin()._pull_before_launch(game_name)
+                await Plugin()._pull_before_launch(game_name, started_at)
             except Exception as e:
                 logger.warning(f"Pull before launch failed for {game_name}: {e}")
 
