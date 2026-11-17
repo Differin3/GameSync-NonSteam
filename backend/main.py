@@ -227,6 +227,8 @@ class Plugin:
     _pull_attempts: Dict[str, float] = {}
     # Активные синхронизации: имя игры -> время начала (для индикатора в UI).
     _active_syncs: Dict[str, float] = {}
+    # Игры, в которые прямо сейчас пишется restore/pull.
+    _active_restores: set = set()
     # Очередь уведомлений для фронтенда: события могут теряться, поэтому
     # UI забирает их опросом get_notifications.
     _notification_seq: int = 0
@@ -380,6 +382,13 @@ class Plugin:
                 except Exception as emit_error:
                     logger.warning(f"Failed to emit sync-finish event: {emit_error}")
                 return
+            # Не синхронизируем игру, пока в неё ещё пишется restore/pull:
+            # иначе архив уйдёт в облако с недописанными файлами.
+            for _ in range(60):
+                if resolved_name not in Plugin._active_restores:
+                    break
+                await asyncio.sleep(0.5)
+
             plugin_instance = Plugin()
             Plugin._active_syncs[resolved_name] = time.time()
             try:
@@ -1259,6 +1268,13 @@ class Plugin:
             if not game_name:
                 return {"success": False, "error": "Не указан game_name"}
 
+            if game_name in Plugin._active_restores:
+                return {
+                    "success": False,
+                    "error": "Восстановление этой игры уже выполняется",
+                }
+            Plugin._active_restores.add(game_name)
+
             if deadline_ts and time.time() > deadline_ts:
                 logger.info(f"Restore skipped for {game_name}: deadline passed")
                 return {
@@ -1492,6 +1508,8 @@ class Plugin:
             logger.error(f"Error restoring backup: {e}")
             Plugin.notify_event("gamesync_restore_failed", {"game": game_name or "игра", "error": str(e)})
             return {"success": False, "error": str(e)}
+        finally:
+            Plugin._active_restores.discard(game_name or "")
 
     @decky_params
     async def delete_backup(self, game_name: str = None, backup_id: str = None, *args, **kwargs) -> Dict[str, Any]:

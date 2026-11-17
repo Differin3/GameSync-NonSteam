@@ -155,7 +155,7 @@ class GameMonitor:
         while self.running:
             try:
                 await self._poll_once()
-                await asyncio.sleep(5)  # Проверяем каждые 5 секунд
+                await asyncio.sleep(2)  # Проверяем каждые 2 секунды
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
                 await asyncio.sleep(5)
