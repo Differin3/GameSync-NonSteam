@@ -327,6 +327,26 @@ def verify_restored(manifest: Dict[str, Any], targets: Dict[str, Dict[str, Any]]
             verified += 1
     return {"verified": verified, "mismatched": mismatched, "checksum_supported": True}
 
+def rollback_from_safety(
+    archive_path: str,
+    allowed_root: Optional[Path] = None,
+    quarantine_callback=None,
+) -> Dict[str, Any]:
+    """Вернуть сейвы из страховочной копии (например, при битых хешах)."""
+    manifest = read_manifest(archive_path)
+    if not manifest:
+        return {"success": False, "error": "В страховочной копии нет манифеста"}
+    result = restore_archive(
+        archive_path, manifest, allowed_root, False, quarantine_callback
+    )
+    mismatched = result.get("mismatched") or []
+    return {
+        "success": not mismatched,
+        "files": int(result.get("files") or 0),
+        "mismatched": mismatched,
+    }
+
+
 def restore_archive(
     archive_path: str,
     manifest: Dict[str, Any],

@@ -108,6 +108,20 @@ def find_game_hint_from_process(process: Dict) -> Optional[str]:
     return _game_dir_from_exe(hints[-1]) or None
 
 
+def has_running_game(processes: Optional[List[Dict]] = None) -> bool:
+    """Запущена ли именно игра, а не только GUI/лаунчер PortProton.
+
+    Процессы wine/proton есть и у открытого интерфейса PortProton, поэтому
+    дополнительно проверяем, что у процесса есть игровой exe/префикс.
+    """
+    procs = processes if processes is not None else find_portproton_processes()
+    if not procs:
+        return False
+    if collect_running_games(procs):
+        return True
+    return any(find_game_hint_from_process(process) for process in procs)
+
+
 def collect_running_games(processes: List[Dict]) -> Dict[str, Set[int]]:
     """Сгруппировать процессы по игре: имя префикса -> набор PID.
 

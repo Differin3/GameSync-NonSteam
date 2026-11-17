@@ -1181,6 +1181,27 @@ class RestoreQuarantineTest(unittest.TestCase):
         self.assertTrue((self.dest / "screenshot.png").exists())
         self.assertIn("slot2.sav", moved)
 
+    def test_rollback_from_safety_restores_original(self):
+        (self.dest / "slot1.sav").write_text("broken")
+        (self.dest / "extra.sav").write_text("extra")
+        moved = []
+
+        def fake_quarantine(extras):
+            for item in extras:
+                target = Path(self.root) / "q" / item["rel"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(item["source"], target)
+                moved.append(item["rel"])
+            return {"moved": len(moved), "path": str(Path(self.root) / "q")}
+
+        result = restore_engine.rollback_from_safety(
+            self.archive, allowed_root=self.root, quarantine_callback=fake_quarantine
+        )
+        self.assertTrue(result["success"])
+        self.assertEqual((self.dest / "slot1.sav").read_text(), "old")
+        self.assertFalse((self.dest / "extra.sav").exists())
+        self.assertIn("extra.sav", moved)
+
 class IntegrityTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

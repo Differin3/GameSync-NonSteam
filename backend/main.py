@@ -1303,11 +1303,11 @@ class Plugin:
 
             if not allow_running:
                 try:
-                    from auto_sync import find_portproton_processes
+                    from auto_sync import has_running_game
 
-                    running = await asyncio.to_thread(find_portproton_processes)
+                    running = await asyncio.to_thread(has_running_game)
                 except Exception:
-                    running = []
+                    running = False
                 if running:
                     return {
                         "success": False,
@@ -1316,7 +1316,7 @@ class Plugin:
 
             from backup_index import add_entry, get_entry
             from config_manager import load_storage_config, load_synced_games
-            from restore_engine import read_manifest, restore_archive
+            from restore_engine import read_manifest, restore_archive, rollback_from_safety
             from sync_engine import create_backup, sanitize_name
 
             entry = get_entry(game_name, backup_id)
@@ -1361,6 +1361,7 @@ class Plugin:
             archive_path = os.path.join(workdir, "backup.tar.gz")
             safety_remote = None
             safety_local = None
+            safety_temp_path = None
 
             try:
                 downloaded = await asyncio.to_thread(provider.download_file, entry["remote"], archive_path)
@@ -1397,6 +1398,7 @@ class Plugin:
                 if current_paths:
                     safety_path = await asyncio.to_thread(create_backup, game_name, current_paths)
                     if safety_path:
+                        safety_temp_path = safety_path
                         from integrity import sha256_file as _sha256_file
 
                         safety_sha = await asyncio.to_thread(_sha256_file, safety_path)
@@ -1437,12 +1439,6 @@ class Plugin:
                                 )
                             except Exception as e:
                                 logger.warning(f"Failed to upload pre-restore backup: {e}")
-                            finally:
-                                try:
-                                    if safety_path:
-                                        os.remove(safety_path)
-                                except OSError:
-                                    pass
 
                 if deadline_ts and time.time() > deadline_ts:
                     logger.info(f"Restore skipped before extraction for {game_name}: game is running")
@@ -1465,16 +1461,38 @@ class Plugin:
                 verified = int(result.get("verified") or 0)
                 mismatched = result.get("mismatched") or []
                 if mismatched:
+                    rollback_ok = False
+                    rollback_archive = safety_local or safety_temp_path
+                    if rollback_archive and os.path.isfile(rollback_archive):
+                        try:
+                            rollback = await asyncio.to_thread(
+                                rollback_from_safety,
+                                rollback_archive,
+                                None,
+                                _quarantine,
+                            )
+                            rollback_ok = bool(rollback.get("success"))
+                            logger.info(
+                                f"Rollback {game_name}: {rollback.get('files', 0)} files, ok={rollback_ok}"
+                            )
+                        except Exception as rollback_error:
+                            logger.error(f"Rollback failed for {game_name}: {rollback_error}")
                     error = (
-                        f"Проверка целостности не пройдена: {len(mismatched)} файлов "
-                        f"повреждены. Текущие сейвы сохранены в резервную копию."
+                        f"Проверка целостности не пройдена: {len(mismatched)} файлов повреждены. "
+                        + (
+                            "Выполнен автоматический откат из страховочной копии."
+                            if rollback_ok
+                            else "Откат не удался — восстановите страховочную копию вручную."
+                        )
                     )
                     Plugin.notify_event("gamesync_restore_failed", {"game": game_name, "error": error})
                     return {
                         "success": False,
                         "error": error,
                         "mismatched": mismatched[:20],
+                        "rolled_back": rollback_ok,
                         "safety_backup": safety_remote,
+                        "safety_local": safety_local,
                     }
                 try:
                     await asyncio.to_thread(quarantine_prune)
@@ -1522,6 +1540,11 @@ class Plugin:
                 }
             finally:
                 shutil.rmtree(workdir, ignore_errors=True)
+                if safety_temp_path:
+                    try:
+                        os.remove(safety_temp_path)
+                    except OSError:
+                        pass
         except Exception as e:
             logger.error(f"Error restoring backup: {e}")
             Plugin.notify_event("gamesync_restore_failed", {"game": game_name or "игра", "error": str(e)})
