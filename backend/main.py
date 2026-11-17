@@ -225,6 +225,8 @@ class Plugin:
     game_monitor = None
     # Не чаще одного pull на игру за 10 минут (процесс может мигать).
     _pull_attempts: Dict[str, float] = {}
+    # Активные синхронизации: имя игры -> время начала (для индикатора в UI).
+    _active_syncs: Dict[str, float] = {}
 
     # Прогресс синхронизации для QAM: этапы, проценты, текущая игра.
     sync_progress: Dict[str, Any] = {
@@ -364,7 +366,11 @@ class Plugin:
                     logger.warning(f"Failed to emit sync-finish event: {emit_error}")
                 return
             plugin_instance = Plugin()
-            result = await plugin_instance.sync_game(resolved_name, resolved_paths)
+            Plugin._active_syncs[resolved_name] = time.time()
+            try:
+                result = await plugin_instance.sync_game(resolved_name, resolved_paths)
+            finally:
+                Plugin._active_syncs.pop(resolved_name, None)
             try:
                 decky.emit(
                     "gamesync_sync_finished",
@@ -503,6 +509,20 @@ class Plugin:
     async def get_sync_progress(self, *args, **kwargs) -> Dict[str, Any]:
         """Текущий прогресс синхронизации для прогресс-бара в QAM."""
         return dict(Plugin.sync_progress)
+
+    @decky_params
+    async def get_sync_state(self, *args, **kwargs) -> Dict[str, Any]:
+        """Какие игры синхронизируются прямо сейчас (для спиннера в UI)."""
+        now = time.time()
+        # Чистим зависшие записи, чтобы индикатор не горел вечно.
+        for name, started in list(Plugin._active_syncs.items()):
+            if now - started > 600:
+                Plugin._active_syncs.pop(name, None)
+        active = [
+            {"game": name, "since": started}
+            for name, started in Plugin._active_syncs.items()
+        ]
+        return {"success": True, "active": active}
 
     @decky_params
     async def get_storage_status(self, *args, **kwargs) -> Dict[str, Any]:
@@ -1223,15 +1243,30 @@ class Plugin:
                             except OSError:
                                 pass
 
-                result = await asyncio.to_thread(restore_archive, archive_path, manifest)
+                from quarantine import move_files as quarantine_move, prune as quarantine_prune
+
+                def _quarantine(extras):
+                    return quarantine_move(game_name, extras, reason="restore")
+
+                result = await asyncio.to_thread(
+                    restore_archive, archive_path, manifest, None, False, _quarantine
+                )
                 removed = int(result.get("removed") or 0)
+                quarantined = int(result.get("quarantined") or 0)
+                try:
+                    await asyncio.to_thread(quarantine_prune)
+                except Exception as prune_error:
+                    logger.warning(f"Quarantine prune failed: {prune_error}")
+                quarantine_path = result.get("quarantine_path") or ""
                 logger.info(
                     f"Restore {game_name}: {result.get('files', 0)} files, "
-                    f"{result.get('bytes', 0)} bytes, removed {removed}, "
+                    f"{result.get('bytes', 0)} bytes, quarantined {quarantined}, "
                     f"skipped {len(result.get('skipped') or [])}"
                 )
 
                 message = f"Восстановлено файлов: {result['files']}"
+                if quarantined:
+                    message += f", перемещено в резерв: {quarantined}"
                 if removed:
                     message += f", удалено лишних: {removed}"
                 return {
@@ -1240,6 +1275,8 @@ class Plugin:
                     "files": result["files"],
                     "bytes": result["bytes"],
                     "removed": removed,
+                    "quarantined": quarantined,
+                    "quarantine_path": quarantine_path,
                     "skipped": result["skipped"],
                     "safety_backup": safety_remote,
                 }
@@ -1247,6 +1284,35 @@ class Plugin:
                 shutil.rmtree(workdir, ignore_errors=True)
         except Exception as e:
             logger.error(f"Error restoring backup: {e}")
+            return {"success": False, "error": str(e)}
+
+    @decky_params
+    async def delete_backup(self, game_name: str = None, backup_id: str = None, *args, **kwargs) -> Dict[str, Any]:
+        """Удалить выбранную версию бэкапа из облака и истории."""
+        try:
+            if not game_name:
+                return {"success": False, "error": "Не указан game_name"}
+
+            from backup_index import get_entry, remove_entry
+            from config_manager import load_storage_config
+
+            entry = get_entry(game_name, backup_id)
+            if not entry or not entry.get("remote"):
+                return {"success": False, "error": "Бэкап не найден"}
+
+            provider, error = _build_provider(load_storage_config())
+            if error or provider is None:
+                return {"success": False, "error": error or "Хранилище не настроено"}
+
+            deleted = await asyncio.to_thread(provider.delete_file, entry["remote"])
+            if not deleted:
+                return {"success": False, "error": "Не удалось удалить файл из облака"}
+
+            remove_entry(game_name, entry.get("id"))
+            logger.info(f"Deleted backup {entry.get('id')} for {game_name}")
+            return {"success": True, "message": "Версия удалена из облака"}
+        except Exception as e:
+            logger.error(f"Error deleting backup: {e}")
             return {"success": False, "error": str(e)}
 
     @decky_params

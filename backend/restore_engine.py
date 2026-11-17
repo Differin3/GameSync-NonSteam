@@ -244,25 +244,90 @@ def _cleanup_extra_files(
     return removed
 
 
+def collect_extra_files(
+    archive_path: str, manifest: Dict[str, Any], allowed_root: Optional[Path] = None
+) -> List[Dict[str, Any]]:
+    """Файлы в папках игры, которых нет в бэкапе.
+
+    Возвращает список ``{source, root, rel, size}`` для переноса в карантин.
+    Служебные и медиафайлы (логи, картинки, скрипты, архивы) не трогаем.
+    """
+    from sync_engine import SERVICE_EXTENSIONS
+
+    excluded = set(SERVICE_EXTENSIONS) | {
+        ".bmp", ".gif", ".svg", ".webp", ".lua", ".py", ".js", ".ts", ".gd",
+        ".cs", ".swf", ".zip", ".gz", ".7z", ".rar", ".yaml", ".yml", ".toml",
+        ".html", ".css", ".bat", ".sh", ".so", ".dylib", ".vdf", ".ttf", ".otf",
+    }
+    targets = plan_targets(manifest, allowed_root)
+    archive_files = _collect_archive_files(archive_path)
+    extras: List[Dict[str, Any]] = []
+
+    for root, target in targets.items():
+        base: Path = target["path"]
+        if not base.is_dir():
+            continue
+        expected = archive_files.get(root) or set()
+        expected_dirs = {"" if "/" not in rel else rel.rsplit("/", 1)[0] for rel in expected if rel}
+        if not expected_dirs:
+            continue
+
+        for dirpath, _dirnames, filenames in os.walk(base):
+            directory = Path(dirpath)
+            rel_dir = "" if directory == base else directory.relative_to(base).as_posix()
+            if rel_dir not in expected_dirs:
+                continue
+            for filename in filenames:
+                full = directory / filename
+                rel = "" if directory == base else f"{rel_dir}/"
+                rel += filename
+                if rel in expected:
+                    continue
+                suffix = full.suffix.lower()
+                if suffix in excluded:
+                    continue
+                try:
+                    size = full.stat().st_size
+                except OSError:
+                    size = 0
+                extras.append(
+                    {"source": str(full), "root": root, "rel": rel, "size": size}
+                )
+    return extras
+
+
 def restore_archive(
     archive_path: str,
     manifest: Dict[str, Any],
     allowed_root: Optional[Path] = None,
     remove_extra: bool = True,
+    quarantine_callback=None,
 ) -> Dict[str, Any]:
     """Полный цикл: манифест -> целевые пути -> безопасная распаковка.
 
-    При ``remove_extra`` файлы сохранений, которых нет в бэкапе, удаляются —
-    иначе восстановление не откатывает прогресс, а лишь перезаписывает
-    совпадающие имена.
+    ``quarantine_callback`` получает список лишних файлов и переносит их
+    (например, в локальный карантин) до распаковки. Если callback не задан,
+    работает старое поведение с удалением при ``remove_extra``.
     """
     targets = plan_targets(manifest, allowed_root)
     if not targets:
         raise ValueError("В архиве нет путей сохранений внутри домашней папки")
 
+    quarantined = 0
+    quarantine_path = ""
+    if quarantine_callback is not None:
+        try:
+            extras = collect_extra_files(archive_path, manifest, allowed_root)
+            if extras:
+                outcome = quarantine_callback(extras) or {}
+                quarantined = int(outcome.get("moved") or 0)
+                quarantine_path = str(outcome.get("path") or "")
+        except Exception as e:
+            logger.warning(f"Quarantine failed, extras left in place: {e}")
+
     result = safe_extract(archive_path, targets)
     removed: List[str] = []
-    if remove_extra:
+    if remove_extra and quarantine_callback is None:
         try:
             from portproton_scanner import SAVE_EXTENSIONS
             archive_files = _collect_archive_files(archive_path)
@@ -274,4 +339,6 @@ def restore_archive(
 
     result["removed"] = len(removed)
     result["removed_files"] = removed[:MAX_SKIPPED_REPORT]
+    result["quarantined"] = quarantined
+    result["quarantine_path"] = quarantine_path
     return result

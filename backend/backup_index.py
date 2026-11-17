@@ -140,3 +140,22 @@ def clear() -> None:
                 path.unlink()
         except OSError:
             pass
+
+def remove_entry(game_name: str, entry_id: Optional[str] = None) -> bool:
+    """Удалить запись из истории бэкапов. Файл в облаке удаляет вызывающий."""
+    if not game_name:
+        return False
+    data = _load()
+    entries = data.get(game_name) or []
+    if not entries:
+        return False
+    target = entry_id or (entries[0].get("id") if entries else None)
+    kept = [entry for entry in entries if entry.get("id") != target]
+    if len(kept) == len(entries):
+        return False
+    if kept:
+        data[game_name] = kept
+    else:
+        data.pop(game_name, None)
+    _save(data)
+    return True

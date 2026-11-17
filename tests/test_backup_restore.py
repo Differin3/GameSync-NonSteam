@@ -428,6 +428,7 @@ class SteamMatchingTest(unittest.TestCase):
         self.assertIn("Factorio", paths[0])
 import portproton_scanner  # noqa: E402
 import pull_engine  # noqa: E402
+import quarantine  # noqa: E402
 
 
 class SteamAppIdDetectionTest(unittest.TestCase):
@@ -1067,3 +1068,85 @@ class RestoreCleanupTest(unittest.TestCase):
 
         self.assertTrue((self.dest / "slot2.sav").exists())
         self.assertEqual(result["removed"], 0)
+
+class QuarantineTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self._old_config = config_manager.CONFIG_DIR
+        config_manager.CONFIG_DIR = self.root / "config"
+
+    def tearDown(self):
+        config_manager.CONFIG_DIR = self._old_config
+        self._tmp.cleanup()
+
+    def test_move_files_keeps_data(self):
+        source = self.root / "saves" / "slot2.sav"
+        source.parent.mkdir(parents=True)
+        source.write_text("new progress")
+
+        result = quarantine.move_files(
+            "Game", [{"source": str(source), "root": "Game", "rel": "slot2.sav"}]
+        )
+
+        self.assertEqual(result["moved"], 1)
+        self.assertFalse(source.exists())
+        stored = Path(result["path"]) / "Game" / "slot2.sav"
+        self.assertTrue(stored.exists())
+        self.assertEqual(stored.read_text(), "new progress")
+        self.assertTrue((Path(result["path"]) / "meta.json").exists())
+
+    def test_prune_removes_by_size_limit(self):
+        source = self.root / "saves" / "slot.sav"
+        source.parent.mkdir(parents=True)
+        source.write_text("x" * 100)
+        result = quarantine.move_files(
+            "Game", [{"source": str(source), "root": "Game", "rel": "slot.sav"}]
+        )
+        self.assertTrue(Path(result["path"]).exists())
+
+        quarantine.prune(max_bytes=1)
+
+        self.assertFalse(Path(result["path"]).exists())
+
+
+class RestoreQuarantineTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.dest = self.root / "saves"
+        self.dest.mkdir()
+        (self.dest / "slot1.sav").write_text("old")
+        self.archive = sync_engine.create_backup("Game", [str(self.dest)])
+        self.manifest = restore_engine.read_manifest(self.archive)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_extra_save_moved_to_quarantine_callback(self):
+        (self.dest / "slot1.sav").write_text("new")
+        (self.dest / "slot2.sav").write_text("fresh")
+        (self.dest / "screenshot.png").write_text("image")
+        moved = []
+
+        def fake_quarantine(extras):
+            for item in extras:
+                target = Path(self.root) / "q" / item["rel"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(item["source"], target)
+                moved.append(item["rel"])
+            return {"moved": len(moved), "path": str(Path(self.root) / "q")}
+
+        result = restore_engine.restore_archive(
+            self.archive,
+            self.manifest,
+            allowed_root=self.root,
+            remove_extra=False,
+            quarantine_callback=fake_quarantine,
+        )
+
+        self.assertEqual(result["quarantined"], 1)
+        self.assertEqual((self.dest / "slot1.sav").read_text(), "old")
+        self.assertFalse((self.dest / "slot2.sav").exists())
+        self.assertTrue((self.dest / "screenshot.png").exists())
+        self.assertIn("slot2.sav", moved)

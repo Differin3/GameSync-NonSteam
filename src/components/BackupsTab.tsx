@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { call } from "@decky/api";
 import { ConfirmModal, Dropdown, PanelSection, PanelSectionRow, Spinner, showModal } from "@decky/ui";
-import { FaBroom, FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaUndoAlt } from "react-icons/fa";
+import { FaBroom, FaCloud, FaCloudDownloadAlt, FaDownload, FaRedo, FaTrash, FaUndoAlt } from "react-icons/fa";
 import type { BackupEntry, GameBackups } from "../utils/types";
 import { ActionButton, Badge, EmptyState, ErrorState, Hint, Loading, Pager, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
@@ -42,6 +42,7 @@ export function BackupsTab() {
   const [page, setPage] = useState<number>(1);
   const [restoring, setRestoring] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
+  const [deleting, setDeleting] = useState<boolean>(false);
   const [cleaning, setCleaning] = useState<boolean>(false);
   const [maxVersions, setMaxVersions] = useState<number>(10);
   const [providerName, setProviderName] = useState<string>("хранилище");
@@ -154,8 +155,9 @@ export function BackupsTab() {
             Бэкап от {formatDate(entry.created)} · {formatBytes(entry.size)}.
             <br />
             Папки сохранений будут приведены к состоянию бэкапа: новые файлы сохранений,
-            созданные после него, удаляются. Перед заменой плагин сохранит текущие файлы в
-            резервный архив.
+            созданные после него, не удаляются, а перемещаются в локальный резерв
+            (~/.config/gamesync/quarantined). Перед заменой плагин сохранит текущие файлы
+            в резервный архив.
           </>
         }
         strOKButtonText="Восстановить"
@@ -231,6 +233,48 @@ export function BackupsTab() {
     } finally {
       setDownloading(false);
     }
+  };
+
+  const removeSelected = async (gameName: string, entry: BackupEntry) => {
+    setDeleting(true);
+    setStatus(null);
+    try {
+      const result: any = await call("delete_backup", { game_name: gameName, backup_id: entry.id });
+      if (result?.success) {
+        setStatus({ tone: "success", text: result.message || "Версия удалена" });
+        setSelectedVersionId(null);
+        await load(true);
+      } else {
+        setStatus({ tone: "error", text: result?.error || "Не удалось удалить версию" });
+      }
+    } catch (err: any) {
+      setStatus({ tone: "error", text: err?.message || String(err) });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const askDelete = (gameName: string, entry: BackupEntry) => {
+    let modal: { Close: () => void } | null = null;
+    modal = showModal(
+      <ConfirmModal
+        strTitle={`Удалить версию «${gameName}»?`}
+        strDescription={
+          <>
+            Версия от {formatDate(entry.created)} ({formatBytes(entry.size)}) будет удалена из облака
+            и из истории. Это действие нельзя отменить.
+          </>
+        }
+        strOKButtonText="Удалить"
+        strCancelButtonText="Отмена"
+        bDestructiveWarning
+        onOK={() => {
+          modal?.Close();
+          removeSelected(gameName, entry);
+        }}
+        onCancel={() => modal?.Close()}
+      />
+    );
   };
 
   if (loading) return <Loading text="Загрузка бэкапов..." />;
@@ -405,6 +449,13 @@ export function BackupsTab() {
             </ActionButton>
             <ActionButton icon={<FaDownload />} onClick={() => download(selectedGame.game, selectedEntry)} disabled={downloading}>
               {downloading ? "Скачивание…" : "Скачать выбранную"}
+            </ActionButton>
+            <ActionButton
+              icon={deleting ? <Spinner /> : <FaTrash />}
+              onClick={() => askDelete(selectedGame.game, selectedEntry)}
+              disabled={deleting || restoring}
+            >
+              {deleting ? "Удаление…" : "Удалить выбранную версию"}
             </ActionButton>
 
             {restoring && (

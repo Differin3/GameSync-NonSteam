@@ -91,12 +91,30 @@ Decky передаёт аргументы позиционно, поэтому `
 { "game_name": "Cyberpunk 2077", "backup_id": "20261114-001000-a1b2c3" }
 ```
 →
-```json
-{ "success": true, "message": "Восстановлено файлов: 1240", "files": 1240, "bytes": 44302336, "skipped": [], "safety_backup": "GameSync/.../prerestore-....tar.gz" }
+{ "success": true, "message": "Восстановлено файлов: 1240, перемещено в резерв: 2", "files": 1240, "bytes": 44302336, "quarantined": 2, "quarantine_path": "/home/deck/.config/gamesync/quarantined/Cyberpunk 2077/20261117-224500", "skipped": [], "safety_backup": "GameSync/.../prerestore-....tar.gz" }
 ```
 
 Без `backup_id` берётся последняя версия. Архивы без манифеста (до 0.3.0) не
 восстанавливаются — вернётся ошибка с предложением пересинхронизировать игру.
+Файлы, которых нет в выбранной версии, переносятся в локальный карантин,
+а не удаляются.
+
+### `delete_backup`
+
+```json
+{ "game_name": "Cyberpunk 2077", "backup_id": "20261114-001000-a1b2c3" }
+```
+
+→ `{ "success": true, "message": "Версия удалена из облака" }`
+
+Удаляет выбранную версию из облака и из истории бэкапов. Необратимо.
+
+### `get_sync_state`
+
+→ `{ "success": true, "active": [{ "game": "Cyberpunk 2077", "since": 1763400000.0 }] }`
+
+Какие игры синхронизируются прямо сейчас. Используется строкой на странице игры,
+чтобы показывать спиннер, даже если событие `gamesync_sync_started` потерялось.
 
 ### `get_game_sync_status`
 

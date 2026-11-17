@@ -93,6 +93,7 @@ export function GameSyncGameRow({ appId, title }: Props) {
   const [checked, setChecked] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [autoBusy, setAutoBusy] = useState<boolean>(false);
+  const [serverBusy, setServerBusy] = useState<boolean>(false);
   const statusRef = useRef<GameSyncStatus | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -108,6 +109,13 @@ export function GameSyncGameRow({ appId, title }: Props) {
     }
   };
 
+  const matchesGame = (eventGame?: string): boolean => {
+    const current = (statusRef.current?.game || title || "").toLowerCase().trim();
+    const incoming = (eventGame || "").toLowerCase().trim();
+    if (!current || !incoming) return false;
+    return current === incoming || incoming.includes(current) || current.includes(incoming);
+  };
+
   useEffect(() => {
     setChecked(false);
     setStatus(null);
@@ -116,21 +124,14 @@ export function GameSyncGameRow({ appId, title }: Props) {
     // Автосинхронизация после выхода из игры должна отражаться без перезахода.
     const timer = setInterval(load, 60000);
 
-    const matches = (eventGame?: string): boolean => {
-      const current = (statusRef.current?.game || title || "").toLowerCase().trim();
-      const incoming = (eventGame || "").toLowerCase().trim();
-      if (!current || !incoming) return false;
-      return current === incoming || incoming.includes(current) || current.includes(incoming);
-    };
-
     const offStarted = addEventListener("gamesync_sync_started", (data: any) => {
-      if (matches(data?.game)) {
+      if (matchesGame(data?.game)) {
         setAutoBusy(true);
         setMessage(null);
       }
     });
     const offFinished = addEventListener("gamesync_sync_finished", (data: any) => {
-      if (!matches(data?.game)) return;
+      if (!matchesGame(data?.game)) return;
       setAutoBusy(false);
       if (!data?.success && data?.error) setMessage(String(data.error));
       load();
@@ -143,13 +144,37 @@ export function GameSyncGameRow({ appId, title }: Props) {
     };
   }, [appId, title]);
 
+  // Страховка на случай потерянного события: спрашиваем бэкенд, что синхронизируется.
+  useEffect(() => {
+    let mounted = true;
+    let wasActive = false;
+    const check = async () => {
+      try {
+        const response: any = await call("get_sync_state", {});
+        if (!mounted) return;
+        const active = (response?.active || []).some((item: any) => matchesGame(item?.game));
+        setServerBusy(active);
+        if (wasActive && !active) load();
+        wasActive = active;
+      } catch {
+        // Бэкенд может быть занят — просто повторим на следующем тике.
+      }
+    };
+    check();
+    const timer = setInterval(check, 2000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, [appId, title]);
+
   statusRef.current = status;
 
   if (!checked || !status) {
     return null;
   }
 
-  const isSyncing = busy || autoBusy;
+  const isSyncing = busy || autoBusy || serverBusy;
 
   const recent = Boolean(
     status.last_sync && Date.now() - new Date(status.last_sync).getTime() < 24 * 3600 * 1000
