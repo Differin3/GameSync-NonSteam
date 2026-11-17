@@ -259,6 +259,8 @@ export function GameSyncGameRow({ appId, title }: Props) {
         openSettings();
       }}
       style={{
+        position: "relative",
+        zIndex: 1000,
         display: "flex",
         alignItems: "center",
         gap: "10px",
