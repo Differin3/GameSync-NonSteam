@@ -550,7 +550,7 @@ class Plugin:
             from auto_sync import collect_running_games, find_portproton_processes
 
             current = await asyncio.to_thread(
-                lambda: collect_running_games(find_portproton_processes())
+                lambda: collect_running_games(find_portproton_processes() or [])
             )
             return {"success": True, "games": list(current.keys())}
         except Exception as e:

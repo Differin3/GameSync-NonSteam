@@ -29,7 +29,7 @@ def find_portproton_processes() -> List[Dict[str, any]]:
                 processes.append({
                     "pid": proc_info['pid'],
                     "name": proc_info['name'],
-                    "cmdline": proc_info.get('cmdline', []),
+                    "cmdline": proc_info.get('cmdline') or [],
                     "cwd": proc_info.get('cwd')
                 })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -52,7 +52,7 @@ def get_game_name_from_process(process: Dict) -> Optional[str]:
                 return parts[idx + 1]
 
     # Альтернативно, пытаемся определить по cmdline
-    cmdline = process.get('cmdline', [])
+    cmdline = process.get('cmdline') or []
     for arg in cmdline:
         if 'prefixes' in arg:
             parts = Path(arg).parts
@@ -115,7 +115,7 @@ def collect_running_games(processes: List[Dict]) -> Dict[str, Set[int]]:
     должна срабатывать только когда завершился последний из них.
     """
     running: Dict[str, Set[int]] = {}
-    for process in processes:
+    for process in processes or []:
         game_name = get_game_name_from_process(process)
         if game_name and game_name.upper() not in IGNORED_PREFIXES:
             key = game_name
