@@ -514,6 +514,16 @@ class PortProtonRootDiscoveryTest(unittest.TestCase):
             root = home / "Games" / "PP"
             (root / "steam_scripts").mkdir(parents=True)
             self.assertEqual(portproton_scanner._discover_portproton_root(home), root)
+
+    def test_configured_root_has_priority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "CustomPP"
+            (root / "steam_scripts").mkdir(parents=True)
+            portproton_scanner.set_configured_root(str(root))
+            try:
+                self.assertEqual(portproton_scanner.find_portproton_root(), root)
+            finally:
+                portproton_scanner.set_configured_root(None)
 import pull_engine  # noqa: E402
 import quarantine  # noqa: E402
 import integrity  # noqa: E402

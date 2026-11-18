@@ -13,6 +13,7 @@ import { FaCheck, FaCloud, FaCloudUploadAlt, FaDatabase, FaExclamationTriangle, 
 import type { ReactNode } from "react";
 import { Hint, Icon, StatusMessage } from "./ui";
 import type { Tone } from "./ui";
+import { browseDirectory } from "../utils/pathBrowser";
 import { colors, actionRow, card, dimText } from "../utils/theme";
 
 const STORAGE_OPTIONS = [
@@ -54,10 +55,38 @@ export function Settings() {
   const [newPath, setNewPath] = useState<string>("");
   const [validating, setValidating] = useState<boolean>(false);
   const [pathValidationResult, setPathValidationResult] = useState<string | null>(null);
+  const [portprotonRoot, setPortprotonRoot] = useState<string>("");
+  const [portprotonBusy, setPortprotonBusy] = useState<boolean>(false);
+  const [portprotonResult, setPortprotonResult] = useState<{ tone: Tone; text: string } | null>(null);
 
   const update = (patch: Partial<Settings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));
     setDirty(true);
+  };
+
+  const savePortprotonRoot = async () => {
+    setPortprotonBusy(true);
+    setPortprotonResult(null);
+    try {
+      const response: any = await call("set_portproton_root", { path: portprotonRoot });
+      if (response?.success) {
+        if (response.path) setPortprotonRoot(response.path);
+        setPortprotonResult({
+          tone: response.warning ? "warning" : "success",
+          text:
+            response.warning ||
+            (response.auto
+              ? "Путь сброшен — PortProton определяется автоматически"
+              : `Сохранено: ${response.path}`),
+        });
+      } else {
+        setPortprotonResult({ tone: "error", text: response?.error || "Ошибка сохранения пути" });
+      }
+    } catch (error: any) {
+      setPortprotonResult({ tone: "error", text: error?.message || String(error) });
+    } finally {
+      setPortprotonBusy(false);
+    }
   };
 
   const preset = getWebDAVPreset(settings.webdavProvider);
@@ -117,6 +146,7 @@ export function Settings() {
                 ? app.default_save_paths
                 : prev.defaultSavePaths,
           }));
+          setPortprotonRoot(typeof app.portproton_root === "string" ? app.portproton_root : "");
         }
       } catch (error) {
         console.error("Error loading app settings:", error);
@@ -616,13 +646,68 @@ export function Settings() {
 
       <PanelSection>
         <PanelSectionRow>
+          <SectionHeader icon={<FaExclamationTriangle />} title="Опасная настройка: папка PortProton" />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <StatusMessage tone="warning">
+            Меняйте только если PortProton установлен нестандартно (перенесён или
+            переименован). Неверный путь сломает поиск игр и путей сохранений.
+          </StatusMessage>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <TextField
+            label="Путь к PortProton (пусто = автоопределение)"
+            value={portprotonRoot}
+            onChange={(e) => setPortprotonRoot(e.target.value)}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <ButtonItem
+              layout="below"
+              onClick={() => browseDirectory(portprotonRoot, setPortprotonRoot, "Папка PortProton")}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+                <FaFolderOpen />Обзор…
+              </span>
+            </ButtonItem>
+            <ButtonItem layout="below" onClick={savePortprotonRoot} disabled={portprotonBusy}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+                <FaSave />{portprotonBusy ? "Сохранение…" : "Сохранить"}
+              </span>
+            </ButtonItem>
+          </div>
+        </PanelSectionRow>
+        {portprotonResult && (
+          <PanelSectionRow>
+            <StatusMessage tone={portprotonResult.tone}>{portprotonResult.text}</StatusMessage>
+          </PanelSectionRow>
+        )}
+        <PanelSectionRow>
+          <Hint>
+            Автоопределение ищет <code>~/PortProton</code>, <code>~/.PortProton</code>,
+            <code>~/.local/share/PortProton</code> и папки по структуре
+            <code>steam_scripts</code> / <code>data/scripts/start.sh</code>.
+          </Hint>
+        </PanelSectionRow>
+      </PanelSection>
+
+      <PanelSection>
+        <PanelSectionRow>
           <SectionHeader icon={<FaFolderOpen />} title="Глобальные пути сохранений" />
         </PanelSectionRow>
         <PanelSectionRow>
           <Hint>Применяются ко всем играм в дополнение к индивидуальным путям.</Hint>
         </PanelSectionRow>
         <PanelSectionRow>
-          <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+              <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
+            </div>
+            <ButtonItem layout="below" onClick={() => browseDirectory(newPath, setNewPath, "Путь сохранений")}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}><FaFolderOpen />Обзор…</span>
+            </ButtonItem>
+          </div>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={addDefaultPath} disabled={validating || !newPath.trim()}>

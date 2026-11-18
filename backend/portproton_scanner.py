@@ -15,6 +15,16 @@ use_cache = True
 # Найденные корни (ключ — домашний каталог), чтобы не сканировать повторно.
 _ROOT_CACHE: Dict[str, Path] = {}
 
+# Путь, заданный пользователем вручную (опасная настройка).
+_CONFIGURED_ROOT: Optional[Path] = None
+
+
+def set_configured_root(path: Optional[str]) -> None:
+    """Задать/сбросить корень PortProton из настроек плагина."""
+    global _CONFIGURED_ROOT
+    _CONFIGURED_ROOT = Path(path).expanduser() if path else None
+    _ROOT_CACHE.clear()
+
 # Каталоги, которые точно не являются PortProton и могут быть огромными.
 _SKIP_ROOT_DIRS = {
     "steam", "steamapps", "steamrt", "node_modules", "snap", "flatpak",
@@ -138,6 +148,13 @@ def find_portproton_root() -> Optional[Path]:
     """Найти корневую папку PortProton."""
     home = Path.home()
     cache_key = str(home)
+
+    if _CONFIGURED_ROOT:
+        if _CONFIGURED_ROOT.is_dir():
+            _ROOT_CACHE[cache_key] = _CONFIGURED_ROOT
+            return _CONFIGURED_ROOT
+        logger.warning(f"Configured PortProton root does not exist: {_CONFIGURED_ROOT}")
+
     cached = _ROOT_CACHE.get(cache_key)
     if cached and cached.is_dir():
         return cached

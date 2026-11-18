@@ -259,6 +259,13 @@ class Plugin:
         except Exception as e:
             logger.warning(f"Failed to invalidate game cache: {e}")
         logger.info("GameSync NonSteam plugin initialized")
+        try:
+            from config_manager import load_app_settings
+            from portproton_scanner import set_configured_root
+
+            set_configured_root(load_app_settings().get("portproton_root"))
+        except Exception as e:
+            logger.warning(f"Failed to apply PortProton root setting: {e}")
         Plugin.auto_sync_enabled = False
         Plugin.game_monitor = None
 
@@ -652,6 +659,94 @@ class Plugin:
             logger.error(f"Error in get_test: {e}")
             return {"success": False, "error": str(e)}
     
+    @decky_params
+    async def browse_path(self, path: str = None, show_hidden: bool = False, *args, **kwargs) -> Dict[str, Any]:
+        """Список папок для ручного выбора пути (файловый браузер)."""
+        import os
+
+        home = os.path.expanduser("~")
+        target = os.path.abspath(os.path.expanduser(path)) if path else home
+        if not os.path.isdir(target):
+            target = home
+
+        try:
+            entries = list(os.scandir(target))
+        except OSError as e:
+            return {"success": False, "error": f"Не удалось открыть папку: {e}"}
+
+        dirs = []
+        for entry in entries:
+            try:
+                if entry.name.startswith(".") and not show_hidden:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    dirs.append({"name": entry.name, "path": entry.path})
+            except OSError:
+                continue
+        dirs.sort(key=lambda item: item["name"].lower())
+
+        shortcuts = [{"name": "Домашняя папка", "path": home}]
+        seen = {home}
+        for candidate in ("/home", "/run/media", "/mnt", "/media", "/var/mnt"):
+            if candidate in seen or not os.path.isdir(candidate):
+                continue
+            seen.add(candidate)
+            shortcuts.append({"name": candidate, "path": candidate})
+
+        parent = os.path.dirname(target)
+        return {
+            "success": True,
+            "path": target,
+            "parent": parent if parent and parent != target else "",
+            "dirs": dirs[:500],
+            "truncated": len(dirs) > 500,
+            "shortcuts": shortcuts,
+        }
+
+    @decky_params
+    async def set_portproton_root(self, path: str = "", *args, **kwargs) -> Dict[str, Any]:
+        """Опасная настройка: вручную задать корень PortProton."""
+        import os
+        from pathlib import Path
+
+        from config_manager import save_app_settings
+        from portproton_scanner import _looks_like_portproton_root, set_configured_root
+
+        raw = (path or "").strip()
+        if not raw:
+            save_app_settings(portproton_root="")
+            set_configured_root(None)
+            try:
+                from cache_manager import cache_manager
+
+                cache_manager.invalidate("portproton_games")
+            except Exception:
+                pass
+            logger.info("PortProton root reset to auto-detect")
+            return {"success": True, "path": "", "auto": True}
+
+        expanded = os.path.abspath(os.path.expanduser(raw))
+        if not os.path.isdir(expanded):
+            return {"success": False, "error": "Папка не найдена"}
+
+        warning = None
+        if not _looks_like_portproton_root(Path(expanded)):
+            warning = (
+                "Папка не похожа на PortProton (нет steam_scripts или "
+                "data/scripts/start.sh). Убедитесь, что путь верный."
+            )
+
+        save_app_settings(portproton_root=expanded)
+        set_configured_root(expanded)
+        try:
+            from cache_manager import cache_manager
+
+            cache_manager.invalidate("portproton_games")
+        except Exception:
+            pass
+        logger.info(f"PortProton root set manually: {expanded}")
+        return {"success": True, "path": expanded, "warning": warning, "auto": False}
+
     @decky_params
     async def scan_games(self, force_refresh: bool = False, *args, **kwargs) -> Dict[str, Any]:
         """Сканирование игр PortProton"""

@@ -7,6 +7,7 @@ import { GameInfo } from "../utils/types";
 import { loadSettings } from "../utils/Settings";
 import { Badge, EmptyState, ErrorState, Loading, Pager, StatusMessage } from "./ui";
 import { ActionButton } from "./ui";
+import { browseDirectory } from "../utils/pathBrowser";
 import { card, colors, dimText } from "../utils/theme";
 
 const PAGE_SIZE = 5;
@@ -251,6 +252,12 @@ export function GamePathsTab() {
                     return (
                       <div key={pathIndex} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                         <TextField label="Путь" value={editingPathValue} onChange={(e) => setEditingPathValue(e.target.value)} />
+                        <ActionButton
+                          icon={<FaFolderOpen />}
+                          onClick={() => browseDirectory(editingPathValue, setEditingPathValue, "Путь сохранений")}
+                        >
+                          Обзор…
+                        </ActionButton>
                         <div style={{ display: "flex", gap: "8px" }}>
                           <div style={{ flex: 1 }}>
                             <ActionButton
@@ -378,6 +385,12 @@ export function GamePathsTab() {
                 {isEditing && (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "6px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                     <TextField label="Добавить путь" value={newPath} onChange={(e) => setNewPath(e.target.value)} />
+                    <ActionButton
+                      icon={<FaFolderOpen />}
+                      onClick={() => browseDirectory(newPath, setNewPath, "Путь сохранений")}
+                    >
+                      Обзор…
+                    </ActionButton>
                     <ActionButton
                       icon={<FaPlus />}
                       onClick={() => addPathToGame(game)}

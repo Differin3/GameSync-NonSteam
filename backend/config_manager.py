@@ -171,6 +171,7 @@ DEFAULT_APP_SETTINGS: Dict[str, Any] = {
     "pull_on_launch": False,
     "max_backup_versions": 10,
     "default_save_paths": [],
+    "portproton_root": "",
 }
 
 
@@ -206,6 +207,9 @@ def save_app_settings(**kwargs) -> Dict[str, Any]:
     if "default_save_paths" in kwargs:
         paths = kwargs.get("default_save_paths") or []
         data["default_save_paths"] = [p for p in paths if isinstance(p, str) and p.strip()]
+    if "portproton_root" in kwargs:
+        root = kwargs.get("portproton_root") or ""
+        data["portproton_root"] = root.strip() if isinstance(root, str) else ""
     if "max_backup_versions" in kwargs:
         try:
             data["max_backup_versions"] = max(1, min(100, int(kwargs["max_backup_versions"])))
