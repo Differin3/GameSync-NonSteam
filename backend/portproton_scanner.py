@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import configparser
 import time
@@ -10,6 +11,15 @@ logger = logging.getLogger(__name__)
 
 # Использование кэша
 use_cache = True
+
+# Найденные корни (ключ — домашний каталог), чтобы не сканировать повторно.
+_ROOT_CACHE: Dict[str, Path] = {}
+
+# Каталоги, которые точно не являются PortProton и могут быть огромными.
+_SKIP_ROOT_DIRS = {
+    "steam", "steamapps", "steamrt", "node_modules", "snap", "flatpak",
+    "documents", "downloads", "music", "pictures", "videos", "tmp",
+}
 
 # Возможные корни PortProton (по приоритету)
 PORTPROTON_ROOT_CANDIDATES = [
@@ -91,13 +101,66 @@ _EDITION_SUFFIXES = [
 ]
 
 
+def _looks_like_portproton_root(path: Path) -> bool:
+    """Узнаём PortProton по структуре, а не только по имени папки."""
+    try:
+        return (path / "data" / "scripts" / "start.sh").is_file() or (
+            path / "steam_scripts"
+        ).is_dir()
+    except OSError:
+        return False
+
+
+def _discover_portproton_root(home: Path) -> Optional[Path]:
+    """Поиск перенесённой/переименованной папки PortProton (глубина 2)."""
+    try:
+        children = list(home.iterdir())
+    except OSError:
+        return None
+    for child in children:
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        if _looks_like_portproton_root(child):
+            return child
+        if child.name.lower() in _SKIP_ROOT_DIRS:
+            continue
+        try:
+            subs = list(child.iterdir())
+        except OSError:
+            continue
+        for sub in subs:
+            if sub.is_dir() and not sub.name.startswith(".") and _looks_like_portproton_root(sub):
+                return sub
+    return None
+
+
 def find_portproton_root() -> Optional[Path]:
     """Найти корневую папку PortProton."""
     home = Path.home()
+    cache_key = str(home)
+    cached = _ROOT_CACHE.get(cache_key)
+    if cached and cached.is_dir():
+        return cached
+
+    env_root = os.environ.get("PORTPROTON_ROOT", "").strip()
+    if env_root:
+        candidate = Path(env_root).expanduser()
+        if candidate.is_dir():
+            _ROOT_CACHE[cache_key] = candidate
+            return candidate
+
     for rel in PORTPROTON_ROOT_CANDIDATES:
         candidate = home / rel
         if candidate.exists() and candidate.is_dir():
+            _ROOT_CACHE[cache_key] = candidate
             return candidate
+
+    discovered = _discover_portproton_root(home)
+    if discovered:
+        logger.info(f"PortProton root discovered at {discovered}")
+        _ROOT_CACHE[cache_key] = discovered
+        return discovered
+
     logger.warning(f"PortProton root not found under {home}")
     return None
 

@@ -337,6 +337,18 @@ class AutoSyncTest(unittest.TestCase):
             )
         )
 
+    def test_portproton_renamed_folder_is_detected_by_structure(self):
+        self.assertTrue(
+            auto_sync.is_portproton_process(
+                "bash", ["/home/deck/PP/data/scripts/start.sh", "/games/game.exe"], None
+            )
+        )
+        self.assertTrue(
+            auto_sync.is_portproton_process(
+                "wine", ["/home/deck/PP/prefixes/DEFAULT/drive_c/game.exe"], None
+            )
+        )
+
     def test_portproton_gui_alone_is_not_running_game(self):
         gui = {
             "pid": 1,
@@ -485,6 +497,23 @@ class SteamMatchingTest(unittest.TestCase):
         self.assertEqual(len(paths), 1)
         self.assertIn("Factorio", paths[0])
 import portproton_scanner  # noqa: E402
+
+
+class PortProtonRootDiscoveryTest(unittest.TestCase):
+    def test_looks_like_portproton_by_structure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "RenamedPP"
+            (root / "data" / "scripts").mkdir(parents=True)
+            (root / "data" / "scripts" / "start.sh").write_text("#!/bin/sh")
+            (root / "steam_scripts").mkdir()
+            self.assertTrue(portproton_scanner._looks_like_portproton_root(root))
+
+    def test_discovers_renamed_root_nested_in_home(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            root = home / "Games" / "PP"
+            (root / "steam_scripts").mkdir(parents=True)
+            self.assertEqual(portproton_scanner._discover_portproton_root(home), root)
 import pull_engine  # noqa: E402
 import quarantine  # noqa: E402
 import integrity  # noqa: E402

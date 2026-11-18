@@ -25,7 +25,14 @@ def is_portproton_process(name: str, cmdline: List[str], cwd: Optional[str] = No
     path_text = " ".join([*(cmdline or []), cwd or ""]).lower()
     if name_l in {"portproton", "portproton.exe", "portproton.bin"}:
         return True
-    return PORTPROTON_MARKER in path_text
+    if PORTPROTON_MARKER in path_text:
+        return True
+    # Папку PortProton могли переименовать/перенести: узнаём по структуре.
+    if "/data/scripts/start.sh" in path_text or "/steam_scripts/" in path_text:
+        return True
+    if "/prefixes/" in path_text and "/drive_c" in path_text:
+        return True
+    return False
 
 # Служебные префиксы, для которых не имеет смысла искать игру
 IGNORED_PREFIXES = {"DEFAULT"}
